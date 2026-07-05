@@ -312,6 +312,10 @@
         <select id="sortedAreaFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
         <select id="sortedStreamFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
       </div>
+      <div class="field-row" style="margin-top:8px;">
+        <select id="sortedCategoryFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
+        <select id="sortedMaterialFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
+      </div>
       <table class="log" id="reviewSortedTable"></table>
     </div>
   </div>
@@ -803,13 +807,19 @@ function renderPresortContext(){
 function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 let presortReviewFilters = {area: 'All', stream: 'All'};
-let sortedReviewFilters = {area: 'All', stream: 'All'};
+let sortedReviewFilters = {area: 'All', stream: 'All', category: 'All', material: 'All'};
 
 function buildFilterOptions(selectEl, kind){
   if (selectEl.dataset.built === '1') return;
-  selectEl.innerHTML = kind === 'area'
-    ? '<option value="All">All areas</option>' + areas.map(a => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`).join('')
-    : '<option value="All">All streams</option>' + STREAMS.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if (kind === 'area'){
+    selectEl.innerHTML = '<option value="All">All areas</option>' + areas.map(a => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`).join('');
+  } else if (kind === 'stream'){
+    selectEl.innerHTML = '<option value="All">All streams</option>' + STREAMS.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  } else if (kind === 'category'){
+    selectEl.innerHTML = '<option value="All">All categories</option>' + CATEGORY_ORDER.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  } else if (kind === 'material'){
+    selectEl.innerHTML = '<option value="All">All materials</option>' + materials.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('');
+  }
   selectEl.dataset.built = '1';
 }
 
@@ -855,28 +865,43 @@ function renderSortedReview(){
 
   const areaSel = document.getElementById('sortedAreaFilter');
   const streamSel = document.getElementById('sortedStreamFilter');
+  const categorySel = document.getElementById('sortedCategoryFilter');
+  const materialSel = document.getElementById('sortedMaterialFilter');
   buildFilterOptions(areaSel, 'area');
   buildFilterOptions(streamSel, 'stream');
+  buildFilterOptions(categorySel, 'category');
+  buildFilterOptions(materialSel, 'material');
   if (!areaSel.onchange){
     areaSel.onchange = () => { sortedReviewFilters.area = areaSel.value; renderSortedReview(); };
     streamSel.onchange = () => { sortedReviewFilters.stream = streamSel.value; renderSortedReview(); };
+    categorySel.onchange = () => { sortedReviewFilters.category = categorySel.value; renderSortedReview(); };
+    materialSel.onchange = () => { sortedReviewFilters.material = materialSel.value; renderSortedReview(); };
   }
   areaSel.value = sortedReviewFilters.area;
   streamSel.value = sortedReviewFilters.stream;
+  categorySel.value = sortedReviewFilters.category;
+  materialSel.value = sortedReviewFilters.material;
+
+  const categoryOf = (e) => {
+    const mat = materials.find(m => m.id === e.materialId);
+    return mat ? mat.category : '';
+  };
 
   const matchesFilter = e =>
     (sortedReviewFilters.area === 'All' || e.area === sortedReviewFilters.area) &&
-    (sortedReviewFilters.stream === 'All' || e.stream === sortedReviewFilters.stream);
+    (sortedReviewFilters.stream === 'All' || e.stream === sortedReviewFilters.stream) &&
+    (sortedReviewFilters.category === 'All' || categoryOf(e) === sortedReviewFilters.category) &&
+    (sortedReviewFilters.material === 'All' || e.materialName === sortedReviewFilters.material);
 
   const filteredSorted = sortedEntries.filter(matchesFilter);
   const st = document.getElementById('reviewSortedTable');
   if (filteredSorted.length === 0){
     st.innerHTML = '<tr><td class="empty-hint">Nothing matches this filter</td></tr>';
   } else {
-    st.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Material</th><th class="num">Wt</th><th></th></tr>' +
+    st.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Category</th><th>Material</th><th class="num">Wt</th><th></th></tr>' +
       filteredSorted.slice().reverse().map(e => {
         const idx = sortedEntries.indexOf(e);
-        return `<tr><td>${e.area}</td><td>${e.stream}</td>
+        return `<tr><td>${e.area}</td><td>${e.stream}</td><td>${categoryOf(e)}</td>
         <td>${e.materialName}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
         <td class="del-cell"><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></td></tr>`;
