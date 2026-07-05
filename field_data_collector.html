@@ -89,6 +89,14 @@
   }
   .context-bar b{color:var(--brand-dark);}
   table.log{width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;}
+  .summary-table-title{font-size:13px; font-weight:700; color:var(--brand-dark); margin:20px 0 6px;}
+  .summary-table-title:first-child{margin-top:4px;}
+  table.analysis{width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:6px;}
+  table.analysis th{background:var(--brand); color:#fff; text-align:left; padding:6px 8px; font-size:11px; text-transform:uppercase;}
+  table.analysis td{padding:6px 8px; border-bottom:1px solid var(--line);}
+  table.analysis td.num{text-align:right; font-variant-numeric:tabular-nums;}
+  table.analysis tr.total-row td{font-weight:700; border-top:1.5px solid var(--brand); border-bottom:none;}
+  table.analysis tr.cat-row td:first-child{font-weight:600;}
   table.log th{text-align:left; font-size:11px; text-transform:uppercase; color:#6c675a; padding:6px 4px; border-bottom:1.5px solid var(--line);}
   table.log td{padding:8px 4px; border-bottom:1px solid var(--line); vertical-align:top;}
   table.log td.num{text-align:right; font-variant-numeric:tabular-nums;}
@@ -195,6 +203,7 @@
   <button data-tab="info" class="active">Audit Info</button>
   <button data-tab="presort">Pre-Sort Bags</button>
   <button data-tab="sorted">Sorted Weights</button>
+  <button data-tab="summaries">Summaries</button>
   <button data-tab="review">Review and Export</button>
 </nav>
 
@@ -278,6 +287,13 @@
     </div>
 
     <table class="log" id="sortedContextLog"></table>
+  </div>
+
+  <!-- ============ SUMMARIES ============ -->
+  <div class="panel" id="panel-summaries">
+    <div class="section-label">View</div>
+    <div class="chips" id="summaryScopeChips"></div>
+    <div id="summaryContent"></div>
   </div>
 
   <!-- ============ REVIEW AND EXPORT ============ -->
@@ -391,43 +407,55 @@ const DEFAULT_MATERIALS = [
   ['FIB01','Corrugated Cardboard','Fibers','Yes','Cardboard Recycling','Yes'],
   ['FIB02','Soiled Cardboard','Fibers','No','Trash','No'],
   ['FIB03','Waxed Cardboard','Fibers','No','Trash','No'],
-  ['FIB04','Mixed Paper','Fibers','Yes','Mixed Recycling','Yes'],
+  ['FIB04','Mixed Paper','Fibers','Yes','GMPC Recycling','Yes'],
   ['FIB05','Soiled Paper','Fibers','No','Trash','No'],
-  ['FIB06','Beverage Cartons','Fibers','Yes','Mixed Recycling','Yes'],
+  ['FIB06','Beverage Cartons','Fibers','Yes','GMPC Recycling','Yes'],
   ['FIB07','Soiled Beverage Cartons','Fibers','No','Trash','No'],
   ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No','Trash','No'],
-  ['GLA01','Glass Bottles & Jars','Glass','Yes','Mixed Recycling','Yes'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes','GMPC Recycling','Yes'],
   ['GLA02','Soiled Glass','Glass','No','Trash','No'],
-  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes','Mixed Recycling','Yes'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes','GMPC Recycling','Yes'],
   ['MET02','Soiled Metals','Metals','No','Trash','No'],
-  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes','Mixed Recycling','Yes'],
+  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes','GMPC Recycling','Yes'],
   ['PLA02','Soiled Rigid Plastics','Plastics','No','Trash','No'],
   ['PLA03','Film Plastics','Plastics','No','Trash','No'],
   ['PLA04','Foams','Plastics','No','Trash','No'],
   ['ORG01','Food Waste','Organics','Yes','Organics Recycling','Yes'],
-  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','Yes','Organics Recycling','Yes'],
-  ['ORG03','Fiber-based Compostable Serviceware','Organics','Yes','Organics Recycling','Yes'],
-  ['ORG04','PLA Compostable Serviceware','Organics','Yes','Organics Recycling','Yes'],
+  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No','Trash','No'],
+  ['ORG03','Fiber-based Compostable Serviceware','Organics','No','Trash','No'],
+  ['ORG04','PLA Compostable Serviceware','Organics','No','Trash','No'],
   ['UNA01','E/U Waste','Unacceptable','No','Trash','Unacceptable'],
   ['UNA02','Textiles','Unacceptable','No','Trash','Unacceptable'],
   ['UNA03','Other Unacceptable (specify)','Unacceptable','No','Trash','Unacceptable'],
   ['UNA04','Liquids','Unacceptable','No','Trash','Unacceptable'],
-  ['OTH01','Snack Wrappers (Composites)','Other','No','Trash','No'],
+  ['OTH01','Snack Wrappers (Composites)','Other','Yes','Terracycle','No'],
   ['OTH02','Other/Residual Materials','Other','No','Trash','No'],
 ].map(([id,name,category,accepted,target,divertible]) => ({id,name,category,accepted,target,divertible}));
 
 const DEFAULT_AREAS = [
-  {id:'OFFICES', name:'OFFICES', rollup:'Base Building'},
-  {id:'CAFE_BOH', name:'CAFÉ BOH', rollup:'Cafeteria'},
-  {id:'LOC_C', name:'LOCATION C', rollup:'Base Building'},
-  {id:'LOC_D', name:'LOCATION D', rollup:'Base Building'},
-  {id:'BATHROOM', name:'BATHROOM', rollup:'Base Building'},
+  {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building'},
+  {id:'CAFE_BOH', name:'CAFÉ BOH', rollup:'BOH'},
+  {id:'LOC_C', name:'LOCATION C', rollup:'Rest of Building'},
+  {id:'LOC_D', name:'LOCATION D', rollup:'Rest of Building'},
+  {id:'BATHROOM', name:'BATHROOM', rollup:'Rest of Building'},
 ];
 
-const STREAMS = ['Trash','Mixed Recycling','Organics Recycling','Cardboard Recycling','Paper','Terracycle'];
+const STREAMS = ['Trash','GMPC Recycling','Organics Recycling','Cardboard Recycling','Paper Recycling','Terracycle'];
 const ACCEPT_OPTIONS = ['Yes','No'];
 const DIVERTIBLE_OPTIONS = ['Yes','No','Unacceptable'];
 const CATEGORY_ORDER = ['Fibers','Glass','Metals','Plastics','Organics','Unacceptable','Other'];
+
+// Streams sharing a bucket are treated as the same underlying collection program for
+// contamination purposes — e.g. GMPC/Cardboard/Paper Recycling are all "dry recyclables"
+// collected differently (bagged vs. loose) but processed by the same hauler stream, so a
+// recyclable found in any of the three isn't "contamination." Terracycle is a distinct
+// specialty program and Organics/Trash are their own buckets.
+function streamBucket(stream){
+  if (stream === 'Trash') return 'trash';
+  if (stream === 'Organics Recycling') return 'organics';
+  if (stream === 'Terracycle') return 'terracycle';
+  return 'dryrecyclables'; // GMPC Recycling, Cardboard Recycling, Paper Recycling
+}
 
 // Descriptions sourced from Great Forest's "Default Waste Audit Sorting Categories" (Feb 2026)
 const SOILED_INFO = 'Differentiated only when audited from a recycling-type stream. Soiled recyclables found in the trash stream aren\u2019t separated out, since it\u2019s hard to tell whether they were already contaminated when discarded or became soiled from mixing with trash and liquids.';
@@ -916,6 +944,7 @@ function renderAll(){
   renderSortedAddButton(); renderSortedContext();
   renderPresortAreas(); renderPresortStreams(); renderPresortAddButton(); renderPresortContext();
   renderPresortReview(); renderSortedReview();
+  renderSummaryTab();
 }
 
 // ============================================================
@@ -994,6 +1023,181 @@ function switchReviewSubtab(which){
 }
 document.getElementById('subtabPresortBtn').onclick = () => switchReviewSubtab('presort');
 document.getElementById('subtabSortedBtn').onclick = () => switchReviewSubtab('sorted');
+
+// ============================================================
+// Live Summaries tab — computes the exact same tables as the Excel
+// export (Total Waste Generation, Waste Stream Breakdown, Total Waste
+// Consumption, Contamination matrix, Current v Potential Diversion),
+// directly against in-memory state, using the identical rules
+// (extrapolation from sorted sample to full pre-sort weight, same
+// streamBucket() logic) so this view and the exported file can never
+// silently drift apart.
+// ============================================================
+let summaryScope = null; // null = Overall, else an area name
+
+function computeExtrapolatedRows(){
+  const rows = [];
+  areas.forEach(a => {
+    STREAMS.forEach(s => {
+      const sortedTotal = sortedEntries.filter(e => e.area === a.name && e.stream === s).reduce((sum,e) => sum + e.weight, 0);
+      const preSortTotal = s === 'Cardboard Recycling'
+        ? sortedTotal
+        : presortEntries.filter(e => e.area === a.name && e.stream === s).reduce((sum,e) => sum + e.weight, 0);
+      materials.forEach(m => {
+        const sortedWeight = sortedEntries.filter(e => e.area === a.name && e.stream === s && e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
+        const weight = sortedTotal === 0 ? 0 : (sortedWeight / sortedTotal) * preSortTotal;
+        const belongsHere = streamBucket(s) === streamBucket(m.target) ? 1 : 0;
+        const correctlyPlaced = (belongsHere && m.accepted === 'Yes') ? 1 : 0;
+        rows.push({area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
+                   weight, belongsHere, correctlyPlaced, accepted:m.accepted, rollup:a.rollup});
+      });
+    });
+  });
+  return rows;
+}
+function areaTotalPresortLive(areaName){
+  const bagged = presortEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
+  const loose = sortedEntries.filter(e => e.area === areaName && e.stream === 'Cardboard Recycling').reduce((s,e) => s + e.weight, 0);
+  return bagged + loose;
+}
+function areaTotalSortedLive(areaName){
+  return sortedEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
+}
+
+function pct(n){ return (n*100).toFixed(1) + '%'; }
+function lbs(n){ return n.toFixed(2); }
+
+function renderAnalysisTable(title, headers, bodyRowsHtml, extraClass){
+  return `<div class="summary-table-title">${title}</div>
+    <table class="analysis ${extraClass||''}"><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>${bodyRowsHtml}</table>`;
+}
+
+function renderSummaryScopeChips(){
+  const box = document.getElementById('summaryScopeChips');
+  box.innerHTML = '';
+  box.appendChild(chip('Overall', summaryScope === null, () => { summaryScope = null; renderSummaryTab(); }));
+  areas.forEach(a => {
+    box.appendChild(chip(a.name, summaryScope === a.name, () => { summaryScope = a.name; renderSummaryTab(); }));
+  });
+}
+
+function renderSummaryTab(){
+  renderSummaryScopeChips();
+  const container = document.getElementById('summaryContent');
+  const isOverall = summaryScope === null;
+  const fex = computeExtrapolatedRows();
+  const scoped = isOverall ? fex : fex.filter(r => r.area === summaryScope);
+  const unsortedAreas = areas.filter(a => areaTotalPresortLive(a.name) > 0 && areaTotalSortedLive(a.name) === 0);
+  const scopedUnsorted = isOverall ? unsortedAreas : unsortedAreas.filter(a => a.name === summaryScope);
+  const activeAreaNames = isOverall
+    ? areas.filter(a => !unsortedAreas.includes(a)).map(a => a.name)
+    : (scopedUnsorted.length ? [] : [summaryScope]);
+
+  // Direct pre-sort total for one area+stream — always correct regardless of whether that
+  // specific stream was sorted (mirrors presortTotalFormula() in the Excel export exactly).
+  function presortTotalLive(areaName, stream){
+    if (stream === 'Cardboard Recycling'){
+      return sortedEntries.filter(e => e.area === areaName && e.stream === stream).reduce((s,e) => s + e.weight, 0);
+    }
+    return presortEntries.filter(e => e.area === areaName && e.stream === stream).reduce((s,e) => s + e.weight, 0);
+  }
+
+  let html = '';
+
+  // ---- Table 1: Total Waste Generation ----
+  let streamRows = STREAMS.map(s => {
+    const weight = activeAreaNames.reduce((sum,an) => sum + presortTotalLive(an, s), 0);
+    const diverted = scoped.filter(r => r.stream === s && r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
+    return {label: s, weight, diverted};
+  });
+  scopedUnsorted.forEach(a => streamRows.push({label: `${a.name} Waste`, weight: areaTotalPresortLive(a.name), diverted: 0}));
+  const grandTotal = streamRows.reduce((s,r) => s + r.weight, 0);
+  const grandDiverted = streamRows.reduce((s,r) => s + r.diverted, 0);
+  let rowsHtml = streamRows.map(r => `<tr><td>${r.label}</td><td class="num">${lbs(r.weight)}</td>
+    <td class="num">${pct(grandTotal?r.weight/grandTotal:0)}</td><td class="num">${lbs(r.diverted)}</td>
+    <td class="num">${pct(r.weight?r.diverted/r.weight:0)}</td></tr>`).join('');
+  rowsHtml += `<tr class="total-row"><td>Total</td><td class="num">${lbs(grandTotal)}</td><td class="num">100.0%</td>
+    <td class="num">${lbs(grandDiverted)}</td><td class="num">${pct(grandTotal?grandDiverted/grandTotal:0)}</td></tr>`;
+  html += renderAnalysisTable('Total Waste Generation — Day of Audit',
+    ['Waste Stream','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted'], rowsHtml);
+
+  // ---- Table 2: Waste Stream Breakdown by Material ----
+  let prevCat = null;
+  let t2Html = '';
+  const catTotals = {};
+  CATEGORY_ORDER.forEach(cat => {
+    let catWeight = 0;
+    materials.filter(m => m.category === cat).forEach(m => {
+      const matData = scoped.filter(r => r.materialId === m.id);
+      const weight = matData.reduce((sum,r) => sum + r.weight, 0);
+      const diverted = matData.filter(r => r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
+      catWeight += weight;
+      t2Html += `<tr><td>${cat !== prevCat ? cat : ''}</td><td>${m.name}</td><td class="num">${lbs(weight)}</td>
+        <td class="num">${pct(grandTotal?weight/grandTotal:0)}</td><td class="num">${lbs(diverted)}</td>
+        <td class="num">${pct(weight?diverted/weight:0)}</td><td>${m.divertible}</td></tr>`;
+      prevCat = cat;
+    });
+    catTotals[cat] = catWeight;
+  });
+  html += renderAnalysisTable('Waste Stream Breakdown — by Material Type',
+    ['Category','Material','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted','Divertible?'], t2Html);
+
+  // ---- Table 3: Total Waste Consumption (by category) ----
+  const categorySum = Object.values(catTotals).reduce((s,v) => s+v, 0);
+  // Residual, not a manual enumeration — guaranteed to reconcile against Table 1's total
+  // regardless of whether the gap is a whole unsorted area, a single unsorted stream within
+  // an otherwise-sorted area, or anything else not captured by material-level extrapolation.
+  const unsortedResidual = grandTotal - categorySum;
+  let t3Html = CATEGORY_ORDER.map(cat =>
+    `<tr class="cat-row"><td>${cat}</td><td class="num">${lbs(catTotals[cat])}</td><td class="num">${pct(grandTotal?catTotals[cat]/grandTotal:0)}</td></tr>`
+  ).join('');
+  t3Html += `<tr class="cat-row"><td>Unsorted (not broken down by material)</td><td class="num">${lbs(unsortedResidual)}</td><td class="num">${pct(grandTotal?unsortedResidual/grandTotal:0)}</td></tr>`;
+  t3Html += `<tr class="total-row"><td>Total</td><td class="num">${lbs(categorySum + unsortedResidual)}</td><td class="num">${pct(grandTotal?(categorySum+unsortedResidual)/grandTotal:0)}</td></tr>`;
+  html += renderAnalysisTable('Total Waste Consumption', ['Material Type','Weight (lbs.)','% of Total'], t3Html);
+
+  if (isOverall){
+    const rollups = [...new Set(areas.map(a => a.rollup))];
+
+    // ---- Table 4: Waste Stream Contamination matrix ----
+    let t4Html = rollups.map(rg => {
+      const areaNamesInRollup = areas.filter(a => a.rollup === rg && activeAreaNames.includes(a.name)).map(a => a.name);
+      const cells = STREAMS.map(s => {
+        const total = areaNamesInRollup.reduce((sum,an) => sum + presortTotalLive(an, s), 0);
+        const belongs = fex.filter(r => r.rollup === rg && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
+        const contamination = total === 0 ? 0 : 1 - belongs/total;
+        return `<td class="num">${pct(contamination)}</td>`;
+      }).join('');
+      return `<tr><td>${rg}</td>${cells}</tr>`;
+    }).join('');
+    const totalCells = STREAMS.map(s => {
+      const total = activeAreaNames.reduce((sum,an) => sum + presortTotalLive(an, s), 0);
+      const belongs = fex.filter(r => r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
+      const contamination = total === 0 ? 0 : 1 - belongs/total;
+      return `<td class="num">${pct(contamination)}</td>`;
+    }).join('');
+    t4Html += `<tr class="total-row"><td>Total</td>${totalCells}</tr>`;
+    html += renderAnalysisTable('Waste Stream Contamination', ['Generation Area', ...STREAMS], t4Html);
+
+    // ---- Table 5: Current v Potential Diversion by rollup ----
+    let t5Html = '';
+    let allTotal = 0, allDiverted = 0, allPotential = 0;
+    rollups.forEach(rg => {
+      const areaNames = areas.filter(a => a.rollup === rg).map(a => a.name);
+      const total = areaNames.reduce((s,an) => s + areaTotalPresortLive(an), 0);
+      const rgData = fex.filter(r => r.rollup === rg);
+      const diverted = rgData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
+      const potential = rgData.filter(r => r.accepted === 'Yes').reduce((s,r) => s + r.weight, 0);
+      allTotal += total; allDiverted += diverted; allPotential += potential;
+      const curRate = total ? diverted/total : 0, potRate = total ? potential/total : 0;
+      t5Html += `<tr><td>${rg}</td><td class="num">${pct(curRate)}</td><td class="num">${pct(potRate)}</td><td class="num">${pct(potRate-curRate)}</td></tr>`;
+    });
+    const curRateTot = allTotal ? allDiverted/allTotal : 0, potRateTot = allTotal ? allPotential/allTotal : 0;
+    t5Html += `<tr class="total-row"><td>Total</td><td class="num">${pct(curRateTot)}</td><td class="num">${pct(potRateTot)}</td><td class="num">${pct(potRateTot-curRateTot)}</td></tr>`;
+    html += renderAnalysisTable('Current v Potential Diversion', ['Generation Area','Current Diversion Rate','Potential Diversion Rate','Gap'], t5Html);
+  }
+
+  container.innerHTML = html;
+}
 
 // ============================================================
 // Excel export — builds a workbook matching the Fact_SortedWeights /
@@ -1078,20 +1282,24 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, makeSheet(psRows), 'Fact_PreSortWeights');
 
   // ---------------------------------------------------------------
-  // Summary sheets — one "Overall Summary" plus one per configured
-  // area, each with Table 1 (Total Waste Generation) and Table 2
-  // (Waste Stream Breakdown by material, incl. live Currently
-  // Divertible? lookup from Materials Master). Generated dynamically
-  // from whatever areas/materials are configured — nothing hardcoded.
+  // ---------------------------------------------------------------
+  // Fact_Extrapolated — the corrected methodology. Total waste per
+  // area/stream is the FULL pre-sort weight (everything that went on
+  // the scale), not just what got hand-sorted into materials. The
+  // material breakdown is extrapolated: whatever % each material
+  // represented in the sorted SAMPLE is applied to the full pre-sort
+  // weight for that area/stream. (Cardboard Recycling has no separate
+  // bagged pre-sort step — it's weighed loose, so its "pre-sort total"
+  // is just its own sorted total, i.e. 100% sorted by definition.)
   // ---------------------------------------------------------------
   const FSW_STREAM = `Fact_SortedWeights!$B$2:$B$${FS_LAST}`;
   const FSW_AREA = `Fact_SortedWeights!$C$2:$C$${FS_LAST}`;
   const FSW_MATID = `Fact_SortedWeights!$D$2:$D$${FS_LAST}`;
   const FSW_W = `Fact_SortedWeights!$E$2:$E$${FS_LAST}`;
-  const FSW_TARGET = `Fact_SortedWeights!$H$2:$H$${FS_LAST}`;
-  const FSW_ACCEPT = `Fact_SortedWeights!$I$2:$I$${FS_LAST}`;
-  const FSW_CP = `Fact_SortedWeights!$J$2:$J$${FS_LAST}`;
-  const FSW_ROLLUP = `Fact_SortedWeights!$K$2:$K$${FS_LAST}`;
+  const PSW_STREAM = `Fact_PreSortWeights!$B$2:$B$${PS_LAST}`;
+  const PSW_AREA = `Fact_PreSortWeights!$C$2:$C$${PS_LAST}`;
+  const PSW_W = `Fact_PreSortWeights!$E$2:$E$${PS_LAST}`;
+
   const usedSheetNames = new Set();
   function excelSafeSheetName(raw){
     let s = String(raw).replace(/[\\\/\?\*\[\]:]/g, ' ').trim();
@@ -1106,22 +1314,101 @@ function buildWorkbook(){
     usedSheetNames.add(candidate.toLowerCase());
     return candidate;
   }
+  function bucketExpr(streamRef){
+    return `IF(${streamRef}="Trash","trash",IF(${streamRef}="Organics Recycling","organics",IF(${streamRef}="Terracycle","terracycle","dryrecyclables")))`;
+  }
 
-  function buildSummarySheetRows(areaName){
-    const ac = areaName ? `,${FSW_AREA},"${areaName}"` : '';
+  // areas with pre-sort weight but zero sorted-material rows anywhere —
+  // their full weight is reported as its own "{Area} Waste" line rather
+  // than silently folding into (or vanishing from) a normal stream row
+  function areaSortedTotal(areaName){
+    return sortedEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
+  }
+  function areaPresortTotalJS(areaName){
+    const bagged = presortEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
+    const loose = sortedEntries.filter(e => e.area === areaName && e.stream === 'Cardboard Recycling').reduce((s,e) => s + e.weight, 0);
+    return bagged + loose;
+  }
+  const unsortedAreas = areas.filter(a => areaPresortTotalJS(a.name) > 0 && areaSortedTotal(a.name) === 0);
+  function unsortedAreaWeightFormula(areaName){
+    return `SUMIFS(${PSW_W},${PSW_AREA},"${areaName}")+SUMIFS(${FSW_W},${FSW_AREA},"${areaName}",${FSW_STREAM},"Cardboard Recycling")`;
+  }
+  // Direct pre-sort total for one area+stream — always correct regardless of whether that
+  // specific stream was sorted, unlike summing Fact_Extrapolated (which is 0 wherever
+  // sortedTotal=0, even if real pre-sort weight exists for that exact area+stream).
+  function presortTotalFormula(areaName, stream){
+    if (stream === 'Cardboard Recycling') return `SUMIFS(${FSW_W},${FSW_AREA},"${areaName}",${FSW_STREAM},"${stream}")`;
+    return `SUMIFS(${PSW_W},${PSW_AREA},"${areaName}",${PSW_STREAM},"${stream}")`;
+  }
+
+  // ---- Fact_Extrapolated sheet ----
+  const fexRows = [['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','rollup_group','belongs_here']];
+  areas.forEach(a => {
+    STREAMS.forEach(s => {
+      materials.forEach(m => {
+        fexRows.push([a.name, s, m.id, null, null, null, null, null, null, null]);
+      });
+    });
+  });
+  const FEX_LAST = fexRows.length;
+  for (let r = 2; r <= FEX_LAST; r++){
+    const areaRef = `$A${r}`, streamRef = `$B${r}`, matRef = `$C${r}`;
+    fexRows[r-1][3] = {f:`IFERROR(INDEX('Materials Master'!$B$2:$B$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
+    fexRows[r-1][4] = {f:`IFERROR(INDEX('Materials Master'!$C$2:$C$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
+    const sortedTotalExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef})`;
+    const sortedWeightExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef})`;
+    const preSortExpr = `IF(${streamRef}="Cardboard Recycling",${sortedTotalExpr},SUMIFS(${PSW_W},${PSW_AREA},${areaRef},${PSW_STREAM},${streamRef}))`;
+    fexRows[r-1][5] = {f:`IF(${sortedTotalExpr}=0,0,${sortedWeightExpr}/${sortedTotalExpr}*(${preSortExpr}))`};
+    const targetExpr = `INDEX('Materials Master'!$E$2:$E$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
+    const acceptedExpr = `INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
+    // "diverted" — properly recycled/composted elsewhere (bucket match AND accepted). Always 0 for
+    // Trash, since nothing accepted ever targets Trash — that's the point.
+    fexRows[r-1][6] = {f:`IF(AND(${bucketExpr(streamRef)}=${bucketExpr(targetExpr)},${acceptedExpr}="Yes"),1,0)`};
+    fexRows[r-1][7] = {f:acceptedExpr};
+    fexRows[r-1][8] = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$B$2:$B$${AREAS_LAST},0)),"")`};
+    // "belongs_here" — bucket match only, no accepted condition. For Trash, this is true for
+    // materials that are SUPPOSED to be trash (accepted=No), so 1-belongs_here correctly measures
+    // what share of trash is actually divertible material thrown away wrongly — not trivially 100%.
+    fexRows[r-1][9] = {f:`IF(${bucketExpr(streamRef)}=${bucketExpr(targetExpr)},1,0)`};
+  }
+  const fexSheet = makeSheet(fexRows);
+  XLSX.utils.book_append_sheet(wb, fexSheet, 'Fact_Extrapolated');
+
+  const FEX_AREA = `Fact_Extrapolated!$A$2:$A$${FEX_LAST}`;
+  const FEX_STREAM = `Fact_Extrapolated!$B$2:$B$${FEX_LAST}`;
+  const FEX_MATID = `Fact_Extrapolated!$C$2:$C$${FEX_LAST}`;
+  const FEX_CAT = `Fact_Extrapolated!$E$2:$E$${FEX_LAST}`;
+  const FEX_W = `Fact_Extrapolated!$F$2:$F$${FEX_LAST}`;
+  const FEX_CP = `Fact_Extrapolated!$G$2:$G$${FEX_LAST}`;
+  const FEX_ACCEPT = `Fact_Extrapolated!$H$2:$H$${FEX_LAST}`;
+  const FEX_ROLLUP = `Fact_Extrapolated!$I$2:$I$${FEX_LAST}`;
+  const FEX_BELONGS = `Fact_Extrapolated!$J$2:$J$${FEX_LAST}`;
+
+  function buildSummarySheetRows(areaName, isOverall){
+    const ac = areaName ? `,${FEX_AREA},"${areaName}"` : '';
+    const scopedUnsorted = areaName ? unsortedAreas.filter(a => a.name === areaName) : unsortedAreas;
+    const activeAreaNames = areaName
+      ? (scopedUnsorted.length ? [] : [areaName])
+      : areas.filter(a => !unsortedAreas.includes(a)).map(a => a.name);
     const rows = [];
+
+    // ---- Table 1: Total Waste Generation ----
     rows.push(['Total Waste Generation — Day of Audit']);
     rows.push(['Waste Stream','Waste Stream Weight (lbs.)','% of Total Waste Stream',
                 'Weight of Material Diverted (lbs.)','% of Material Diverted']);
     const streamStart = rows.length + 1;
     STREAMS.forEach(s => {
       const rr = rows.length + 1;
+      const weightExpr = activeAreaNames.length
+        ? activeAreaNames.map(an => presortTotalFormula(an, s)).join('+')
+        : '0';
       rows.push([s,
-        {f:`SUMIFS(${FSW_W},${FSW_STREAM},A${rr}${ac})`},
-        null,
-        {f:`SUMIFS(${FSW_W},${FSW_STREAM},A${rr}${ac},${FSW_CP},1)`},
-        null
+        {f:weightExpr}, null,
+        {f:`SUMIFS(${FEX_W},${FEX_STREAM},A${rr}${ac},${FEX_CP},1)`}, null
       ]);
+    });
+    scopedUnsorted.forEach(a => {
+      rows.push([`${a.name} Waste`, {f:unsortedAreaWeightFormula(a.name)}, null, 0, null]);
     });
     const streamEnd = rows.length;
     const totalRow = rows.length + 1;
@@ -1134,21 +1421,24 @@ function buildWorkbook(){
       rows[rr-1][2] = {f:`IF($B$${totalRow}=0,0,B${rr}/$B$${totalRow})`};
     }
 
+    // ---- Table 2: Waste Stream Breakdown by Material ----
     rows.push([]);
     rows.push(['Waste Stream Breakdown — by Material Type']);
     rows.push(['Material Type Category','Material Type','Total Material Type Weight (lbs.)',
                 '% of Total Waste Stream','Weight of Material Diverted (lbs.)',
                 '% of Material Diverted','Currently Divertible?']);
     let prevCat = null;
+    const catRowRanges = {}; // category -> [firstRow, lastRow] within Table 2, for Table 3 reuse
     CATEGORY_ORDER.forEach(cat => {
       materials.filter(m => m.category === cat).forEach(m => {
         const rr = rows.length + 1;
+        if (!catRowRanges[cat]) catRowRanges[cat] = [rr, rr]; else catRowRanges[cat][1] = rr;
         rows.push([
           cat !== prevCat ? cat : null,
           m.name,
-          {f:`SUMIFS(${FSW_W},${FSW_MATID},"${m.id}"${ac})`},
+          {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}"${ac})`},
           {f:`IF($B$${totalRow}=0,0,C${rr}/$B$${totalRow})`},
-          {f:`SUMIFS(${FSW_W},${FSW_MATID},"${m.id}"${ac},${FSW_CP},1)`},
+          {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}"${ac},${FEX_CP},1)`},
           {f:`IF(C${rr}=0,0,E${rr}/C${rr})`},
           {f:`INDEX('Materials Master'!$F$2:$F$${MM_LAST},MATCH(B${rr},'Materials Master'!$B$2:$B$${MM_LAST},0))`}
         ]);
@@ -1156,65 +1446,99 @@ function buildWorkbook(){
       });
     });
 
+    // ---- Table 3: Total Waste Consumption (by category) ----
     rows.push([]);
-    rows.push(['Contamination Rate by Stream']);
-    rows.push(['Stream','Total Weight (lbs.)','Correctly Placed (lbs.)','Contamination Rate']);
-    STREAMS.forEach(s => {
+    rows.push(['Total Waste Consumption']);
+    rows.push(['Material Type','Total Material Type Weight (lbs.)','% of Total Waste Stream']);
+    const cat3Start = rows.length + 1;
+    CATEGORY_ORDER.forEach(cat => {
       const rr = rows.length + 1;
-      rows.push([s,
-        {f:`SUMIFS(${FSW_W},${FSW_STREAM},A${rr}${ac})`},
-        {f:`SUMIFS(${FSW_W},${FSW_STREAM},A${rr}${ac},${FSW_CP},1)`},
-        {f:`IF(B${rr}=0,0,1-C${rr}/B${rr})`}
-      ]);
+      const [r0, r1] = catRowRanges[cat];
+      rows.push([cat, {f:`SUM(C${r0}:C${r1})`}, {f:`IF($B$${totalRow}=0,0,B${rr}/$B$${totalRow})`}]);
     });
+    const cat3CategoryEnd = rows.length;
+    // Residual, not a manual enumeration — guaranteed to reconcile against Table 1's total
+    // regardless of whether the gap is a whole unsorted area, a single unsorted stream within
+    // an otherwise-sorted area, or anything else not captured by material-level extrapolation.
+    const unsortedRow = rows.length + 1;
+    rows.push(['Unsorted (not broken down by material)',
+      {f:`$B$${totalRow}-SUM(B${cat3Start}:B${cat3CategoryEnd})`},
+      {f:`IF($B$${totalRow}=0,0,B${unsortedRow}/$B$${totalRow})`}]);
+    const cat3End = rows.length;
+    const cat3Tot = rows.length + 1;
+    rows.push(['Total', {f:`SUM(B${cat3Start}:B${cat3End})`}, {f:`IF(B${cat3Tot}=0,0,B${cat3Tot}/$B$${totalRow})`}]);
+
+    if (isOverall){
+      const rollups = [...new Set(areas.map(a => a.rollup))];
+
+      // ---- Table 4: Waste Stream Contamination (rollup x stream matrix) ----
+      rows.push([]);
+      rows.push(['Waste Stream Contamination']);
+      rows.push(['Generation Area', ...STREAMS]);
+      const contStart = rows.length + 1;
+      rollups.forEach(rg => {
+        const row = [rg];
+        const areaNamesInRollup = areas.filter(a => a.rollup === rg && activeAreaNames.includes(a.name)).map(a => a.name);
+        STREAMS.forEach(s => {
+          const totalExpr = areaNamesInRollup.length ? areaNamesInRollup.map(an => presortTotalFormula(an, s)).join('+') : '0';
+          row.push({f:`IF((${totalExpr})=0,0,1-SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_STREAM},"${s}",${FEX_BELONGS},1)/(${totalExpr}))`});
+        });
+        rows.push(row);
+      });
+      const contEnd = rows.length;
+      const contTotRow = ['Total'];
+      STREAMS.forEach((s, i) => {
+        const col = String.fromCharCode(66 + i); // B, C, D...
+        const totalExpr = activeAreaNames.length ? activeAreaNames.map(an => presortTotalFormula(an, s)).join('+') : '0';
+        contTotRow.push({f:`IF((${totalExpr})=0,0,1-SUMIFS(${FEX_W},${FEX_STREAM},"${s}",${FEX_BELONGS},1)/(${totalExpr}))`});
+      });
+      rows.push(contTotRow);
+
+      // ---- Table 5: Current vs. Potential Diversion (by rollup group) ----
+      rows.push([]);
+      rows.push(['Current v Potential Diversion']);
+      rows.push(['Generation Area','Current Diversion Rate','Potential Diversion Rate','Current v Potential (Percentage Point) Gap']);
+      const divStart = rows.length + 1;
+      rollups.forEach(rg => {
+        const rr = rows.length + 1;
+        const areaNamesInRollup = areas.filter(a => a.rollup === rg).map(a => a.name);
+        const totalExpr = areaNamesInRollup.map(an =>
+          `SUMIFS(${PSW_W},${PSW_AREA},"${an}")+SUMIFS(${FSW_W},${FSW_AREA},"${an}",${FSW_STREAM},"Cardboard Recycling")`
+        ).join('+');
+        rows.push([rg,
+          {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_CP},1)/(${totalExpr}))`},
+          {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_ACCEPT},"Yes")/(${totalExpr}))`},
+          {f:`C${rr}-B${rr}`}
+        ]);
+      });
+      const divEnd = rows.length;
+      const divTot = rows.length + 1;
+      const allAreaTotalExpr = areas.map(a =>
+        `SUMIFS(${PSW_W},${PSW_AREA},"${a.name}")+SUMIFS(${FSW_W},${FSW_AREA},"${a.name}",${FSW_STREAM},"Cardboard Recycling")`
+      ).join('+');
+      rows.push(['Total',
+        {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_CP},1)/(${allAreaTotalExpr}))`},
+        {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ACCEPT},"Yes")/(${allAreaTotalExpr}))`},
+        {f:`C${divTot}-B${divTot}`}
+      ]);
+      // fix sign convention on the per-rollup rows to match: gap = potential - current (positive)
+    }
 
     return rows;
   }
 
-  function buildRollupDiversionRows(startRow){
-    const rows = [];
-    const R = (i) => startRow + i; // absolute sheet row for local row index i (0-based)
-    rows.push(['Current vs. Potential Diversion Rate by Area Group']);
-    rows.push(['Rollup Group','Total Weight (lbs.)','Diverted (lbs.)','Current Diversion Rate',
-                'Potential Divertible (lbs.)','Potential Diversion Rate']);
-    const rollups = [...new Set(areas.map(a => a.rollup))];
-    const rgStartLocal = rows.length; // 0-based index of first data row
-    rollups.forEach((rg, i) => {
-      const rr = R(rgStartLocal + i);
-      rows.push([rg,
-        {f:`SUMIF(${FSW_ROLLUP},A${rr},${FSW_W})`},
-        {f:`SUMIFS(${FSW_W},${FSW_ROLLUP},A${rr},${FSW_CP},1)`},
-        {f:`IF(B${rr}=0,0,C${rr}/B${rr})`},
-        {f:`SUMIFS(${FSW_W},${FSW_ROLLUP},A${rr},${FSW_ACCEPT},"Yes",${FSW_TARGET},"<>Trash")`},
-        {f:`IF(B${rr}=0,0,E${rr}/B${rr})`}
-      ]);
-    });
-    const rgEndLocal = rows.length - 1;
-    const totLocal = rows.length;
-    const rgStartAbs = R(rgStartLocal), rgEndAbs = R(rgEndLocal), totAbs = R(totLocal);
-    rows.push(['Total',
-      {f:`SUM(B${rgStartAbs}:B${rgEndAbs})`},
-      {f:`SUM(C${rgStartAbs}:C${rgEndAbs})`},
-      {f:`IF(B${totAbs}=0,0,C${totAbs}/B${totAbs})`},
-      {f:`SUM(E${rgStartAbs}:E${rgEndAbs})`},
-      {f:`IF(B${totAbs}=0,0,E${totAbs}/B${totAbs})`}
-    ]);
-    return rows;
-  }
-
-  const overallRows = buildSummarySheetRows(null);
-  overallRows.push([]);
-  buildRollupDiversionRows(overallRows.length + 1).forEach(r => overallRows.push(r));
-  XLSX.utils.book_append_sheet(wb, makeSheet(overallRows), excelSafeSheetName('Overall Summary'));
+  XLSX.utils.book_append_sheet(wb, makeSheet(buildSummarySheetRows(null, true)), excelSafeSheetName('Overall Summary'));
   areas.forEach(a => {
-    XLSX.utils.book_append_sheet(wb, makeSheet(buildSummarySheetRows(a.name)), excelSafeSheetName(`${a.name} Summary`));
+    XLSX.utils.book_append_sheet(wb, makeSheet(buildSummarySheetRows(a.name, false)), excelSafeSheetName(`${a.name} Summary`));
   });
 
   // Notes & Assumptions
   const notesRows = [
     ['Notes & Assumptions'], [],
-    ['All figures are computed directly from sorted material weights (Fact_SortedWeights) using the material categorization and program rules defined in Materials Master — there are no hand-entered totals anywhere in this workbook.'], [],
-    ['Any area with pre-sort bag weights but no sorted-material rows yet will show $0 in these tables until sorting is recorded — see QA_Reconciliation for the full pre-sort vs. sorted check by area and stream.'], [],
+    ['Total Waste Generation reflects the full pre-sort weight for each stream — everything that went on the scale — not just the portion that was hand-sorted into materials. The material breakdown is extrapolated: whatever percentage each material represented in the sorted sample is applied to the full pre-sort weight for that area/stream.'], [],
+    ['Cardboard Recycling is weighed loose rather than bagged, so its "pre-sort total" is the same as its sorted total (100% sorted by definition, no extrapolation needed).'], [],
+    ['GMPC Recycling, Cardboard Recycling, and Paper Recycling are treated as the same underlying dry-recyclables program for contamination purposes (collected differently — bagged vs. loose — but processed together) — a recyclable found in any of the three is not counted as contamination. Terracycle is a separate specialty program with its own accepted materials.'], [],
+    ['Any area with pre-sort weight but zero sorted-material rows (nothing was hand-sorted there) is reported as its own "[Area] Waste" line rather than folded into a stream it was never actually sorted into.'], [],
     ['"Currently Divertible?" is pulled live from the Materials Master tab for this site\u2019s specific recycling program, so it stays consistent across every summary sheet automatically.'],
   ];
   XLSX.utils.book_append_sheet(wb, makeSheet(notesRows), 'Notes & Assumptions');
@@ -1222,9 +1546,6 @@ function buildWorkbook(){
   // QA_Reconciliation
   const qaRows = [['QA — Pre-sort bag weights vs. sorted material weights'], [],
     ['area','stream','presort_total_lbs','sorted_total_lbs','variance_lbs','variance_pct','flag']];
-  const PSW_W = `Fact_PreSortWeights!$E$2:$E$${PS_LAST}`;
-  const PSW_STREAM = `Fact_PreSortWeights!$B$2:$B$${PS_LAST}`;
-  const PSW_AREA = `Fact_PreSortWeights!$C$2:$C$${PS_LAST}`;
   areas.forEach(a => {
     STREAMS.forEach(s => {
       const rr = qaRows.length + 1;
