@@ -102,6 +102,7 @@
   table.log td.num{text-align:right; font-variant-numeric:tabular-nums;}
   table.log .entry-note{display:block; font-size:11.5px; color:#8a8578; font-style:italic; margin-top:2px;}
   .del-btn{background:none; border:none; color:var(--danger); font-size:16px; cursor:pointer; padding:4px 8px;}
+  .edit-btn{background:none; border:1px solid var(--brand); color:var(--brand-dark); font-size:12px; font-weight:600; cursor:pointer; padding:3px 9px; border-radius:6px;}
   td.del-cell{text-align:right; width:1%; white-space:nowrap;}
   .summary-box{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px;}
   .summary-box h3{margin:0 0 6px; font-size:14px;}
@@ -144,6 +145,17 @@
   }
   .mm-label{font-size:10px; color:#8a8578; display:block; margin-bottom:2px;}
   .mm-field{flex:1 1 100px; min-width:90px;}
+  .mm-targets{flex:1 1 220px; min-width:180px;}
+  .mm-target-chips{display:flex; flex-wrap:wrap; gap:4px;}
+  .mm-target-chip{
+    font-size:11px; padding:4px 8px; border-radius:12px; border:1.5px solid var(--line); background:#fff;
+    color:#6c675a; cursor:pointer; user-select:none;
+  }
+  .mm-target-chip.selected{background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600;}
+  .mm-badge{font-size:11px; padding:4px 8px; border-radius:12px; font-weight:600; white-space:nowrap;}
+  .mm-badge.yes{background:var(--brand-light); color:var(--brand-dark);}
+  .mm-badge.no{background:#f0ece2; color:#8a8578;}
+  .mm-del-btn{background:none; border:none; color:var(--danger); font-size:16px; cursor:pointer; padding:2px 6px;}
   .area-row{display:flex; align-items:flex-end; gap:8px; padding:8px 4px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
   .area-field{flex:1 1 140px; min-width:110px;}
   .area-field input{width:100%; padding:8px 10px; border-radius:6px; border:1.5px solid var(--line); font-size:13px;}
@@ -247,6 +259,7 @@
     </div>
     <div class="field-row">
       <button class="btn btn-primary" id="addPresortBtn" disabled style="flex:1;">Add Bag</button>
+      <button class="btn" id="cancelPresortEditBtn" style="display:none;">Cancel</button>
     </div>
 
     <div class="context-bar">
@@ -279,6 +292,7 @@
     </div>
     <div class="field-row">
       <button class="btn btn-primary" id="addSortedBtn" disabled style="flex:1;">Add Entry</button>
+      <button class="btn" id="cancelSortedEditBtn" style="display:none;">Cancel</button>
     </div>
 
     <div class="context-bar">
@@ -404,33 +418,40 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 // (Materials are editable at runtime via the Audit Info tab; these are just the starting defaults)
 // ============================================================
 const DEFAULT_MATERIALS = [
-  ['FIB01','Corrugated Cardboard','Fibers','Yes','Cardboard Recycling','Yes'],
-  ['FIB02','Soiled Cardboard','Fibers','No','Trash','No'],
-  ['FIB03','Waxed Cardboard','Fibers','No','Trash','No'],
-  ['FIB04','Mixed Paper','Fibers','Yes','GMPC Recycling','Yes'],
-  ['FIB05','Soiled Paper','Fibers','No','Trash','No'],
-  ['FIB06','Beverage Cartons','Fibers','Yes','GMPC Recycling','Yes'],
-  ['FIB07','Soiled Beverage Cartons','Fibers','No','Trash','No'],
-  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No','Trash','No'],
-  ['GLA01','Glass Bottles & Jars','Glass','Yes','GMPC Recycling','Yes'],
-  ['GLA02','Soiled Glass','Glass','No','Trash','No'],
-  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes','GMPC Recycling','Yes'],
-  ['MET02','Soiled Metals','Metals','No','Trash','No'],
-  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes','GMPC Recycling','Yes'],
-  ['PLA02','Soiled Rigid Plastics','Plastics','No','Trash','No'],
-  ['PLA03','Film Plastics','Plastics','No','Trash','No'],
-  ['PLA04','Foams','Plastics','No','Trash','No'],
-  ['ORG01','Food Waste','Organics','Yes','Organics Recycling','Yes'],
-  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No','Trash','No'],
-  ['ORG03','Fiber-based Compostable Serviceware','Organics','No','Trash','No'],
-  ['ORG04','PLA Compostable Serviceware','Organics','No','Trash','No'],
-  ['UNA01','E/U Waste','Unacceptable','No','Trash','Unacceptable'],
-  ['UNA02','Textiles','Unacceptable','No','Trash','Unacceptable'],
-  ['UNA03','Other Unacceptable (specify)','Unacceptable','No','Trash','Unacceptable'],
-  ['UNA04','Liquids','Unacceptable','No','Trash','Unacceptable'],
-  ['OTH01','Snack Wrappers (Composites)','Other','Yes','Terracycle','No'],
-  ['OTH02','Other/Residual Materials','Other','No','Trash','No'],
-].map(([id,name,category,accepted,target,divertible]) => ({id,name,category,accepted,target,divertible}));
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling','GMPC Recycling','Paper Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
+  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
+  ['FIB06','Beverage Cartons','Fibers','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
+  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
+  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
+  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
+  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
+  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
+  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
+  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
+  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
+  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
+  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['OTH01','Snack Wrappers (Composites)','Other','Yes',['Terracycle'],'No'],
+  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
+].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
+
+// "Accepted in program" is its own independently-editable field — a material's target
+// stream(s) say where it's *supposed* to go, but acceptance is a separate real-world fact
+// (e.g. a hauler may not actually take something even though a stream exists for it).
+function materialAccepted(m){ return m.accepted; }
+function materialBelongsIn(m, stream){ return m.targets.includes(stream); }
+function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && stream !== 'Trash'; }
 
 const DEFAULT_AREAS = [
   {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building'},
@@ -444,18 +465,6 @@ const STREAMS = ['Trash','GMPC Recycling','Organics Recycling','Cardboard Recycl
 const ACCEPT_OPTIONS = ['Yes','No'];
 const DIVERTIBLE_OPTIONS = ['Yes','No','Unacceptable'];
 const CATEGORY_ORDER = ['Fibers','Glass','Metals','Plastics','Organics','Unacceptable','Other'];
-
-// Streams sharing a bucket are treated as the same underlying collection program for
-// contamination purposes — e.g. GMPC/Cardboard/Paper Recycling are all "dry recyclables"
-// collected differently (bagged vs. loose) but processed by the same hauler stream, so a
-// recyclable found in any of the three isn't "contamination." Terracycle is a distinct
-// specialty program and Organics/Trash are their own buckets.
-function streamBucket(stream){
-  if (stream === 'Trash') return 'trash';
-  if (stream === 'Organics Recycling') return 'organics';
-  if (stream === 'Terracycle') return 'terracycle';
-  return 'dryrecyclables'; // GMPC Recycling, Cardboard Recycling, Paper Recycling
-}
 
 // Descriptions sourced from Great Forest's "Default Waste Audit Sorting Categories" (Feb 2026)
 const SOILED_INFO = 'Differentiated only when audited from a recycling-type stream. Soiled recyclables found in the trash stream aren\u2019t separated out, since it\u2019s hard to tell whether they were already contaminated when discarded or became soiled from mixing with trash and liquids.';
@@ -518,6 +527,8 @@ let presortEntries = [];  // {area, stream, weight, note, ts}
 
 let sortedSel = {area:null, stream:null, category:null, materialId:null};
 let presortSel = {area:null, stream:null};
+let editingSortedTs = null;
+let editingPresortTs = null;
 
 function materialsForStream(stream){
   if (NO_SOILED_STREAMS.has(stream)) return materials.filter(m => !SOILED_IDS.has(m.id));
@@ -598,6 +609,39 @@ function renderAuditInfoForm(){
 }
 let mmOpen = false;
 let mmInfoOpenSet = new Set();
+let mmAddOpen = false;
+let mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No'};
+
+function makeTargetChips(m){
+  const wrap = document.createElement('div');
+  wrap.className = 'mm-targets';
+  const lab = document.createElement('span');
+  lab.className = 'mm-label';
+  lab.textContent = 'Target stream(s) — where this material is correctly diverted';
+  const chipRow = document.createElement('div');
+  chipRow.className = 'mm-target-chips';
+  STREAMS.forEach(s => {
+    const c = document.createElement('div');
+    c.className = 'mm-target-chip' + (m.targets.includes(s) ? ' selected' : '');
+    c.textContent = s;
+    c.onclick = () => {
+      if (m.targets.includes(s)){
+        // a material always needs at least one target — falling back to Trash rather
+        // than leaving it with none, which would make it uncategorizable in every report
+        m.targets = m.targets.filter(t => t !== s);
+        if (m.targets.length === 0) m.targets = ['Trash'];
+      } else {
+        m.targets = m.targets.filter(t => t !== 'Trash').concat([s]);
+      }
+      saveMaterials();
+      renderMaterialsMasterForm();
+    };
+    chipRow.appendChild(c);
+  });
+  wrap.appendChild(lab); wrap.appendChild(chipRow);
+  return wrap;
+}
+
 function renderMaterialsMasterForm(){
   document.getElementById('mmMainChevron').classList.toggle('open', mmOpen);
   const box = document.getElementById('materialsMasterForm');
@@ -638,8 +682,21 @@ function renderMaterialsMasterForm(){
       row.appendChild(name);
 
       row.appendChild(makeSelectField('Accepted', ACCEPT_OPTIONS, m.accepted, v => { m.accepted = v; saveMaterials(); }));
-      row.appendChild(makeSelectField('Target stream', STREAMS, m.target, v => { m.target = v; saveMaterials(); }));
+      row.appendChild(makeTargetChips(m));
       row.appendChild(makeSelectField('Divertible', DIVERTIBLE_OPTIONS, m.divertible, v => { m.divertible = v; saveMaterials(); }));
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'mm-del-btn';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Remove ' + m.name;
+      delBtn.onclick = () => {
+        materials = materials.filter(x => x.id !== m.id);
+        saveMaterials();
+        renderAll();
+        showToast('Removed ' + m.name);
+      };
+      row.appendChild(delBtn);
 
       box.appendChild(row);
 
@@ -651,6 +708,93 @@ function renderMaterialsMasterForm(){
       }
     });
   });
+
+  // ---- Add new material ----
+  const addWrap = document.createElement('div');
+  addWrap.style.marginTop = '16px';
+  const addToggle = document.createElement('button');
+  addToggle.type = 'button';
+  addToggle.className = 'btn';
+  addToggle.textContent = mmAddOpen ? '– Cancel' : '+ Add a new material type';
+  addToggle.onclick = () => {
+    mmAddOpen = !mmAddOpen;
+    if (mmAddOpen) mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No'};
+    renderMaterialsMasterForm();
+  };
+  addWrap.appendChild(addToggle);
+  box.appendChild(addWrap);
+
+  if (mmAddOpen){
+    const form = document.createElement('div');
+    form.className = 'mm-row';
+    form.style.background = 'var(--brand-light)';
+    form.style.borderRadius = '8px';
+    form.style.marginTop = '8px';
+
+    const nameWrap = document.createElement('div');
+    nameWrap.className = 'mm-field';
+    nameWrap.style.flex = '1 1 200px';
+    const nameLab = document.createElement('span');
+    nameLab.className = 'mm-label';
+    nameLab.textContent = 'Material name';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = mmNewMaterial.name;
+    nameInput.placeholder = 'e.g. Paper Towels';
+    nameInput.style.cssText = 'width:100%; padding:6px 8px; border-radius:6px; border:1.5px solid var(--line); font-size:13px;';
+    nameInput.addEventListener('input', () => { mmNewMaterial.name = nameInput.value; });
+    nameWrap.appendChild(nameLab); nameWrap.appendChild(nameInput);
+    form.appendChild(nameWrap);
+
+    form.appendChild(makeSelectField('Category', CATEGORY_ORDER, mmNewMaterial.category, v => { mmNewMaterial.category = v; }));
+    form.appendChild(makeSelectField('Accepted', ACCEPT_OPTIONS, mmNewMaterial.accepted, v => { mmNewMaterial.accepted = v; }));
+
+    const dummyForTargets = {targets: mmNewMaterial.targets};
+    const targetChips = document.createElement('div');
+    targetChips.className = 'mm-targets';
+    const targetLab = document.createElement('span');
+    targetLab.className = 'mm-label';
+    targetLab.textContent = 'Target stream(s)';
+    const targetRow = document.createElement('div');
+    targetRow.className = 'mm-target-chips';
+    STREAMS.forEach(s => {
+      const c = document.createElement('div');
+      c.className = 'mm-target-chip' + (mmNewMaterial.targets.includes(s) ? ' selected' : '');
+      c.textContent = s;
+      c.onclick = () => {
+        if (mmNewMaterial.targets.includes(s)) mmNewMaterial.targets = mmNewMaterial.targets.filter(t => t !== s);
+        else mmNewMaterial.targets = mmNewMaterial.targets.concat([s]);
+        renderMaterialsMasterForm();
+      };
+      targetRow.appendChild(c);
+    });
+    targetChips.appendChild(targetLab); targetChips.appendChild(targetRow);
+    form.appendChild(targetChips);
+
+    form.appendChild(makeSelectField('Divertible', DIVERTIBLE_OPTIONS, mmNewMaterial.divertible, v => { mmNewMaterial.divertible = v; }));
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn btn-primary';
+    saveBtn.textContent = 'Add Material';
+    saveBtn.onclick = () => {
+      const name = mmNewMaterial.name.trim();
+      if (!name){ showToast('Enter a material name'); return; }
+      if (mmNewMaterial.targets.length === 0){ showToast('Pick at least one target stream'); return; }
+      const prefix = mmNewMaterial.category.slice(0,3).toUpperCase();
+      let n = 1;
+      let id = `${prefix}C${n}`;
+      while (materials.some(m => m.id === id)){ n++; id = `${prefix}C${n}`; }
+      materials.push({id, name, category: mmNewMaterial.category, accepted: mmNewMaterial.accepted, targets: mmNewMaterial.targets.slice(), divertible: mmNewMaterial.divertible});
+      saveMaterials();
+      mmAddOpen = false;
+      renderAll();
+      showToast('Added ' + name);
+    };
+    form.appendChild(saveBtn);
+
+    box.appendChild(form);
+  }
 }
 document.getElementById('mmMainToggle').onclick = () => { mmOpen = !mmOpen; renderMaterialsMasterForm(); };
 
@@ -769,9 +913,13 @@ function renderSortedMaterials(){
 }
 function renderSortedAddButton(){
   const btn = document.getElementById('addSortedBtn');
+  const cancelBtn = document.getElementById('cancelSortedEditBtn');
   const ready = sortedSel.area && sortedSel.stream && sortedSel.materialId &&
                 parseFloat(document.getElementById('sortedWeight').value) > 0;
   btn.disabled = !ready;
+  const editing = editingSortedTs !== null;
+  btn.textContent = editing ? 'Update Entry' : 'Add Entry';
+  cancelBtn.style.display = editing ? '' : 'none';
 }
 function renderSortedContext(){
   const ctx = sortedEntries.filter(e => e.area === sortedSel.area && e.stream === sortedSel.stream);
@@ -782,12 +930,13 @@ function renderSortedContext(){
     table.innerHTML = '<tr><td class="empty-hint">No entries logged yet</td></tr>';
     return;
   }
-  table.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Material</th><th class="num">Weight</th><th></th></tr>' +
+  table.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Material</th><th class="num">Weight</th><th></th><th></th></tr>' +
     sortedEntries.slice().reverse().map(e => {
       const idx = sortedEntries.indexOf(e);
       return `<tr><td>${e.area}</td><td>${e.stream}</td>
         <td>${e.materialName}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
+        <td class="del-cell"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button></td>
         <td class="del-cell"><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></td></tr>`;
     }).join('');
 }
@@ -809,9 +958,13 @@ function renderPresortStreams(){
 }
 function renderPresortAddButton(){
   const btn = document.getElementById('addPresortBtn');
+  const cancelBtn = document.getElementById('cancelPresortEditBtn');
   const ready = presortSel.area && presortSel.stream &&
                 parseFloat(document.getElementById('presortWeight').value) > 0;
   btn.disabled = !ready;
+  const editing = editingPresortTs !== null;
+  btn.textContent = editing ? 'Update Bag' : 'Add Bag';
+  cancelBtn.style.display = editing ? '' : 'none';
 }
 function renderPresortContext(){
   const ctx = presortEntries.filter(e => e.area === presortSel.area && e.stream === presortSel.stream);
@@ -822,11 +975,12 @@ function renderPresortContext(){
     table.innerHTML = '<tr><td class="empty-hint">No bags logged yet</td></tr>';
     return;
   }
-  table.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Weight</th><th></th></tr>' +
+  table.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Weight</th><th></th><th></th></tr>' +
     presortEntries.slice().reverse().map(e => {
       const idx = presortEntries.indexOf(e);
       return `<tr><td>${e.area}</td><td>${e.stream}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
+        <td class="del-cell"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button></td>
         <td class="del-cell"><button class="del-btn" onclick="deletePresort(${idx})">✕</button></td></tr>`;
     }).join('');
 }
@@ -876,11 +1030,12 @@ function renderPresortReview(){
   if (filteredPresort.length === 0){
     pt.innerHTML = '<tr><td class="empty-hint">Nothing matches this filter</td></tr>';
   } else {
-    pt.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Wt</th><th></th></tr>' +
+    pt.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Wt</th><th></th><th></th></tr>' +
       filteredPresort.slice().reverse().map(e => {
         const idx = presortEntries.indexOf(e);
         return `<tr><td>${e.area}</td><td>${e.stream}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
+        <td class="del-cell"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button></td>
         <td class="del-cell"><button class="del-btn" onclick="deletePresort(${idx})">✕</button></td></tr>`;
       }).join('');
   }
@@ -926,12 +1081,13 @@ function renderSortedReview(){
   if (filteredSorted.length === 0){
     st.innerHTML = '<tr><td class="empty-hint">Nothing matches this filter</td></tr>';
   } else {
-    st.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Category</th><th>Material</th><th class="num">Wt</th><th></th></tr>' +
+    st.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Category</th><th>Material</th><th class="num">Wt</th><th></th><th></th></tr>' +
       filteredSorted.slice().reverse().map(e => {
         const idx = sortedEntries.indexOf(e);
         return `<tr><td>${e.area}</td><td>${e.stream}</td><td>${categoryOf(e)}</td>
         <td>${e.materialName}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
+        <td class="del-cell"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button></td>
         <td class="del-cell"><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></td></tr>`;
       }).join('');
   }
@@ -950,14 +1106,78 @@ function renderAll(){
 // ============================================================
 // Actions
 // ============================================================
-window.deleteSorted = function(idx){ sortedEntries.splice(idx,1); saveSorted(); renderAll(); };
-window.deletePresort = function(idx){ presortEntries.splice(idx,1); savePresort(); renderAll(); };
+window.deleteSorted = function(idx){
+  const entry = sortedEntries[idx];
+  if (entry && editingSortedTs === entry.ts) cancelEditSorted();
+  sortedEntries.splice(idx,1); saveSorted(); renderAll();
+};
+window.deletePresort = function(idx){
+  const entry = presortEntries[idx];
+  if (entry && editingPresortTs === entry.ts) cancelEditPresort();
+  presortEntries.splice(idx,1); savePresort(); renderAll();
+};
+
+// Editing tracks the entry's unique `ts` rather than its array index — indices shift
+// whenever any other entry is added or deleted, which would silently point an in-progress
+// edit at the wrong row. Matching by ts stays correct regardless of what else changes.
+window.editSorted = function(idx){
+  const e = sortedEntries[idx];
+  if (!e) return;
+  const mat = materials.find(m => m.id === e.materialId);
+  sortedSel.area = e.area;
+  sortedSel.stream = e.stream;
+  sortedSel.category = mat ? mat.category : null;
+  sortedSel.materialId = e.materialId;
+  editingSortedTs = e.ts;
+  switchTab('sorted');
+  document.getElementById('sortedWeight').value = e.weight;
+  document.getElementById('sortedNote').value = e.note || '';
+  renderAll();
+  showToast('Editing entry — change fields and click Update');
+};
+window.editPresort = function(idx){
+  const e = presortEntries[idx];
+  if (!e) return;
+  presortSel.area = e.area;
+  presortSel.stream = e.stream;
+  editingPresortTs = e.ts;
+  switchTab('presort');
+  document.getElementById('presortWeight').value = e.weight;
+  document.getElementById('presortNote').value = e.note || '';
+  renderAll();
+  showToast('Editing bag — change fields and click Update');
+};
+function cancelEditSorted(){
+  editingSortedTs = null;
+  document.getElementById('sortedWeight').value = '';
+  document.getElementById('sortedNote').value = '';
+  sortedSel.materialId = null;
+}
+function cancelEditPresort(){
+  editingPresortTs = null;
+  document.getElementById('presortWeight').value = '';
+  document.getElementById('presortNote').value = '';
+}
+document.getElementById('cancelSortedEditBtn').onclick = () => { cancelEditSorted(); renderAll(); };
+document.getElementById('cancelPresortEditBtn').onclick = () => { cancelEditPresort(); renderAll(); };
 
 document.getElementById('addSortedBtn').onclick = () => {
   const w = parseFloat(document.getElementById('sortedWeight').value);
   if (!w || w <= 0) return;
   const mat = materials.find(m => m.id === sortedSel.materialId);
   const note = document.getElementById('sortedNote').value.trim();
+  if (editingSortedTs !== null){
+    const entry = sortedEntries.find(e => e.ts === editingSortedTs);
+    if (entry){
+      entry.area = sortedSel.area; entry.stream = sortedSel.stream;
+      entry.materialId = mat.id; entry.materialName = mat.name;
+      entry.weight = w; entry.note = note;
+    }
+    cancelEditSorted();
+    saveSorted(); renderAll();
+    showToast('Entry updated');
+    return;
+  }
   sortedEntries.push({
     area: sortedSel.area, stream: sortedSel.stream,
     materialId: mat.id, materialName: mat.name, weight: w, note, ts: Date.now()
@@ -973,6 +1193,17 @@ document.getElementById('addPresortBtn').onclick = () => {
   const w = parseFloat(document.getElementById('presortWeight').value);
   if (!w || w <= 0) return;
   const note = document.getElementById('presortNote').value.trim();
+  if (editingPresortTs !== null){
+    const entry = presortEntries.find(e => e.ts === editingPresortTs);
+    if (entry){
+      entry.area = presortSel.area; entry.stream = presortSel.stream;
+      entry.weight = w; entry.note = note;
+    }
+    cancelEditPresort();
+    savePresort(); renderAll();
+    showToast('Bag updated');
+    return;
+  }
   presortEntries.push({area: presortSel.area, stream: presortSel.stream, weight: w, note, ts: Date.now()});
   document.getElementById('presortWeight').value = '';
   document.getElementById('presortNote').value = '';
@@ -1030,8 +1261,8 @@ document.getElementById('subtabSortedBtn').onclick = () => switchReviewSubtab('s
 // Consumption, Contamination matrix, Current v Potential Diversion),
 // directly against in-memory state, using the identical rules
 // (extrapolation from sorted sample to full pre-sort weight, same
-// streamBucket() logic) so this view and the exported file can never
-// silently drift apart.
+// multi-target membership logic) so this view and the exported file can
+// never silently drift apart.
 // ============================================================
 let summaryScope = null; // null = Overall, else an area name
 
@@ -1046,10 +1277,10 @@ function computeExtrapolatedRows(){
       materials.forEach(m => {
         const sortedWeight = sortedEntries.filter(e => e.area === a.name && e.stream === s && e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
         const weight = sortedTotal === 0 ? 0 : (sortedWeight / sortedTotal) * preSortTotal;
-        const belongsHere = streamBucket(s) === streamBucket(m.target) ? 1 : 0;
-        const correctlyPlaced = (belongsHere && m.accepted === 'Yes') ? 1 : 0;
+        const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
+        const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
         rows.push({area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
-                   weight, belongsHere, correctlyPlaced, accepted:m.accepted, rollup:a.rollup});
+                   weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), rollup:a.rollup});
       });
     });
   });
@@ -1235,11 +1466,43 @@ function buildWorkbook(){
   infoRows.push(['Source', 'Collected via tablet field form']);
   XLSX.utils.book_append_sheet(wb, makeSheet(infoRows), 'Audit Info');
 
-  // Materials Master
-  const mmRows = [['material_id','material_name','material_category','accepted_in_program','target_stream','currently_divertible']];
-  materials.forEach(m => mmRows.push([m.id, m.name, m.category, m.accepted, m.target, m.divertible]));
-  XLSX.utils.book_append_sheet(wb, makeSheet(mmRows), 'Materials Master');
+  // Materials Master — one Yes/No column per stream (rather than a single target_stream
+  // value) so a material can legitimately be correct in more than one place, e.g. paper
+  // that's normally recycled but is also accepted in organics at this site. Column order
+  // always mirrors STREAMS, and Trash is always STREAMS[0], which the formulas below rely on.
+  // accepted_in_program is its own directly-editable column, independent of the target
+  // streams — a stream existing for a material doesn't guarantee it's actually accepted.
+  const targetColStart = 6; // A..E are id/name/category/divertible/accepted, targets start at F
+  const colLetter = (n) => String.fromCharCode(64 + n); // 1-indexed
+  const firstTargetCol = colLetter(targetColStart);
+  const lastTargetCol = colLetter(targetColStart + STREAMS.length - 1);
+  const acceptedCol = 'E';
+  const mmHeader = ['material_id','material_name','material_category','currently_divertible','accepted_in_program',
+                     ...STREAMS.map(s => `target: ${s}`)];
+  const mmRows = [mmHeader];
+  materials.forEach(m => {
+    mmRows.push([m.id, m.name, m.category, m.divertible, m.accepted,
+                 ...STREAMS.map(s => m.targets.includes(s) ? 'Yes' : 'No')]);
+  });
   const MM_LAST = mmRows.length;
+  XLSX.utils.book_append_sheet(wb, makeSheet(mmRows), 'Materials Master');
+
+  // Reusable 2D lookup: does this material's row have "Yes" in the column for this
+  // specific stream? Used both for the informational annotation on Fact_SortedWeights
+  // and for the real correctly_placed/belongs_here calculation in Fact_Extrapolated.
+  // Column choice is a nested IF over the known STREAMS list (built at generation time)
+  // rather than a MATCH against the header row — the header text is "target: <stream>"
+  // for readability, which would never match a bare stream value at recalculation time.
+  function mmBelongsExpr(materialIdRef, streamRef){
+    const materialRowMatch = `MATCH(${materialIdRef},'Materials Master'!$A$2:$A$${MM_LAST},0)`;
+    let chain = '"No"';
+    for (let i = STREAMS.length - 1; i >= 0; i--){
+      const col = colLetter(targetColStart + i);
+      const indexExpr = `INDEX('Materials Master'!$${col}$2:$${col}$${MM_LAST},${materialRowMatch})`;
+      chain = `IF(${streamRef}="${STREAMS[i]}",${indexExpr},${chain})`;
+    }
+    return chain;
+  }
 
   // Areas
   const areaRows = [['area_id','area_name','rollup_group']];
@@ -1254,8 +1517,8 @@ function buildWorkbook(){
 
   // Fact_SortedWeights
   const fsHeader = ['audit_id','stream','area','material_id','weight_lbs',
-                     'material_name','material_category','target_stream','accepted_in_program',
-                     'correctly_placed','rollup_group','notes'];
+                     'material_name','material_category','currently_divertible','accepted_in_program',
+                     'belongs_here','rollup_group','notes'];
   const fsRows = [fsHeader];
   sortedEntries.forEach(e => fsRows.push([AUDIT_ID, e.stream, e.area, e.materialId, e.weight,
     null,null,null,null,null,null, e.note || '']));
@@ -1263,9 +1526,9 @@ function buildWorkbook(){
   for (let r = 2; r <= FS_LAST; r++){
     fsRows[r-1][5] = {f:`IFERROR(INDEX('Materials Master'!$B$2:$B$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
     fsRows[r-1][6] = {f:`IFERROR(INDEX('Materials Master'!$C$2:$C$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
-    fsRows[r-1][7] = {f:`IFERROR(INDEX('Materials Master'!$E$2:$E$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
-    fsRows[r-1][8] = {f:`IFERROR(INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
-    fsRows[r-1][9] = {f:`IF(AND(B${r}=H${r},I${r}="Yes"),1,0)`};
+    fsRows[r-1][7] = {f:`IFERROR(INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
+    fsRows[r-1][8] = {f:`IFERROR(INDEX('Materials Master'!$${acceptedCol}$2:$${acceptedCol}$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
+    fsRows[r-1][9] = {f:`IFERROR(${mmBelongsExpr(`D${r}`, `B${r}`)},"")`};
     fsRows[r-1][10] = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(C${r},Areas!$B$2:$B$${AREAS_LAST},0)),"")`};
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(fsRows), 'Fact_SortedWeights');
@@ -1314,9 +1577,6 @@ function buildWorkbook(){
     usedSheetNames.add(candidate.toLowerCase());
     return candidate;
   }
-  function bucketExpr(streamRef){
-    return `IF(${streamRef}="Trash","trash",IF(${streamRef}="Organics Recycling","organics",IF(${streamRef}="Terracycle","terracycle","dryrecyclables")))`;
-  }
 
   // areas with pre-sort weight but zero sorted-material rows anywhere —
   // their full weight is reported as its own "{Area} Waste" line rather
@@ -1359,17 +1619,19 @@ function buildWorkbook(){
     const sortedWeightExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef})`;
     const preSortExpr = `IF(${streamRef}="Cardboard Recycling",${sortedTotalExpr},SUMIFS(${PSW_W},${PSW_AREA},${areaRef},${PSW_STREAM},${streamRef}))`;
     fexRows[r-1][5] = {f:`IF(${sortedTotalExpr}=0,0,${sortedWeightExpr}/${sortedTotalExpr}*(${preSortExpr}))`};
-    const targetExpr = `INDEX('Materials Master'!$E$2:$E$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
-    const acceptedExpr = `INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
-    // "diverted" — properly recycled/composted elsewhere (bucket match AND accepted). Always 0 for
-    // Trash, since nothing accepted ever targets Trash — that's the point.
-    fexRows[r-1][6] = {f:`IF(AND(${bucketExpr(streamRef)}=${bucketExpr(targetExpr)},${acceptedExpr}="Yes"),1,0)`};
+    const belongsExpr = `${mmBelongsExpr(matRef, streamRef)}="Yes"`;
+    const acceptedExpr = `INDEX('Materials Master'!$${acceptedCol}$2:$${acceptedCol}$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
+    // "diverted" — properly recycled/composted elsewhere (this row's stream is one of the
+    // material's target streams, it's actually accepted in the program, AND it's not
+    // literally Trash — being correctly placed IN Trash isn't "diversion", that's the point).
+    fexRows[r-1][6] = {f:`IF(AND(${belongsExpr},${acceptedExpr}="Yes",${streamRef}<>"Trash"),1,0)`};
     fexRows[r-1][7] = {f:acceptedExpr};
     fexRows[r-1][8] = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$B$2:$B$${AREAS_LAST},0)),"")`};
-    // "belongs_here" — bucket match only, no accepted condition. For Trash, this is true for
-    // materials that are SUPPOSED to be trash (accepted=No), so 1-belongs_here correctly measures
-    // what share of trash is actually divertible material thrown away wrongly — not trivially 100%.
-    fexRows[r-1][9] = {f:`IF(${bucketExpr(streamRef)}=${bucketExpr(targetExpr)},1,0)`};
+    // "belongs_here" — is this row's stream one of the material's target streams at all
+    // (Trash included)? For materials whose only target IS Trash, this is true when found in
+    // Trash (correctly placed as non-divertible), so 1-belongs_here correctly measures what
+    // share of Trash is actually divertible material thrown away wrongly — not trivially 100%.
+    fexRows[r-1][9] = {f:`IF(${belongsExpr},1,0)`};
   }
   const fexSheet = makeSheet(fexRows);
   XLSX.utils.book_append_sheet(wb, fexSheet, 'Fact_Extrapolated');
@@ -1440,7 +1702,7 @@ function buildWorkbook(){
           {f:`IF($B$${totalRow}=0,0,C${rr}/$B$${totalRow})`},
           {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}"${ac},${FEX_CP},1)`},
           {f:`IF(C${rr}=0,0,E${rr}/C${rr})`},
-          {f:`INDEX('Materials Master'!$F$2:$F$${MM_LAST},MATCH(B${rr},'Materials Master'!$B$2:$B$${MM_LAST},0))`}
+          {f:`INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(B${rr},'Materials Master'!$B$2:$B$${MM_LAST},0))`}
         ]);
         prevCat = cat;
       });
