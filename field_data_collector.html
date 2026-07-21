@@ -1840,11 +1840,40 @@ function sheetRows(wb, name){
 function parseImportedWorkbook(wb){
   const result = {materials:null, areas:null, auditMeta:{}, sortedEntries:[], presortEntries:[]};
 
+  // Materials Master — column POSITIONS have changed twice now (single target_stream ->
+  // one Yes/No column per stream, accepted_in_program moving from computed to its own
+  // editable column), so this reads by HEADER NAME rather than fixed index. That makes it
+  // correct against the current export and against older exports that still have the
+  // single target_stream column, rather than silently misreading values into the wrong
+  // fields the next time the schema changes.
   const mmRows = sheetRows(wb, 'Materials Master');
   if (mmRows && mmRows.length > 1){
-    result.materials = mmRows.slice(1).filter(r => r[0]).map(r => ({
-      id:r[0], name:r[1], category:r[2], accepted:r[3], target:r[4], divertible:r[5]
-    }));
+    const header = mmRows[0].map(h => (h == null ? '' : String(h)));
+    const targetCols = [];
+    header.forEach((h, i) => { if (h.indexOf('target: ') === 0) targetCols.push({stream: h.slice(8), idx: i}); });
+    const catIdx = header.indexOf('material_category');
+    const divIdx = header.indexOf('currently_divertible');
+    const accIdx = header.indexOf('accepted_in_program');
+    const legacyTargetIdx = header.indexOf('target_stream'); // pre-multi-target export format
+
+    result.materials = mmRows.slice(1).filter(r => r[0]).map(r => {
+      let targets;
+      if (targetCols.length){
+        targets = targetCols.filter(tc => r[tc.idx] === 'Yes').map(tc => tc.stream);
+      } else if (legacyTargetIdx >= 0 && r[legacyTargetIdx]){
+        targets = [r[legacyTargetIdx]];
+      } else {
+        targets = [];
+      }
+      if (targets.length === 0) targets = ['Trash']; // every material needs at least one target
+      return {
+        id: r[0], name: r[1],
+        category: catIdx >= 0 ? r[catIdx] : r[2],
+        accepted: (accIdx >= 0 ? r[accIdx] : r[3]) || 'No',
+        targets,
+        divertible: (divIdx >= 0 ? r[divIdx] : r[5]) || 'No',
+      };
+    });
   }
 
   const areaRows = sheetRows(wb, 'Areas');
@@ -1864,27 +1893,37 @@ function parseImportedWorkbook(wb){
   }
 
   const materialsForLookup = result.materials || materials;
+
+  // Fact tables — also read by header name for the handful of fields actually consumed
+  // on import (the rest are recalculated formulas/annotations, not source data).
   const fsRows = sheetRows(wb, 'Fact_SortedWeights');
   if (fsRows && fsRows.length > 1){
+    const fsHeader = fsRows[0].map(h => (h == null ? '' : String(h)));
+    const streamIdx = fsHeader.indexOf('stream'), areaIdx = fsHeader.indexOf('area'),
+          matIdx = fsHeader.indexOf('material_id'), wIdx = fsHeader.indexOf('weight_lbs'),
+          noteIdx = fsHeader.indexOf('notes');
     fsRows.slice(1).forEach(r => {
-      if (!r || !r[1] || !r[2] || !r[3]) return;
-      const mat = materialsForLookup.find(m => m.id === r[3]);
+      if (!r || !r[streamIdx] || !r[areaIdx] || !r[matIdx]) return;
+      const mat = materialsForLookup.find(m => m.id === r[matIdx]);
       result.sortedEntries.push({
-        area: r[2], stream: r[1], materialId: r[3],
-        materialName: mat ? mat.name : r[3],
-        weight: parseFloat(r[4]) || 0,
-        note: r[11] || '', ts: Date.now() + Math.random()
+        area: r[areaIdx], stream: r[streamIdx], materialId: r[matIdx],
+        materialName: mat ? mat.name : r[matIdx],
+        weight: parseFloat(r[wIdx]) || 0,
+        note: (noteIdx >= 0 ? r[noteIdx] : '') || '', ts: Date.now() + Math.random()
       });
     });
   }
 
   const psRows = sheetRows(wb, 'Fact_PreSortWeights');
   if (psRows && psRows.length > 1){
+    const psHeader = psRows[0].map(h => (h == null ? '' : String(h)));
+    const streamIdx = psHeader.indexOf('stream'), areaIdx = psHeader.indexOf('area'),
+          wIdx = psHeader.indexOf('weight_lbs'), noteIdx = psHeader.indexOf('notes');
     psRows.slice(1).forEach(r => {
-      if (!r || !r[1] || !r[2]) return;
+      if (!r || !r[streamIdx] || !r[areaIdx]) return;
       result.presortEntries.push({
-        area: r[2], stream: r[1], weight: parseFloat(r[4]) || 0,
-        note: r[5] || '', ts: Date.now() + Math.random()
+        area: r[areaIdx], stream: r[streamIdx], weight: parseFloat(r[wIdx]) || 0,
+        note: (noteIdx >= 0 ? r[noteIdx] : '') || '', ts: Date.now() + Math.random()
       });
     });
   }
