@@ -1353,25 +1353,30 @@ function renderSummaryTab(){
     ['Waste Stream','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted'], rowsHtml);
 
   // ---- Table 2: Waste Stream Breakdown by Material ----
-  let prevCat = null;
+  // One row per (category, material, stream) combination that actually has weight —
+  // Category is repeated on every row (not blanked after the first) and Waste Stream is
+  // its own column, so this can be pasted straight into a pivot table or another tool
+  // without needing to reconstruct which rows belong to which category/stream.
   let t2Html = '';
   const catTotals = {};
   CATEGORY_ORDER.forEach(cat => {
     let catWeight = 0;
     materials.filter(m => m.category === cat).forEach(m => {
-      const matData = scoped.filter(r => r.materialId === m.id);
-      const weight = matData.reduce((sum,r) => sum + r.weight, 0);
-      const diverted = matData.filter(r => r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
-      catWeight += weight;
-      t2Html += `<tr><td>${cat !== prevCat ? cat : ''}</td><td>${m.name}</td><td class="num">${lbs(weight)}</td>
-        <td class="num">${pct(grandTotal?weight/grandTotal:0)}</td><td class="num">${lbs(diverted)}</td>
-        <td class="num">${pct(weight?diverted/weight:0)}</td><td>${m.divertible}</td></tr>`;
-      prevCat = cat;
+      STREAMS.forEach(s => {
+        const matStreamData = scoped.filter(r => r.materialId === m.id && r.stream === s);
+        const weight = matStreamData.reduce((sum,r) => sum + r.weight, 0);
+        catWeight += weight;
+        if (weight === 0) return;
+        const diverted = matStreamData.filter(r => r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
+        t2Html += `<tr><td>${cat}</td><td>${m.name}</td><td>${s}</td><td class="num">${lbs(weight)}</td>
+          <td class="num">${pct(grandTotal?weight/grandTotal:0)}</td><td class="num">${lbs(diverted)}</td>
+          <td class="num">${pct(weight?diverted/weight:0)}</td><td>${m.divertible}</td></tr>`;
+      });
     });
     catTotals[cat] = catWeight;
   });
   html += renderAnalysisTable('Waste Stream Breakdown — by Material Type',
-    ['Category','Material','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted','Divertible?'], t2Html);
+    ['Category','Material','Waste Stream','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted','Divertible?'], t2Html);
 
   // ---- Table 3: Total Waste Consumption (by category) ----
   const categorySum = Object.values(catTotals).reduce((s,v) => s+v, 0);
@@ -1684,27 +1689,32 @@ function buildWorkbook(){
     }
 
     // ---- Table 2: Waste Stream Breakdown by Material ----
+    // One row per (category, material, stream) that actually has weight, with Category
+    // repeated on every row and its own Waste Stream column — matches the live Summaries
+    // tab, and pastes cleanly into a pivot table or another tool without merged-looking
+    // blank cells or having to reconstruct which stream a total came from.
     rows.push([]);
     rows.push(['Waste Stream Breakdown — by Material Type']);
-    rows.push(['Material Type Category','Material Type','Total Material Type Weight (lbs.)',
+    rows.push(['Material Type Category','Material Type','Waste Stream','Total Material Type Weight (lbs.)',
                 '% of Total Waste Stream','Weight of Material Diverted (lbs.)',
                 '% of Material Diverted','Currently Divertible?']);
-    let prevCat = null;
     const catRowRanges = {}; // category -> [firstRow, lastRow] within Table 2, for Table 3 reuse
     CATEGORY_ORDER.forEach(cat => {
       materials.filter(m => m.category === cat).forEach(m => {
-        const rr = rows.length + 1;
-        if (!catRowRanges[cat]) catRowRanges[cat] = [rr, rr]; else catRowRanges[cat][1] = rr;
-        rows.push([
-          cat !== prevCat ? cat : null,
-          m.name,
-          {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}"${ac})`},
-          {f:`IF($B$${totalRow}=0,0,C${rr}/$B$${totalRow})`},
-          {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}"${ac},${FEX_CP},1)`},
-          {f:`IF(C${rr}=0,0,E${rr}/C${rr})`},
-          {f:`INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(B${rr},'Materials Master'!$B$2:$B$${MM_LAST},0))`}
-        ]);
-        prevCat = cat;
+        STREAMS.forEach(s => {
+          const hasWeight = sortedEntries.some(e => activeAreaNames.includes(e.area) && e.stream === s && e.materialId === m.id && e.weight > 0);
+          if (!hasWeight) return;
+          const rr = rows.length + 1;
+          if (!catRowRanges[cat]) catRowRanges[cat] = [rr, rr]; else catRowRanges[cat][1] = rr;
+          rows.push([
+            cat, m.name, s,
+            {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}",${FEX_STREAM},"${s}"${ac})`},
+            {f:`IF($B$${totalRow}=0,0,D${rr}/$B$${totalRow})`},
+            {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}",${FEX_STREAM},"${s}"${ac},${FEX_CP},1)`},
+            {f:`IF(D${rr}=0,0,F${rr}/D${rr})`},
+            {f:`INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(B${rr},'Materials Master'!$B$2:$B$${MM_LAST},0))`}
+          ]);
+        });
       });
     });
 
@@ -1715,8 +1725,11 @@ function buildWorkbook(){
     const cat3Start = rows.length + 1;
     CATEGORY_ORDER.forEach(cat => {
       const rr = rows.length + 1;
-      const [r0, r1] = catRowRanges[cat];
-      rows.push([cat, {f:`SUM(C${r0}:C${r1})`}, {f:`IF($B$${totalRow}=0,0,B${rr}/$B$${totalRow})`}]);
+      const range = catRowRanges[cat];
+      // A category can have zero rows in Table 2 now that zero-weight (material, stream)
+      // combinations are skipped — e.g. a category simply absent from one area's scope.
+      const weightCell = range ? {f:`SUM(D${range[0]}:D${range[1]})`} : 0;
+      rows.push([cat, weightCell, {f:`IF($B$${totalRow}=0,0,B${rr}/$B$${totalRow})`}]);
     });
     const cat3CategoryEnd = rows.length;
     // Residual, not a manual enumeration — guaranteed to reconcile against Table 1's total
