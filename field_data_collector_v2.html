@@ -40,7 +40,7 @@
     font-size:12.5px; font-weight:600; border-bottom:3px solid transparent; cursor:pointer;
   }
   nav.tabs button.active{color:#fff; border-bottom-color:var(--amber); background:rgba(255,255,255,0.06);}
-  main{padding:14px 12px 100px; max-width:950px; margin:0 auto;}
+  main{padding:14px 12px 100px; max-width:720px; margin:0 auto;}
   .panel{display:none;}
   .panel.active{display:block;}
   .section-label{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#6c675a; margin:18px 0 8px; font-weight:700;}
@@ -74,7 +74,6 @@
   }
   .field-row input[type=number]{font-size:22px;}
   .note-row{margin-top:10px;}
-  #presortKnownSection, #sortedNonRepSection{margin-top:14px;}
   .note-row input{width:100%; font-size:14px; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line);}
   .btn{
     border:none; border-radius:10px; padding:14px 18px; font-size:15px; font-weight:700;
@@ -90,40 +89,20 @@
   }
   .context-bar b{color:var(--brand-dark);}
   table.log{width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;}
-  .summary-table-title{font-size:17px; font-weight:800; color:var(--brand-dark); margin:36px 0 10px; padding-top:20px; border-top:2px solid var(--brand-light); display:flex; align-items:baseline; justify-content:space-between; gap:12px;}
-  .summary-table-title:first-child{margin-top:24px; padding-top:0; border-top:none;}
-  .copy-table-btn{font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; border:1.5px solid var(--brand); background:#fff; color:var(--brand-dark); cursor:pointer; white-space:nowrap; flex-shrink:0;}
-  .copy-table-btn:hover{background:var(--brand-light);}
-  .copy-table-btn:active{background:var(--brand); color:#fff;}
+  .summary-table-title{font-size:13px; font-weight:700; color:var(--brand-dark); margin:20px 0 6px;}
+  .summary-table-title:first-child{margin-top:4px;}
   table.analysis{width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:6px;}
-  table.analysis th{background:var(--brand); color:#fff; text-align:left; padding:6px 8px; font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none; white-space:nowrap;}
-  table.analysis th:hover{background:var(--brand-dark);}
-  table.analysis th .sort-arrow{display:inline-block; width:0.9em; opacity:0.6; font-size:10px;}
+  table.analysis th{background:var(--brand); color:#fff; text-align:left; padding:6px 8px; font-size:11px; text-transform:uppercase;}
   table.analysis td{padding:6px 8px; border-bottom:1px solid var(--line);}
   table.analysis td.num{text-align:right; font-variant-numeric:tabular-nums;}
   table.analysis tr.total-row td{font-weight:700; border-top:1.5px solid var(--brand); border-bottom:none;}
   table.analysis tr.cat-row td:first-child{font-weight:600;}
   table.log th{text-align:left; font-size:11px; text-transform:uppercase; color:#6c675a; padding:6px 4px; border-bottom:1.5px solid var(--line);}
-  table.log td{padding:8px 4px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  table.log td{padding:8px 4px; border-bottom:1px solid var(--line); vertical-align:top;}
   table.log td.num{text-align:right; font-variant-numeric:tabular-nums;}
   table.log .entry-note{display:block; font-size:11.5px; color:#8a8578; font-style:italic; margin-top:2px;}
-  .flag-badge{display:inline-block; font-size:10px; font-weight:700; padding:2px 6px; border-radius:8px; background:var(--brand-light); color:var(--brand-dark); margin-left:4px; vertical-align:middle;}
-  .toggle-field{
-    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:6px;
-    border:1.5px solid var(--line); background:#fff; cursor:pointer; user-select:none;
-  }
-  .toggle-field:hover{background:var(--brand-light);}
-  .toggle-field input[type="checkbox"]{width:18px; height:18px; accent-color:var(--brand); flex-shrink:0; cursor:pointer;}
-  .toggle-field span{font-size:13px; color:var(--ink);}
-  /* Edit and Delete are sized/weighted the same (both a bordered pill) so the two sit as a
-     matched pair rather than a heavy button next to a bare symbol — and they share one
-     action cell instead of two, so column widths don't shift row to row. */
-  .row-actions{display:flex; align-items:center; justify-content:flex-end; gap:6px;}
-  .edit-btn, .del-btn{
-    font-size:12px; font-weight:600; cursor:pointer; padding:3px 9px; border-radius:6px;
-    border:1px solid var(--brand); background:none; color:var(--brand-dark); line-height:1.4;
-  }
-  .del-btn{border-color:var(--danger); color:var(--danger);}
+  .del-btn{background:none; border:none; color:var(--danger); font-size:16px; cursor:pointer; padding:4px 8px;}
+  .edit-btn{background:none; border:1px solid var(--brand); color:var(--brand-dark); font-size:12px; font-weight:600; cursor:pointer; padding:3px 9px; border-radius:6px;}
   td.del-cell{text-align:right; width:1%; white-space:nowrap;}
   .summary-box{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px;}
   .summary-box h3{margin:0 0 6px; font-size:14px;}
@@ -157,45 +136,29 @@
     background:var(--brand-light); font-weight:700; font-size:12px; padding:8px 10px; margin-top:14px;
     border-radius:6px; color:var(--brand-dark);
   }
-  .mm-category-divider{
-    background:#e9e7e0; font-weight:700; font-size:13px; color:#5c584d; padding:8px 10px; margin-top:18px;
-    border-radius:6px; text-transform:uppercase; letter-spacing:0.03em;
+  .mm-row{
+    display:flex; align-items:center; gap:6px; padding:8px 4px; border-bottom:1px solid var(--line); flex-wrap:wrap;
   }
-  .mm-category-divider:first-child{margin-top:4px;}
-  .mm-category-count{font-weight:400; color:#95917f; text-transform:none; letter-spacing:normal;}
-  .mm-card{padding:20px 6px; margin-bottom:16px; border-bottom:2px solid var(--line);}
-  .mm-add-form{display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; padding:12px;}
-  .mm-card-header{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
-  .mm-name{display:flex; align-items:center; gap:6px; font-size:14px; font-weight:600; flex:1 1 auto; min-width:0; overflow-wrap:anywhere;}
-  select{
-    font-size:13px; padding:8px 8px; border-radius:6px; border:1.5px solid var(--line); background:#fff;
-    color:var(--ink); flex:1 1 100px; font-family:inherit;
+  .mm-name{flex:1 1 160px; font-size:13px; font-weight:600;}
+  .mm-row select{
+    font-size:12.5px; padding:6px 4px; border-radius:6px; border:1.5px solid var(--line); background:#fff; flex:1 1 100px;
   }
-  .mm-card-fields-row{display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;}
-  .mm-card-fields-row .mm-field{flex:0 1 160px;}
   .mm-label{font-size:10px; color:#8a8578; display:block; margin-bottom:2px;}
-  .mm-field{flex:1 1 140px; min-width:120px;}
-  .mm-targets{flex:1 1 240px; min-width:220px;}
+  .mm-field{flex:1 1 100px; min-width:90px;}
+  .mm-targets{flex:1 1 220px; min-width:180px;}
   .mm-target-chips{display:flex; flex-wrap:wrap; gap:4px;}
   .mm-target-chip{
     font-size:11px; padding:4px 8px; border-radius:12px; border:1.5px solid var(--line); background:#fff;
     color:#6c675a; cursor:pointer; user-select:none;
   }
   .mm-target-chip.selected{background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600;}
-  .mm-target-chip.disabled{opacity:0.45; cursor:not-allowed;}
-  .mm-target-chip.disabled.selected{background:#a8a8a8; border-color:#a8a8a8;}
   .mm-badge{font-size:11px; padding:4px 8px; border-radius:12px; font-weight:600; white-space:nowrap;}
   .mm-badge.yes{background:var(--brand-light); color:var(--brand-dark);}
   .mm-badge.no{background:#f0ece2; color:#8a8578;}
-  .mm-del-btn{background:none; border:1px solid var(--danger); color:var(--danger); font-size:15px; cursor:pointer; padding:6px 12px; border-radius:6px; flex:0 0 auto; line-height:1;}
-  .area-row{display:flex; align-items:flex-end; gap:6px; padding:10px 4px; border-bottom:1px solid var(--line); flex-wrap:nowrap;}
-  .area-field{flex:1 1 0; min-width:0;}
-  .area-field input, .area-field select{width:100%; padding:8px 10px; border-radius:6px; border:1.5px solid var(--line); font-size:13px; box-sizing:border-box;}
-  .area-del-btn{flex:0 0 auto; font-size:15px; padding:9px 12px; line-height:1;}
-  .stream-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 4px; border-bottom:1px solid var(--line);}
-  .stream-row:last-child{border-bottom:none;}
-  .stream-row-name{font-size:13px; font-weight:600;}
-  .stream-row-toggle{display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;}
+  .mm-del-btn{background:none; border:none; color:var(--danger); font-size:16px; cursor:pointer; padding:2px 6px;}
+  .area-row{display:flex; align-items:flex-end; gap:8px; padding:8px 4px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .area-field{flex:1 1 140px; min-width:110px;}
+  .area-field input{width:100%; padding:8px 10px; border-radius:6px; border:1.5px solid var(--line); font-size:13px;}
   .add-area-btn{margin-top:12px; background:var(--brand-light); color:var(--brand-dark); border:none; border-radius:8px; padding:10px 14px; font-size:13px; font-weight:700; cursor:pointer;}
   .info-icon{
     width:18px; height:18px; min-width:18px; border-radius:50%; border:1.5px solid #8a8578; background:#fff;
@@ -211,7 +174,7 @@
   .mm-cat-header{
     display:flex; justify-content:space-between; align-items:center; cursor:pointer;
   }
-  .mm-chevron{transition:transform .15s; font-size:13px;}
+  .mm-chevron{transition:transform .15s; font-size:11px;}
   .mm-chevron.open{transform:rotate(90deg);}
   .mm-cat-body{display:none;}
   .mm-cat-body.open{display:block;}
@@ -253,7 +216,7 @@
   <button data-tab="presort">Pre-Sort Bags</button>
   <button data-tab="sorted">Sorted Weights</button>
   <button data-tab="summaries">Summaries</button>
-  <button data-tab="review">Review</button>
+  <button data-tab="review">Review and Export</button>
 </nav>
 
 <main>
@@ -266,22 +229,17 @@
     <div class="section-label" style="margin-top:28px; font-size:14px; color:var(--brand-dark);">Audit configuration</div>
 
     <div class="mm-cat-header" id="areasMainToggle" style="margin-top:10px; padding:10px 12px; background:var(--brand-light); border-radius:8px;">
-      <span style="font-size:16px; font-weight:700; color:var(--brand-dark);">Areas — define the points of generation for this site</span>
+      <span style="font-size:13px; font-weight:700; color:var(--brand-dark);">Areas — define the points of generation for this site</span>
       <span class="mm-chevron" id="areasMainChevron">▶</span>
     </div>
     <p class="note">Renaming an area does not update entries already logged under its old name — do this before the audit starts, not mid-session.</p>
     <div id="areasForm"></div>
 
-    <div class="mm-cat-header" id="streamsMainToggle" style="margin-top:24px; padding:10px 12px; background:var(--brand-light); border-radius:8px;">
-      <span style="font-size:16px; font-weight:700; color:var(--brand-dark);">Streams — mark any that are weighed and sorted in one step</span>
-      <span class="mm-chevron" id="streamsMainChevron">▶</span>
-    </div>
-    <div id="streamsForm"></div>
-
     <div class="mm-cat-header" id="mmMainToggle" style="margin-top:24px; padding:10px 12px; background:var(--brand-light); border-radius:8px;">
-      <span style="font-size:16px; font-weight:700; color:var(--brand-dark);">Materials Master — edit if this site's program differs</span>
+      <span style="font-size:13px; font-weight:700; color:var(--brand-dark);">Materials Master — edit if this site's program differs</span>
       <span class="mm-chevron" id="mmMainChevron">▶</span>
     </div>
+    <p class="note">accepted_in_program and target_stream drive every diversion/contamination calculation on export. currently_divertible is shown on the client report. Changes here apply to all entries, past and future, in this session.</p>
     <div id="materialsMasterForm"></div>
   </div>
 
@@ -294,15 +252,8 @@
     <div class="chips" id="presortStreamChips"></div>
 
     <div class="field-row">
-      <input type="number" inputmode="decimal" step="0.01" id="presortWeight" placeholder="Bag weight" style="flex:2;" />
-      <select id="presortUnit" style="flex:1;">
-        <option value="lbs">lbs</option>
-        <option value="oz">oz</option>
-        <option value="kg">kg</option>
-        <option value="g">g</option>
-      </select>
+      <input type="number" inputmode="decimal" step="0.01" id="presortWeight" placeholder="Bag weight (lbs)" />
     </div>
-    <div id="presortKnownSection"></div>
     <div class="note-row">
       <input type="text" id="presortNote" placeholder="Note (optional) — e.g. unusual contents, torn bag" />
     </div>
@@ -334,15 +285,8 @@
     <div class="material-grid" id="sortedMaterialChips"></div>
 
     <div class="field-row">
-      <input type="number" inputmode="decimal" step="0.01" id="sortedWeight" placeholder="Weight" style="flex:2;" />
-      <select id="sortedUnit" style="flex:1;">
-        <option value="lbs">lbs</option>
-        <option value="oz">oz</option>
-        <option value="kg">kg</option>
-        <option value="g">g</option>
-      </select>
+      <input type="number" inputmode="decimal" step="0.01" id="sortedWeight" placeholder="Weight (lbs)" />
     </div>
-    <div id="sortedNonRepSection"></div>
     <div class="note-row">
       <input type="text" id="sortedNote" placeholder="Note (optional) — e.g. mostly one item, unusual find" />
     </div>
@@ -361,7 +305,7 @@
 
   <!-- ============ SUMMARIES ============ -->
   <div class="panel" id="panel-summaries">
-    <div class="section-label">Areas</div>
+    <div class="section-label">View</div>
     <div class="chips" id="summaryScopeChips"></div>
     <div id="summaryContent"></div>
   </div>
@@ -381,8 +325,8 @@
       </div>
       <div class="section-label">Filter pre-sort bags</div>
       <div class="field-row" style="margin-top:0;">
-        <select id="presortAreaFilter" style="flex:1; min-width:120px;"></select>
-        <select id="presortStreamFilter" style="flex:1; min-width:120px;"></select>
+        <select id="presortAreaFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
+        <select id="presortStreamFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
       </div>
       <table class="log" id="reviewPresortTable"></table>
     </div>
@@ -395,12 +339,12 @@
       </div>
       <div class="section-label">Filter sorted weights</div>
       <div class="field-row" style="margin-top:0;">
-        <select id="sortedAreaFilter" style="flex:1; min-width:120px;"></select>
-        <select id="sortedStreamFilter" style="flex:1; min-width:120px;"></select>
+        <select id="sortedAreaFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
+        <select id="sortedStreamFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
       </div>
       <div class="field-row" style="margin-top:8px;">
-        <select id="sortedCategoryFilter" style="flex:1; min-width:120px;"></select>
-        <select id="sortedMaterialFilter" style="flex:1; min-width:120px;"></select>
+        <select id="sortedCategoryFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
+        <select id="sortedMaterialFilter" style="flex:1; min-width:120px; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;"></select>
       </div>
       <table class="log" id="reviewSortedTable"></table>
     </div>
@@ -510,47 +454,15 @@ function materialBelongsIn(m, stream){ return m.targets.includes(stream); }
 function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && stream !== 'Trash'; }
 
 const DEFAULT_AREAS = [
-  {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'CAFE_BOH', name:'CAFÉ BOH', rollup:'BOH', defaultMaterialId:null},
-  {id:'LOC_C', name:'LOCATION C', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'LOC_D', name:'LOCATION D', rollup:'Rest of Building', defaultMaterialId:null},
-  // Bathroom waste is routinely never sorted (sanitary reasons) but is reliably almost all
-  // paper towels/toilet paper — rather than showing as an unlabeled "Area Waste" lump, this
-  // default assumption lets it flow into the normal material breakdown like everything else.
-  {id:'BATHROOM', name:'BATHROOM', rollup:'Rest of Building', defaultMaterialId:'ORG02'},
+  {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building'},
+  {id:'CAFE_BOH', name:'CAFÉ BOH', rollup:'BOH'},
+  {id:'LOC_C', name:'LOCATION C', rollup:'Rest of Building'},
+  {id:'LOC_D', name:'LOCATION D', rollup:'Rest of Building'},
+  {id:'BATHROOM', name:'BATHROOM', rollup:'Rest of Building'},
 ];
 
-const DEFAULT_STREAM_CONFIG = [
-  {name:'Trash', combinedWeighSort:false},
-  {name:'GMPC Recycling', combinedWeighSort:false},
-  {name:'Organics Recycling', combinedWeighSort:false},
-  // Combined weigh-and-sort: loose/bulky material that's weighed and categorized in one
-  // action rather than bagged-then-sampled. For these streams the Pre-Sort Bags tab is
-  // suppressed entirely, and the stream's total is just the sum of Sorted Weights — there's
-  // no separate "pool" to extrapolate against, since everything is directly observed.
-  {name:'Cardboard Recycling', combinedWeighSort:true},
-  {name:'Paper Recycling', combinedWeighSort:false},
-  {name:'Terracycle', combinedWeighSort:false},
-];
-// STREAMS stays a flat array of names — nearly all existing code (STREAMS.forEach,
-// STREAMS.includes, Materials Master's per-stream target columns) only ever needed the
-// name, not the config, so this keeps that code working unchanged.
-let streamConfig = DEFAULT_STREAM_CONFIG.map(s => ({...s}));
-let STREAMS = streamConfig.map(s => s.name);
-function isCombinedWeighSort(streamName){
-  const cfg = streamConfig.find(s => s.name === streamName);
-  return cfg ? !!cfg.combinedWeighSort : false;
-}
-function applyStreamConfig(newConfig){
-  streamConfig = newConfig;
-  STREAMS = streamConfig.map(s => s.name);
-}
+const STREAMS = ['Trash','GMPC Recycling','Organics Recycling','Cardboard Recycling','Paper Recycling','Terracycle'];
 const ACCEPT_OPTIONS = ['Yes','No'];
-// All weights are stored internally in lbs regardless of what unit was entered — this
-// keeps every formula, Excel export, and import untouched; the unit selector only affects
-// what's typed in and (for the current entry, before it's saved) what's displayed.
-const WEIGHT_UNIT_TO_LBS = {lbs: 1, oz: 1/16, kg: 2.2046226218, g: 2.2046226218/1000};
-function toLbs(value, unit){ return value * (WEIGHT_UNIT_TO_LBS[unit] || 1); }
 const DIVERTIBLE_OPTIONS = ['Yes','No','Unacceptable'];
 const CATEGORY_ORDER = ['Fibers','Glass','Metals','Plastics','Organics','Unacceptable','Other'];
 
@@ -591,11 +503,11 @@ const NO_SOILED_STREAMS = new Set(['Trash','Organics Recycling']);
 const AUDIT_ID = '120PARK-2025';
 
 const AUDIT_FIELDS = [
-  {key:'clientName', label:'Client Name', default:''},
-  {key:'siteName', label:'Site Name', default:''},
-  {key:'siteAddress', label:'Site Address', default:''},
-  {key:'hauler', label:'Hauler', default:''},
-  {key:'tenantBreakouts', label:'Tenant/Area Breakouts', default:''},
+  {key:'clientName', label:'Client Name', default:'CBRE - Bloomberg'},
+  {key:'siteName', label:'Site Name', default:'120 Park Avenue'},
+  {key:'siteAddress', label:'Site Address', default:'120 Park Avenue, New York, NY'},
+  {key:'hauler', label:'Hauler', default:'Waste Connections'},
+  {key:'tenantBreakouts', label:'Tenant/Area Breakouts', default:'BOH Foodservice Management'},
   {key:'auditors', label:'Auditors', default:''},
   {key:'auditDate', label:'Audit Date', default:'', type:'date'},
   {key:'siteOccupancy', label:'Site Occupancy', default:''},
@@ -613,8 +525,8 @@ auditMeta.auditDate = new Date().toISOString().slice(0,10); // YYYY-MM-DD
 let sortedEntries = [];   // {area, stream, materialId, materialName, weight, note, ts}
 let presortEntries = [];  // {area, stream, weight, note, ts}
 
-let sortedSel = {area:null, stream:null, category:null, materialId:null, nonRepresentative:false};
-let presortSel = {area:null, stream:null, knownMaterialId:null};
+let sortedSel = {area:null, stream:null, category:null, materialId:null};
+let presortSel = {area:null, stream:null};
 let editingSortedTs = null;
 let editingPresortTs = null;
 
@@ -648,14 +560,12 @@ async function loadState(){
   try { const a = await window.storage.get('auditMeta'); if (a) auditMeta = {...auditMeta, ...JSON.parse(a.value)}; } catch(e){}
   try { const m = await window.storage.get('materials'); if (m) materials = JSON.parse(m.value); } catch(e){}
   try { const ar = await window.storage.get('areas'); if (ar) areas = JSON.parse(ar.value); } catch(e){}
-  try { const sc = await window.storage.get('streamConfig'); if (sc) applyStreamConfig(JSON.parse(sc.value)); } catch(e){}
 }
 async function saveSorted(){ try { await window.storage.set('sortedEntries', JSON.stringify(sortedEntries), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
 async function savePresort(){ try { await window.storage.set('presortEntries', JSON.stringify(presortEntries), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
 async function saveMeta(){ try { await window.storage.set('auditMeta', JSON.stringify(auditMeta), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
 async function saveMaterials(){ try { await window.storage.set('materials', JSON.stringify(materials), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
 async function saveAreas(){ try { await window.storage.set('areas', JSON.stringify(areas), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-async function saveStreamConfig(){ try { await window.storage.set('streamConfig', JSON.stringify(streamConfig), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
 
 // ============================================================
 // UI helpers
@@ -710,48 +620,25 @@ function makeTargetChips(m){
   lab.textContent = 'Target stream(s) — where this material is correctly diverted';
   const chipRow = document.createElement('div');
   chipRow.className = 'mm-target-chips';
-  // If a material isn't accepted, it has no correct recycling-stream home — picking one
-  // anyway would be self-contradictory, and (since belongs_here only checks the target
-  // list, not accepted) would wrongly count as "divertible material found in Trash" for
-  // contamination purposes even though it was just marked not accepted anywhere.
-  const locked = m.accepted !== 'Yes';
   STREAMS.forEach(s => {
     const c = document.createElement('div');
-    c.className = 'mm-target-chip' + (m.targets.includes(s) ? ' selected' : '') + (locked ? ' disabled' : '');
+    c.className = 'mm-target-chip' + (m.targets.includes(s) ? ' selected' : '');
     c.textContent = s;
-    if (!locked){
-      c.onclick = () => {
-        if (m.targets.includes(s)){
-          m.targets = m.targets.filter(t => t !== s);
-          // Materials classified as Unacceptable may have no correct placement stream at
-          // all — e.g. batteries or e-waste don't have a "correct" home among the routine
-          // collection streams this tool tracks, so finding them anywhere (including Trash)
-          // is itself worth flagging. Every other material still needs at least one target,
-          // or it'd be uncategorizable in every report.
-          if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = ['Trash'];
-        } else {
-          m.targets = m.targets.filter(t => t !== 'Trash').concat([s]);
-        }
-        saveMaterials();
-        renderMaterialsMasterForm();
-      };
-    }
+    c.onclick = () => {
+      if (m.targets.includes(s)){
+        // a material always needs at least one target — falling back to Trash rather
+        // than leaving it with none, which would make it uncategorizable in every report
+        m.targets = m.targets.filter(t => t !== s);
+        if (m.targets.length === 0) m.targets = ['Trash'];
+      } else {
+        m.targets = m.targets.filter(t => t !== 'Trash').concat([s]);
+      }
+      saveMaterials();
+      renderMaterialsMasterForm();
+    };
     chipRow.appendChild(c);
   });
   wrap.appendChild(lab); wrap.appendChild(chipRow);
-  if (locked){
-    const note = document.createElement('div');
-    note.className = 'note';
-    note.textContent = m.divertible === 'Unacceptable'
-      ? 'Not accepted — locked. This material has no correct placement anywhere, including Trash.'
-      : 'Not accepted — locked to Trash. Set Accepted to "Yes" to pick a real target stream.';
-    wrap.appendChild(note);
-  } else if (m.targets.length === 0){
-    const note = document.createElement('div');
-    note.className = 'note';
-    note.textContent = 'No target stream — this material has no correct placement anywhere; finding it in any stream (including Trash) counts as contamination.';
-    wrap.appendChild(note);
-  }
   return wrap;
 }
 
@@ -762,22 +649,21 @@ function renderMaterialsMasterForm(){
   if (!mmOpen) return;
   CATEGORY_ORDER.forEach(cat => {
     const header = document.createElement('div');
-    header.className = 'mm-category-divider';
+    header.className = 'mm-cat-header';
+    header.style.cursor = 'default';
     const count = materials.filter(m => m.category === cat).length;
-    header.innerHTML = `${cat} <span class="mm-category-count">(${count})</span>`;
+    header.innerHTML = `<span>${cat} <span style="font-weight:400; color:#6c675a;">(${count})</span></span>`;
     box.appendChild(header);
 
     materials.filter(m => m.category === cat).forEach(m => {
-      const card = document.createElement('div');
-      card.className = 'mm-card';
-
-      // Header line: name (+ info icon) and delete button — the only two things sharing
-      // this line, so there's nothing else for the delete button to compete with.
-      const headerRow = document.createElement('div');
-      headerRow.className = 'mm-card-header';
+      const row = document.createElement('div');
+      row.className = 'mm-row';
 
       const name = document.createElement('div');
       name.className = 'mm-name';
+      name.style.display = 'flex';
+      name.style.alignItems = 'center';
+      name.style.gap = '6px';
       const nameText = document.createElement('span');
       nameText.textContent = m.name;
       name.appendChild(nameText);
@@ -793,6 +679,11 @@ function renderMaterialsMasterForm(){
         };
         name.appendChild(infoBtn);
       }
+      row.appendChild(name);
+
+      row.appendChild(makeSelectField('Accepted', ACCEPT_OPTIONS, m.accepted, v => { m.accepted = v; saveMaterials(); }));
+      row.appendChild(makeTargetChips(m));
+      row.appendChild(makeSelectField('Divertible', DIVERTIBLE_OPTIONS, m.divertible, v => { m.divertible = v; saveMaterials(); }));
 
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
@@ -805,23 +696,9 @@ function renderMaterialsMasterForm(){
         renderAll();
         showToast('Removed ' + m.name);
       };
+      row.appendChild(delBtn);
 
-      headerRow.appendChild(name); headerRow.appendChild(delBtn);
-
-      // Second line: Accepted, target streams, then Divertible — all together in one row.
-      const fieldsRow = document.createElement('div');
-      fieldsRow.className = 'mm-card-fields-row';
-      fieldsRow.appendChild(makeSelectField('Accepted', ACCEPT_OPTIONS, m.accepted, v => {
-        m.accepted = v;
-        if (v !== 'Yes') m.targets = (m.divertible === 'Unacceptable') ? [] : ['Trash'];
-        saveMaterials();
-        renderMaterialsMasterForm();
-      }));
-      fieldsRow.appendChild(makeTargetChips(m));
-      fieldsRow.appendChild(makeSelectField('Divertible', DIVERTIBLE_OPTIONS, m.divertible, v => { m.divertible = v; saveMaterials(); }));
-
-      card.appendChild(headerRow); card.appendChild(fieldsRow);
-      box.appendChild(card);
+      box.appendChild(row);
 
       if (mmInfoOpenSet.has(m.id) && MATERIAL_INFO[m.id]){
         const infoPanel = document.createElement('div');
@@ -837,7 +714,7 @@ function renderMaterialsMasterForm(){
   addWrap.style.marginTop = '16px';
   const addToggle = document.createElement('button');
   addToggle.type = 'button';
-  addToggle.className = mmAddOpen ? 'btn' : 'btn btn-primary';
+  addToggle.className = 'btn';
   addToggle.textContent = mmAddOpen ? '– Cancel' : '+ Add a new material type';
   addToggle.onclick = () => {
     mmAddOpen = !mmAddOpen;
@@ -849,7 +726,7 @@ function renderMaterialsMasterForm(){
 
   if (mmAddOpen){
     const form = document.createElement('div');
-    form.className = 'mm-add-form';
+    form.className = 'mm-row';
     form.style.background = 'var(--brand-light)';
     form.style.borderRadius = '8px';
     form.style.marginTop = '8px';
@@ -870,12 +747,9 @@ function renderMaterialsMasterForm(){
     form.appendChild(nameWrap);
 
     form.appendChild(makeSelectField('Category', CATEGORY_ORDER, mmNewMaterial.category, v => { mmNewMaterial.category = v; }));
-    form.appendChild(makeSelectField('Accepted', ACCEPT_OPTIONS, mmNewMaterial.accepted, v => {
-      mmNewMaterial.accepted = v;
-      if (v !== 'Yes') mmNewMaterial.targets = (mmNewMaterial.divertible === 'Unacceptable') ? [] : ['Trash'];
-      renderMaterialsMasterForm();
-    }));
+    form.appendChild(makeSelectField('Accepted', ACCEPT_OPTIONS, mmNewMaterial.accepted, v => { mmNewMaterial.accepted = v; }));
 
+    const dummyForTargets = {targets: mmNewMaterial.targets};
     const targetChips = document.createElement('div');
     targetChips.className = 'mm-targets';
     const targetLab = document.createElement('span');
@@ -883,27 +757,18 @@ function renderMaterialsMasterForm(){
     targetLab.textContent = 'Target stream(s)';
     const targetRow = document.createElement('div');
     targetRow.className = 'mm-target-chips';
-    const newMatLocked = mmNewMaterial.accepted !== 'Yes';
     STREAMS.forEach(s => {
       const c = document.createElement('div');
-      c.className = 'mm-target-chip' + (mmNewMaterial.targets.includes(s) ? ' selected' : '') + (newMatLocked ? ' disabled' : '');
+      c.className = 'mm-target-chip' + (mmNewMaterial.targets.includes(s) ? ' selected' : '');
       c.textContent = s;
-      if (!newMatLocked){
-        c.onclick = () => {
-          if (mmNewMaterial.targets.includes(s)) mmNewMaterial.targets = mmNewMaterial.targets.filter(t => t !== s);
-          else mmNewMaterial.targets = mmNewMaterial.targets.concat([s]);
-          renderMaterialsMasterForm();
-        };
-      }
+      c.onclick = () => {
+        if (mmNewMaterial.targets.includes(s)) mmNewMaterial.targets = mmNewMaterial.targets.filter(t => t !== s);
+        else mmNewMaterial.targets = mmNewMaterial.targets.concat([s]);
+        renderMaterialsMasterForm();
+      };
       targetRow.appendChild(c);
     });
     targetChips.appendChild(targetLab); targetChips.appendChild(targetRow);
-    if (newMatLocked){
-      const lockNote = document.createElement('div');
-      lockNote.className = 'note';
-      lockNote.textContent = 'Not accepted — locked. Set Accepted to "Yes" to pick a target stream.';
-      targetChips.appendChild(lockNote);
-    }
     form.appendChild(targetChips);
 
     form.appendChild(makeSelectField('Divertible', DIVERTIBLE_OPTIONS, mmNewMaterial.divertible, v => { mmNewMaterial.divertible = v; }));
@@ -915,7 +780,7 @@ function renderMaterialsMasterForm(){
     saveBtn.onclick = () => {
       const name = mmNewMaterial.name.trim();
       if (!name){ showToast('Enter a material name'); return; }
-      if (mmNewMaterial.targets.length === 0 && mmNewMaterial.divertible !== 'Unacceptable'){ showToast('Pick at least one target stream, or set Divertible to Unacceptable'); return; }
+      if (mmNewMaterial.targets.length === 0){ showToast('Pick at least one target stream'); return; }
       const prefix = mmNewMaterial.category.slice(0,3).toUpperCase();
       let n = 1;
       let id = `${prefix}C${n}`;
@@ -965,25 +830,15 @@ function renderAreasForm(){
     rollupInput.addEventListener('change', () => { a.rollup = rollupInput.value.trim() || a.rollup; saveAreas(); });
     rollupWrap.appendChild(rollupLabel); rollupWrap.appendChild(rollupInput);
 
-    const defaultMatOptions = ['None', ...materials.map(m => m.name)];
-    const currentDefaultName = a.defaultMaterialId
-      ? (materials.find(m => m.id === a.defaultMaterialId)?.name || 'None') : 'None';
-    const defaultMatField = makeSelectField('Default material (if never sorted)', defaultMatOptions, currentDefaultName, v => {
-      a.defaultMaterialId = v === 'None' ? null : materials.find(m => m.name === v).id;
-      saveAreas();
-      renderAll();
-    });
-    defaultMatField.className = 'area-field';
-
     const delBtn = document.createElement('button');
-    delBtn.className = 'del-btn area-del-btn';
+    delBtn.className = 'del-btn';
     delBtn.textContent = '✕';
     delBtn.onclick = () => {
       if (areas.length <= 1) { showToast('At least one area is required'); return; }
       areas.splice(idx, 1); saveAreas(); renderAll();
     };
 
-    row.appendChild(nameWrap); row.appendChild(rollupWrap); row.appendChild(defaultMatField); row.appendChild(delBtn);
+    row.appendChild(nameWrap); row.appendChild(rollupWrap); row.appendChild(delBtn);
     box.appendChild(row);
   });
 
@@ -991,49 +846,12 @@ function renderAreasForm(){
   addBtn.className = 'add-area-btn';
   addBtn.textContent = '+ Add area';
   addBtn.onclick = () => {
-    areas.push({id: 'AREA_' + Date.now(), name: 'NEW AREA', rollup: 'Base Building', defaultMaterialId: null});
+    areas.push({id: 'AREA_' + Date.now(), name: 'NEW AREA', rollup: 'Base Building'});
     saveAreas(); renderAll();
   };
   box.appendChild(addBtn);
 }
 document.getElementById('areasMainToggle').onclick = () => { areasOpen = !areasOpen; renderAreasForm(); };
-
-let streamsOpen = false;
-function renderStreamsForm(){
-  document.getElementById('streamsMainChevron').classList.toggle('open', streamsOpen);
-  const box = document.getElementById('streamsForm');
-  box.innerHTML = '';
-  if (!streamsOpen) return;
-  streamConfig.forEach(s => {
-    const row = document.createElement('div');
-    row.className = 'stream-row';
-
-    const nameEl = document.createElement('span');
-    nameEl.className = 'stream-row-name';
-    nameEl.textContent = s.name;
-
-    const toggleWrap = document.createElement('label');
-    toggleWrap.className = 'stream-row-toggle';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = !!s.combinedWeighSort;
-    cb.addEventListener('change', () => {
-      s.combinedWeighSort = cb.checked;
-      saveStreamConfig();
-      renderAll();
-      showToast(s.combinedWeighSort
-        ? s.name + ': weighed and sorted in one step — Pre-Sort Bags hidden for this stream'
-        : s.name + ': back to bagged/sampled workflow');
-    });
-    const lab = document.createElement('span');
-    lab.textContent = 'Combined weigh-and-sort (no separate bagging)';
-    toggleWrap.appendChild(cb); toggleWrap.appendChild(lab);
-
-    row.appendChild(nameEl); row.appendChild(toggleWrap);
-    box.appendChild(row);
-  });
-}
-document.getElementById('streamsMainToggle').onclick = () => { streamsOpen = !streamsOpen; renderStreamsForm(); };
 function makeSelectField(label, options, value, onChange){
   const wrap = document.createElement('div');
   wrap.className = 'mm-field';
@@ -1103,26 +921,6 @@ function renderSortedAddButton(){
   btn.textContent = editing ? 'Update Entry' : 'Add Entry';
   cancelBtn.style.display = editing ? '' : 'none';
 }
-function renderSortedNonRepToggle(){
-  const box = document.getElementById('sortedNonRepSection');
-  box.innerHTML = '';
-  const wrap = document.createElement('label');
-  wrap.className = 'toggle-field';
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.checked = !!sortedSel.nonRepresentative;
-  cb.addEventListener('change', () => { sortedSel.nonRepresentative = cb.checked; renderAll(); });
-  const lab = document.createElement('span');
-  lab.textContent = 'Non-representative — a one-off find, not typical of this bag';
-  wrap.appendChild(cb); wrap.appendChild(lab);
-  box.appendChild(wrap);
-  if (sortedSel.nonRepresentative){
-    const note = document.createElement('div');
-    note.className = 'note';
-    note.textContent = 'Counts once toward this material\'s total, but won\'t be scaled up as if the rest of the bag were the same.';
-    box.appendChild(note);
-  }
-}
 function renderSortedContext(){
   const ctx = sortedEntries.filter(e => e.area === sortedSel.area && e.stream === sortedSel.stream);
   const total = ctx.reduce((s,e) => s + e.weight, 0);
@@ -1132,13 +930,14 @@ function renderSortedContext(){
     table.innerHTML = '<tr><td class="empty-hint">No entries logged yet</td></tr>';
     return;
   }
-  table.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Material</th><th class="num">Weight</th><th></th></tr>' +
+  table.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Material</th><th class="num">Weight</th><th></th><th></th></tr>' +
     sortedEntries.slice().reverse().map(e => {
       const idx = sortedEntries.indexOf(e);
       return `<tr><td>${e.area}</td><td>${e.stream}</td>
-        <td>${e.materialName}${nonRepBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
+        <td>${e.materialName}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
-        <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></div></td></tr>`;
+        <td class="del-cell"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button></td>
+        <td class="del-cell"><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></td></tr>`;
     }).join('');
 }
 
@@ -1153,48 +952,9 @@ function renderPresortAreas(){
 function renderPresortStreams(){
   const box = document.getElementById('presortStreamChips');
   box.innerHTML = '';
-  // Combined weigh-and-sort streams (e.g. loose cardboard) skip this tab entirely — there's
-  // no separate bag weight to log, since weighing and sorting happen in one action on the
-  // Sorted Weights tab.
-  STREAMS.filter(s => !isCombinedWeighSort(s)).forEach(s => {
+  STREAMS.forEach(s => {
     box.appendChild(chip(s, presortSel.stream === s, () => { presortSel.stream = s; renderAll(); }));
   });
-  if (STREAMS.some(isCombinedWeighSort)){
-    const note = document.createElement('div');
-    note.className = 'note';
-    note.style.width = '100%';
-    note.textContent = 'Hidden: ' + STREAMS.filter(isCombinedWeighSort).join(', ') + ' — weighed and sorted in one step, logged directly on Sorted Weights.';
-    box.appendChild(note);
-  }
-}
-function renderPresortKnownToggle(){
-  const box = document.getElementById('presortKnownSection');
-  box.innerHTML = '';
-  const wrap = document.createElement('label');
-  wrap.className = 'toggle-field';
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.checked = presortSel.knownMaterialId !== null;
-  cb.addEventListener('change', () => {
-    presortSel.knownMaterialId = cb.checked ? (materials[0] ? materials[0].id : null) : null;
-    renderAll();
-  });
-  const lab = document.createElement('span');
-  lab.textContent = 'Known composition — this whole bag is one material';
-  wrap.appendChild(cb); wrap.appendChild(lab);
-  box.appendChild(wrap);
-  if (presortSel.knownMaterialId !== null){
-    const sel = makeSelectField('Material', materials.map(m => m.name),
-      materials.find(m => m.id === presortSel.knownMaterialId)?.name || materials[0].name,
-      v => { presortSel.knownMaterialId = materials.find(m => m.name === v).id; renderAll(); });
-    sel.style.marginTop = '8px';
-    sel.style.width = '100%';
-    box.appendChild(sel);
-    const note = document.createElement('div');
-    note.className = 'note';
-    note.textContent = 'This bag\'s full weight goes straight to that material\'s total, and is excluded from the sample used to extrapolate other (mixed) bags.';
-    box.appendChild(note);
-  }
 }
 function renderPresortAddButton(){
   const btn = document.getElementById('addPresortBtn');
@@ -1215,28 +975,18 @@ function renderPresortContext(){
     table.innerHTML = '<tr><td class="empty-hint">No bags logged yet</td></tr>';
     return;
   }
-  table.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Weight</th><th></th></tr>' +
+  table.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Weight</th><th></th><th></th></tr>' +
     presortEntries.slice().reverse().map(e => {
       const idx = presortEntries.indexOf(e);
-      return `<tr><td>${e.area}</td><td>${e.stream}${knownBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
+      return `<tr><td>${e.area}</td><td>${e.stream}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
-        <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button><button class="del-btn" onclick="deletePresort(${idx})">✕</button></div></td></tr>`;
+        <td class="del-cell"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button></td>
+        <td class="del-cell"><button class="del-btn" onclick="deletePresort(${idx})">✕</button></td></tr>`;
     }).join('');
 }
 
 // ---------- Review panel ----------
 function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-// Small inline badges flagging the two extrapolation-exclusion cases, so they're visible
-// wherever an entry is listed, not just in the form that created them.
-function knownBadge(e){
-  if (!e.knownMaterialId) return '';
-  const mat = materials.find(m => m.id === e.knownMaterialId);
-  return ` <span class="flag-badge" title="Known composition — excluded from the extrapolation pool">known: ${escapeHtml(mat ? mat.name : e.knownMaterialId)}</span>`;
-}
-function nonRepBadge(e){
-  if (!e.nonRepresentative) return '';
-  return ` <span class="flag-badge" title="Non-representative — counted once, not scaled up">non-rep</span>`;
-}
 
 let presortReviewFilters = {area: 'All', stream: 'All'};
 let sortedReviewFilters = {area: 'All', stream: 'All', category: 'All', material: 'All'};
@@ -1280,12 +1030,13 @@ function renderPresortReview(){
   if (filteredPresort.length === 0){
     pt.innerHTML = '<tr><td class="empty-hint">Nothing matches this filter</td></tr>';
   } else {
-    pt.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Wt</th><th></th></tr>' +
+    pt.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Wt</th><th></th><th></th></tr>' +
       filteredPresort.slice().reverse().map(e => {
         const idx = presortEntries.indexOf(e);
-        return `<tr><td>${e.area}</td><td>${e.stream}${knownBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
+        return `<tr><td>${e.area}</td><td>${e.stream}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
-        <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button><button class="del-btn" onclick="deletePresort(${idx})">✕</button></div></td></tr>`;
+        <td class="del-cell"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button></td>
+        <td class="del-cell"><button class="del-btn" onclick="deletePresort(${idx})">✕</button></td></tr>`;
       }).join('');
   }
 }
@@ -1330,23 +1081,24 @@ function renderSortedReview(){
   if (filteredSorted.length === 0){
     st.innerHTML = '<tr><td class="empty-hint">Nothing matches this filter</td></tr>';
   } else {
-    st.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Category</th><th>Material</th><th class="num">Wt</th><th></th></tr>' +
+    st.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Category</th><th>Material</th><th class="num">Wt</th><th></th><th></th></tr>' +
       filteredSorted.slice().reverse().map(e => {
         const idx = sortedEntries.indexOf(e);
         return `<tr><td>${e.area}</td><td>${e.stream}</td><td>${categoryOf(e)}</td>
-        <td>${e.materialName}${nonRepBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
+        <td>${e.materialName}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
-        <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></div></td></tr>`;
+        <td class="del-cell"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button></td>
+        <td class="del-cell"><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></td></tr>`;
       }).join('');
   }
 }
 
 function renderAll(){
   renderHeader();
-  renderAuditInfoForm(); renderAreasForm(); renderStreamsForm(); renderMaterialsMasterForm();
+  renderAuditInfoForm(); renderAreasForm(); renderMaterialsMasterForm();
   renderSortedAreas(); renderSortedStreams(); renderSortedCategories(); renderSortedMaterials();
-  renderSortedNonRepToggle(); renderSortedAddButton(); renderSortedContext();
-  renderPresortAreas(); renderPresortStreams(); renderPresortKnownToggle(); renderPresortAddButton(); renderPresortContext();
+  renderSortedAddButton(); renderSortedContext();
+  renderPresortAreas(); renderPresortStreams(); renderPresortAddButton(); renderPresortContext();
   renderPresortReview(); renderSortedReview();
   renderSummaryTab();
 }
@@ -1376,11 +1128,9 @@ window.editSorted = function(idx){
   sortedSel.stream = e.stream;
   sortedSel.category = mat ? mat.category : null;
   sortedSel.materialId = e.materialId;
-  sortedSel.nonRepresentative = !!e.nonRepresentative;
   editingSortedTs = e.ts;
   switchTab('sorted');
   document.getElementById('sortedWeight').value = e.weight;
-  document.getElementById('sortedUnit').value = 'lbs'; // stored weight is always in lbs
   document.getElementById('sortedNote').value = e.note || '';
   renderAll();
   showToast('Editing entry — change fields and click Update');
@@ -1390,11 +1140,9 @@ window.editPresort = function(idx){
   if (!e) return;
   presortSel.area = e.area;
   presortSel.stream = e.stream;
-  presortSel.knownMaterialId = e.knownMaterialId || null;
   editingPresortTs = e.ts;
   switchTab('presort');
   document.getElementById('presortWeight').value = e.weight;
-  document.getElementById('presortUnit').value = 'lbs'; // stored weight is always in lbs
   document.getElementById('presortNote').value = e.note || '';
   renderAll();
   showToast('Editing bag — change fields and click Update');
@@ -1404,31 +1152,26 @@ function cancelEditSorted(){
   document.getElementById('sortedWeight').value = '';
   document.getElementById('sortedNote').value = '';
   sortedSel.materialId = null;
-  sortedSel.nonRepresentative = false;
 }
 function cancelEditPresort(){
   editingPresortTs = null;
   document.getElementById('presortWeight').value = '';
   document.getElementById('presortNote').value = '';
-  presortSel.knownMaterialId = null;
 }
 document.getElementById('cancelSortedEditBtn').onclick = () => { cancelEditSorted(); renderAll(); };
 document.getElementById('cancelPresortEditBtn').onclick = () => { cancelEditPresort(); renderAll(); };
 
 document.getElementById('addSortedBtn').onclick = () => {
-  const raw = parseFloat(document.getElementById('sortedWeight').value);
-  if (!raw || raw <= 0) return;
-  const unit = document.getElementById('sortedUnit').value;
-  const w = toLbs(raw, unit);
+  const w = parseFloat(document.getElementById('sortedWeight').value);
+  if (!w || w <= 0) return;
   const mat = materials.find(m => m.id === sortedSel.materialId);
   const note = document.getElementById('sortedNote').value.trim();
-  const nonRepresentative = !!sortedSel.nonRepresentative;
   if (editingSortedTs !== null){
     const entry = sortedEntries.find(e => e.ts === editingSortedTs);
     if (entry){
       entry.area = sortedSel.area; entry.stream = sortedSel.stream;
       entry.materialId = mat.id; entry.materialName = mat.name;
-      entry.weight = w; entry.note = note; entry.nonRepresentative = nonRepresentative;
+      entry.weight = w; entry.note = note;
     }
     cancelEditSorted();
     saveSorted(); renderAll();
@@ -1437,45 +1180,38 @@ document.getElementById('addSortedBtn').onclick = () => {
   }
   sortedEntries.push({
     area: sortedSel.area, stream: sortedSel.stream,
-    materialId: mat.id, materialName: mat.name, weight: w, note, nonRepresentative, ts: Date.now()
+    materialId: mat.id, materialName: mat.name, weight: w, note, ts: Date.now()
   });
   document.getElementById('sortedWeight').value = '';
   document.getElementById('sortedNote').value = '';
   sortedSel.materialId = null;
-  sortedSel.nonRepresentative = false;
   saveSorted(); renderAll();
   showToast('Added ' + mat.name + ' — ' + w.toFixed(2) + ' lbs');
 };
 
 document.getElementById('addPresortBtn').onclick = () => {
-  const raw = parseFloat(document.getElementById('presortWeight').value);
-  if (!raw || raw <= 0) return;
-  const unit = document.getElementById('presortUnit').value;
-  const w = toLbs(raw, unit);
+  const w = parseFloat(document.getElementById('presortWeight').value);
+  if (!w || w <= 0) return;
   const note = document.getElementById('presortNote').value.trim();
-  const knownMaterialId = presortSel.knownMaterialId || null;
   if (editingPresortTs !== null){
     const entry = presortEntries.find(e => e.ts === editingPresortTs);
     if (entry){
       entry.area = presortSel.area; entry.stream = presortSel.stream;
-      entry.weight = w; entry.note = note; entry.knownMaterialId = knownMaterialId;
+      entry.weight = w; entry.note = note;
     }
     cancelEditPresort();
     savePresort(); renderAll();
     showToast('Bag updated');
     return;
   }
-  presortEntries.push({area: presortSel.area, stream: presortSel.stream, weight: w, note, knownMaterialId, ts: Date.now()});
+  presortEntries.push({area: presortSel.area, stream: presortSel.stream, weight: w, note, ts: Date.now()});
   document.getElementById('presortWeight').value = '';
   document.getElementById('presortNote').value = '';
-  presortSel.knownMaterialId = null;
   savePresort(); renderAll();
   showToast('Bag logged — ' + w.toFixed(2) + ' lbs');
 };
 
 document.getElementById('sortedWeight').addEventListener('input', renderSortedAddButton);
-document.getElementById('sortedUnit').addEventListener('change', renderSortedAddButton);
-document.getElementById('presortUnit').addEventListener('change', renderPresortAddButton);
 document.getElementById('presortWeight').addEventListener('input', renderPresortAddButton);
 
 document.getElementById('newSessionBtn').onclick = () => {
@@ -1534,41 +1270,13 @@ function computeExtrapolatedRows(){
   const rows = [];
   areas.forEach(a => {
     STREAMS.forEach(s => {
-      if (isCombinedWeighSort(s)){
-        // Weighed and sorted in one action — every pound is a direct observation, so
-        // there's nothing to extrapolate. knownMaterialId/nonRepresentative don't apply
-        // here (they're both about inferring the UNOBSERVED rest of a bag, which doesn't
-        // exist for this stream type) — every sorted entry just counts as itself.
-        materials.forEach(m => {
-          const weight = sortedEntries.filter(e => e.area === a.name && e.stream === s && e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
-          const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
-          const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
-          rows.push({area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
-                     weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), rollup:a.rollup});
-        });
-        return;
-      }
-      const areaStream = e => e.area === a.name && e.stream === s;
-      const poolWeight = presortEntries.filter(e => areaStream(e) && !e.knownMaterialId).reduce((sum,e) => sum + e.weight, 0);
-      const repSorted = sortedEntries.filter(e => areaStream(e) && !e.nonRepresentative);
-      const nonRepSorted = sortedEntries.filter(e => areaStream(e) && e.nonRepresentative);
-      const sortedTotal = repSorted.reduce((sum,e) => sum + e.weight, 0);
-      // A non-representative item's weight is physically part of a pool bag already
-      // counted in poolWeight — subtract it before scaling, then add it back as itself,
-      // or it gets double-counted (once via the ratio, once via its own flat weight).
-      const nonRepTotalAll = nonRepSorted.reduce((sum,e) => sum + e.weight, 0);
-      const effectivePool = poolWeight - nonRepTotalAll;
+      const sortedTotal = sortedEntries.filter(e => e.area === a.name && e.stream === s).reduce((sum,e) => sum + e.weight, 0);
+      const preSortTotal = s === 'Cardboard Recycling'
+        ? sortedTotal
+        : presortEntries.filter(e => e.area === a.name && e.stream === s).reduce((sum,e) => sum + e.weight, 0);
       materials.forEach(m => {
-        const knownWeight = presortEntries.filter(e => areaStream(e) && e.knownMaterialId === m.id).reduce((sum,e) => sum + e.weight, 0);
-        const repSortedWeight = repSorted.filter(e => e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
-        const nonRepWeight = nonRepSorted.filter(e => e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
-        // Nothing was ever sorted for this area+stream, but if the area has a default
-        // material set (e.g. Bathroom -> Paper Fibers/FSP), route the pool straight to it
-        // rather than leaving every material at 0 and falling back to an unlabeled lump.
-        const ratioTerm = sortedTotal === 0
-          ? (a.defaultMaterialId === m.id ? effectivePool : 0)
-          : (repSortedWeight / sortedTotal) * effectivePool;
-        const weight = knownWeight + nonRepWeight + ratioTerm;
+        const sortedWeight = sortedEntries.filter(e => e.area === a.name && e.stream === s && e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
+        const weight = sortedTotal === 0 ? 0 : (sortedWeight / sortedTotal) * preSortTotal;
         const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
         const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
         rows.push({area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
@@ -1580,14 +1288,8 @@ function computeExtrapolatedRows(){
 }
 function areaTotalPresortLive(areaName){
   const bagged = presortEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
-  const combined = sortedEntries.filter(e => e.area === areaName && isCombinedWeighSort(e.stream)).reduce((s,e) => s + e.weight, 0);
-  return bagged + combined;
-}
-// Pool-only presort weight — excludes known-composition bags, since those don't need a
-// sorted sample to be understood. Used only to detect genuinely "unsorted" areas: pool
-// (mixed/unknown) weight sitting there with zero sorted sample to extrapolate it against.
-function areaPoolOnlyPresortLive(areaName){
-  return presortEntries.filter(e => e.area === areaName && !e.knownMaterialId).reduce((s,e) => s + e.weight, 0);
+  const loose = sortedEntries.filter(e => e.area === areaName && e.stream === 'Cardboard Recycling').reduce((s,e) => s + e.weight, 0);
+  return bagged + loose;
 }
 function areaTotalSortedLive(areaName){
   return sortedEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
@@ -1597,90 +1299,9 @@ function pct(n){ return (n*100).toFixed(1) + '%'; }
 function lbs(n){ return n.toFixed(2); }
 
 function renderAnalysisTable(title, headers, bodyRowsHtml, extraClass){
-  const headerHtml = headers.map(h =>
-    `<th onclick="sortAnalysisTableHeader(this)">${h}<span class="sort-arrow"></span></th>`
-  ).join('');
-  return `<div class="summary-table-title"><span>${title}</span><button type="button" class="copy-table-btn" onclick="copyAnalysisTable(this)">⧉ Copy table</button></div>
-    <table class="analysis ${extraClass||''}"><tr>${headerHtml}</tr>${bodyRowsHtml}</table>`;
+  return `<div class="summary-table-title">${title}</div>
+    <table class="analysis ${extraClass||''}"><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>${bodyRowsHtml}</table>`;
 }
-// Copies the whole table — header row and every data row, in reading order (respects
-// whatever sort is currently applied) — as tab-separated text. That's the format both
-// Excel/Sheets and RAWGraphs expect when pasting in a multi-column table.
-function copyTextToClipboard(text){
-  if (navigator.clipboard && navigator.clipboard.writeText){
-    return navigator.clipboard.writeText(text);
-  }
-  return new Promise((resolve, reject) => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    try {
-      const ok = document.execCommand('copy');
-      document.body.removeChild(ta);
-      ok ? resolve() : reject(new Error('execCommand copy failed'));
-    } catch (e){
-      document.body.removeChild(ta);
-      reject(e);
-    }
-  });
-}
-window.copyAnalysisTable = function(btn){
-  const table = btn.closest('.summary-table-title').nextElementSibling;
-  if (!table) return;
-  const rows = Array.from(table.querySelectorAll('tr'));
-  const text = rows.map(row =>
-    Array.from(row.children).map(cell => {
-      const clone = cell.cloneNode(true);
-      clone.querySelectorAll('.sort-arrow').forEach(el => el.remove());
-      return clone.textContent.trim();
-    }).join('\t')
-  ).join('\n');
-  copyTextToClipboard(text)
-    .then(() => showToast('Table copied'))
-    .catch(() => showToast('Copy failed — check clipboard permissions'));
-};
-// Sorts by re-ordering the already-rendered <tr> elements directly — no need to touch the
-// underlying data or re-render. Total rows are pinned at the bottom regardless of sort
-// direction, since nobody wants "Total" appearing in the middle of a sorted list.
-window.sortAnalysisTableHeader = function(th){
-  const table = th.closest('table');
-  const colIndex = Array.from(th.parentNode.children).indexOf(th);
-  const allRows = Array.from(table.querySelectorAll('tr')).slice(1); // skip header row
-  const totalRows = allRows.filter(r => r.classList.contains('total-row'));
-  const dataRows = allRows.filter(r => !r.classList.contains('total-row'));
-
-  const prevCol = table.dataset.sortCol;
-  const prevDir = table.dataset.sortDir || 'asc';
-  const newDir = (prevCol === String(colIndex) && prevDir === 'asc') ? 'desc' : 'asc';
-  table.dataset.sortCol = colIndex;
-  table.dataset.sortDir = newDir;
-
-  function cellValue(row){
-    const cell = row.children[colIndex];
-    if (!cell) return '';
-    const text = cell.textContent.trim();
-    const cleaned = text.replace(/[,%]/g, '');
-    const num = parseFloat(cleaned);
-    if (!isNaN(num) && /^-?[\d.]+$/.test(cleaned)) return num;
-    return text.toLowerCase();
-  }
-
-  dataRows.sort((a, b) => {
-    const va = cellValue(a), vb = cellValue(b);
-    if (typeof va === 'number' && typeof vb === 'number') return newDir === 'asc' ? va - vb : vb - va;
-    return newDir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
-  });
-
-  table.querySelectorAll('th .sort-arrow').forEach(a => a.textContent = '');
-  const arrow = th.querySelector('.sort-arrow');
-  if (arrow) arrow.textContent = newDir === 'asc' ? ' \u25B2' : ' \u25BC';
-
-  dataRows.forEach(r => table.appendChild(r));
-  totalRows.forEach(r => table.appendChild(r));
-};
 
 function renderSummaryScopeChips(){
   const box = document.getElementById('summaryScopeChips');
@@ -1697,7 +1318,7 @@ function renderSummaryTab(){
   const isOverall = summaryScope === null;
   const fex = computeExtrapolatedRows();
   const scoped = isOverall ? fex : fex.filter(r => r.area === summaryScope);
-  const unsortedAreas = areas.filter(a => !a.defaultMaterialId && areaPoolOnlyPresortLive(a.name) > 0 && areaTotalSortedLive(a.name) === 0);
+  const unsortedAreas = areas.filter(a => areaTotalPresortLive(a.name) > 0 && areaTotalSortedLive(a.name) === 0);
   const scopedUnsorted = isOverall ? unsortedAreas : unsortedAreas.filter(a => a.name === summaryScope);
   const activeAreaNames = isOverall
     ? areas.filter(a => !unsortedAreas.includes(a)).map(a => a.name)
@@ -1706,7 +1327,7 @@ function renderSummaryTab(){
   // Direct pre-sort total for one area+stream — always correct regardless of whether that
   // specific stream was sorted (mirrors presortTotalFormula() in the Excel export exactly).
   function presortTotalLive(areaName, stream){
-    if (isCombinedWeighSort(stream)){
+    if (stream === 'Cardboard Recycling'){
       return sortedEntries.filter(e => e.area === areaName && e.stream === stream).reduce((s,e) => s + e.weight, 0);
     }
     return presortEntries.filter(e => e.area === areaName && e.stream === stream).reduce((s,e) => s + e.weight, 0);
@@ -1747,15 +1368,15 @@ function renderSummaryTab(){
         catWeight += weight;
         if (weight === 0) return;
         const diverted = matStreamData.filter(r => r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
-        t2Html += `<tr><td>${s}</td><td>${cat}</td><td>${m.name}</td><td class="num">${lbs(weight)}</td>
+        t2Html += `<tr><td>${cat}</td><td>${m.name}</td><td>${s}</td><td class="num">${lbs(weight)}</td>
           <td class="num">${pct(grandTotal?weight/grandTotal:0)}</td><td class="num">${lbs(diverted)}</td>
           <td class="num">${pct(weight?diverted/weight:0)}</td><td>${m.divertible}</td></tr>`;
       });
     });
     catTotals[cat] = catWeight;
   });
-  html += renderAnalysisTable('Waste Characterization',
-    ['Waste Stream','Category','Material','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted','Divertible?'], t2Html);
+  html += renderAnalysisTable('Waste Stream Breakdown — by Material Type',
+    ['Category','Material','Waste Stream','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted','Divertible?'], t2Html);
 
   // ---- Table 3: Total Waste Consumption (by category) ----
   const categorySum = Object.values(catTotals).reduce((s,v) => s+v, 0);
@@ -1889,23 +1510,23 @@ function buildWorkbook(){
   }
 
   // Areas
-  const areaRows = [['area_id','area_name','rollup_group','default_material_id']];
-  areas.forEach(a => areaRows.push([a.id, a.name, a.rollup, a.defaultMaterialId || '']));
+  const areaRows = [['area_id','area_name','rollup_group']];
+  areas.forEach(a => areaRows.push([a.id, a.name, a.rollup]));
   XLSX.utils.book_append_sheet(wb, makeSheet(areaRows), 'Areas');
   const AREAS_LAST = areaRows.length;
 
   // Streams
-  const streamRows = [['stream_name','combined_weigh_sort']];
-  streamConfig.forEach(s => streamRows.push([s.name, s.combinedWeighSort ? 'Yes' : 'No']));
+  const streamRows = [['stream_name']];
+  STREAMS.forEach(s => streamRows.push([s]));
   XLSX.utils.book_append_sheet(wb, makeSheet(streamRows), 'Streams');
 
   // Fact_SortedWeights
   const fsHeader = ['audit_id','stream','area','material_id','weight_lbs',
                      'material_name','material_category','currently_divertible','accepted_in_program',
-                     'belongs_here','rollup_group','non_representative','notes'];
+                     'belongs_here','rollup_group','notes'];
   const fsRows = [fsHeader];
   sortedEntries.forEach(e => fsRows.push([AUDIT_ID, e.stream, e.area, e.materialId, e.weight,
-    null,null,null,null,null,null, e.nonRepresentative ? 'Yes' : 'No', e.note || '']));
+    null,null,null,null,null,null, e.note || '']));
   const FS_LAST = fsRows.length;
   for (let r = 2; r <= FS_LAST; r++){
     fsRows[r-1][5] = {f:`IFERROR(INDEX('Materials Master'!$B$2:$B$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
@@ -1918,13 +1539,12 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, makeSheet(fsRows), 'Fact_SortedWeights');
 
   // Fact_PreSortWeights
-  const psHeader = ['audit_id','stream','area','bag_number','weight_lbs','known_material_id','notes'];
-  const psRows = [psHeader];
+  const psRows = [['audit_id','stream','area','bag_number','weight_lbs','notes']];
   const bagCounters = {};
   presortEntries.forEach(e => {
     const key = e.stream + '|' + e.area;
     bagCounters[key] = (bagCounters[key] || 0) + 1;
-    psRows.push([AUDIT_ID, e.stream, e.area, bagCounters[key], e.weight, e.knownMaterialId || '', e.note || '']);
+    psRows.push([AUDIT_ID, e.stream, e.area, bagCounters[key], e.weight, e.note || '']);
   });
   const PS_LAST = psRows.length;
   XLSX.utils.book_append_sheet(wb, makeSheet(psRows), 'Fact_PreSortWeights');
@@ -1944,11 +1564,9 @@ function buildWorkbook(){
   const FSW_AREA = `Fact_SortedWeights!$C$2:$C$${FS_LAST}`;
   const FSW_MATID = `Fact_SortedWeights!$D$2:$D$${FS_LAST}`;
   const FSW_W = `Fact_SortedWeights!$E$2:$E$${FS_LAST}`;
-  const FSW_NONREP = `Fact_SortedWeights!$L$2:$L$${FS_LAST}`;
   const PSW_STREAM = `Fact_PreSortWeights!$B$2:$B$${PS_LAST}`;
   const PSW_AREA = `Fact_PreSortWeights!$C$2:$C$${PS_LAST}`;
   const PSW_W = `Fact_PreSortWeights!$E$2:$E$${PS_LAST}`;
-  const PSW_KNOWN = `Fact_PreSortWeights!$F$2:$F$${PS_LAST}`;
 
   const usedSheetNames = new Set();
   function excelSafeSheetName(raw){
@@ -1971,29 +1589,20 @@ function buildWorkbook(){
   function areaSortedTotal(areaName){
     return sortedEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
   }
-  // Pool-only presort weight — excludes known-composition bags, since those don't need a
-  // sorted sample to be understood. This (not the full presort total) is what should decide
-  // whether an area counts as "unsorted": a known-only area needs no sorting at all.
-  function areaPoolOnlyPresortTotal(areaName){
-    return presortEntries.filter(e => e.area === areaName && !e.knownMaterialId).reduce((s,e) => s + e.weight, 0);
-  }
   function areaPresortTotalJS(areaName){
     const bagged = presortEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
-    const combined = sortedEntries.filter(e => e.area === areaName && isCombinedWeighSort(e.stream)).reduce((s,e) => s + e.weight, 0);
-    return bagged + combined;
+    const loose = sortedEntries.filter(e => e.area === areaName && e.stream === 'Cardboard Recycling').reduce((s,e) => s + e.weight, 0);
+    return bagged + loose;
   }
-  const unsortedAreas = areas.filter(a => !a.defaultMaterialId && areaPoolOnlyPresortTotal(a.name) > 0 && areaSortedTotal(a.name) === 0);
+  const unsortedAreas = areas.filter(a => areaPresortTotalJS(a.name) > 0 && areaSortedTotal(a.name) === 0);
   function unsortedAreaWeightFormula(areaName){
-    const combinedTerms = STREAMS.filter(isCombinedWeighSort)
-      .map(s => `+SUMIFS(${FSW_W},${FSW_AREA},"${areaName}",${FSW_STREAM},"${s}")`).join('');
-    return `SUMIFS(${PSW_W},${PSW_AREA},"${areaName}")${combinedTerms}`;
+    return `SUMIFS(${PSW_W},${PSW_AREA},"${areaName}")+SUMIFS(${FSW_W},${FSW_AREA},"${areaName}",${FSW_STREAM},"Cardboard Recycling")`;
   }
   // Direct pre-sort total for one area+stream — always correct regardless of whether that
   // specific stream was sorted, unlike summing Fact_Extrapolated (which is 0 wherever
-  // sortedTotal=0, even if real pre-sort weight exists for that exact area+stream). Already
-  // includes known-composition bags along with pool bags — both are real weight in the stream.
+  // sortedTotal=0, even if real pre-sort weight exists for that exact area+stream).
   function presortTotalFormula(areaName, stream){
-    if (isCombinedWeighSort(stream)) return `SUMIFS(${FSW_W},${FSW_AREA},"${areaName}",${FSW_STREAM},"${stream}")`;
+    if (stream === 'Cardboard Recycling') return `SUMIFS(${FSW_W},${FSW_AREA},"${areaName}",${FSW_STREAM},"${stream}")`;
     return `SUMIFS(${PSW_W},${PSW_AREA},"${areaName}",${PSW_STREAM},"${stream}")`;
   }
 
@@ -2001,56 +1610,34 @@ function buildWorkbook(){
   const fexRows = [['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','rollup_group','belongs_here']];
   areas.forEach(a => {
     STREAMS.forEach(s => {
-      const combined = isCombinedWeighSort(s);
       materials.forEach(m => {
-        const r = fexRows.length + 1;
-        const areaRef = `$A${r}`, streamRef = `$B${r}`, matRef = `$C${r}`;
-        const nameExpr = {f:`IFERROR(INDEX('Materials Master'!$B$2:$B$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
-        const catExpr = {f:`IFERROR(INDEX('Materials Master'!$C$2:$C$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
-        let weightExpr;
-        if (combined){
-          // Weighed and sorted in one action — every pound is a direct observation, so
-          // knownMaterialId/nonRepresentative don't apply here (both are about inferring
-          // the UNOBSERVED rest of a bag, which doesn't exist for this stream type).
-          weightExpr = {f:`SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef})`};
-        } else {
-          const poolExpr = `SUMIFS(${PSW_W},${PSW_AREA},${areaRef},${PSW_STREAM},${streamRef},${PSW_KNOWN},"")`;
-          const repTotalExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_NONREP},"No")`;
-          const repWeightExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef},${FSW_NONREP},"No")`;
-          const nonRepAllExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_NONREP},"Yes")`;
-          const nonRepWeightExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef},${FSW_NONREP},"Yes")`;
-          const knownWeightExpr = `SUMIFS(${PSW_W},${PSW_AREA},${areaRef},${PSW_STREAM},${streamRef},${PSW_KNOWN},${matRef})`;
-          // A non-representative item's weight is physically part of a pool bag already
-          // counted in poolExpr — subtract it before scaling, then add it back as itself,
-          // or it gets double-counted (once via the ratio, once via its own flat weight).
-          // Known-composition bags are excluded from the pool entirely and added back the
-          // same way, since they never needed a sorted sample to be understood.
-          const effectivePoolExpr = `(${poolExpr})-(${nonRepAllExpr})`;
-          // Nothing was ever sorted for this area+stream, but if the area has a default
-          // material set (e.g. Bathroom -> Paper Fibers/FSP), route the pool straight to
-          // it rather than leaving every material at 0 and falling back to an unlabeled lump.
-          const ratioTermExpr = (a.defaultMaterialId === m.id)
-            ? `IF((${repTotalExpr})=0,${effectivePoolExpr},(${repWeightExpr})/(${repTotalExpr})*(${effectivePoolExpr}))`
-            : `IF((${repTotalExpr})=0,0,(${repWeightExpr})/(${repTotalExpr})*(${effectivePoolExpr}))`;
-          weightExpr = {f:`(${knownWeightExpr})+(${nonRepWeightExpr})+${ratioTermExpr}`};
-        }
-        const belongsExpr = `${mmBelongsExpr(matRef, streamRef)}="Yes"`;
-        const acceptedExpr = `INDEX('Materials Master'!$${acceptedCol}$2:$${acceptedCol}$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
-        // "diverted" — properly recycled/composted elsewhere (this row's stream is one of the
-        // material's target streams, it's actually accepted in the program, AND it's not
-        // literally Trash — being correctly placed IN Trash isn't "diversion", that's the point).
-        const cpExpr = {f:`IF(AND(${belongsExpr},${acceptedExpr}="Yes",${streamRef}<>"Trash"),1,0)`};
-        const rollupExpr = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$B$2:$B$${AREAS_LAST},0)),"")`};
-        // "belongs_here" — is this row's stream one of the material's target streams at all
-        // (Trash included)? For materials whose only target IS Trash, this is true when found
-        // in Trash (correctly placed as non-divertible), so 1-belongs_here correctly measures
-        // what share of Trash is actually divertible material thrown away wrongly.
-        const belongsHereExpr = {f:`IF(${belongsExpr},1,0)`};
-        fexRows.push([a.name, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr]);
+        fexRows.push([a.name, s, m.id, null, null, null, null, null, null, null]);
       });
     });
   });
   const FEX_LAST = fexRows.length;
+  for (let r = 2; r <= FEX_LAST; r++){
+    const areaRef = `$A${r}`, streamRef = `$B${r}`, matRef = `$C${r}`;
+    fexRows[r-1][3] = {f:`IFERROR(INDEX('Materials Master'!$B$2:$B$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
+    fexRows[r-1][4] = {f:`IFERROR(INDEX('Materials Master'!$C$2:$C$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
+    const sortedTotalExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef})`;
+    const sortedWeightExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef})`;
+    const preSortExpr = `IF(${streamRef}="Cardboard Recycling",${sortedTotalExpr},SUMIFS(${PSW_W},${PSW_AREA},${areaRef},${PSW_STREAM},${streamRef}))`;
+    fexRows[r-1][5] = {f:`IF(${sortedTotalExpr}=0,0,${sortedWeightExpr}/${sortedTotalExpr}*(${preSortExpr}))`};
+    const belongsExpr = `${mmBelongsExpr(matRef, streamRef)}="Yes"`;
+    const acceptedExpr = `INDEX('Materials Master'!$${acceptedCol}$2:$${acceptedCol}$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
+    // "diverted" — properly recycled/composted elsewhere (this row's stream is one of the
+    // material's target streams, it's actually accepted in the program, AND it's not
+    // literally Trash — being correctly placed IN Trash isn't "diversion", that's the point).
+    fexRows[r-1][6] = {f:`IF(AND(${belongsExpr},${acceptedExpr}="Yes",${streamRef}<>"Trash"),1,0)`};
+    fexRows[r-1][7] = {f:acceptedExpr};
+    fexRows[r-1][8] = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$B$2:$B$${AREAS_LAST},0)),"")`};
+    // "belongs_here" — is this row's stream one of the material's target streams at all
+    // (Trash included)? For materials whose only target IS Trash, this is true when found in
+    // Trash (correctly placed as non-divertible), so 1-belongs_here correctly measures what
+    // share of Trash is actually divertible material thrown away wrongly — not trivially 100%.
+    fexRows[r-1][9] = {f:`IF(${belongsExpr},1,0)`};
+  }
   const fexSheet = makeSheet(fexRows);
   XLSX.utils.book_append_sheet(wb, fexSheet, 'Fact_Extrapolated');
 
@@ -2107,8 +1694,8 @@ function buildWorkbook(){
     // tab, and pastes cleanly into a pivot table or another tool without merged-looking
     // blank cells or having to reconstruct which stream a total came from.
     rows.push([]);
-    rows.push(['Waste Characterization']);
-    rows.push(['Waste Stream','Material Type Category','Material Type','Total Material Type Weight (lbs.)',
+    rows.push(['Waste Stream Breakdown — by Material Type']);
+    rows.push(['Material Type Category','Material Type','Waste Stream','Total Material Type Weight (lbs.)',
                 '% of Total Waste Stream','Weight of Material Diverted (lbs.)',
                 '% of Material Diverted','Currently Divertible?']);
     const catRowRanges = {}; // category -> [firstRow, lastRow] within Table 2, for Table 3 reuse
@@ -2120,12 +1707,12 @@ function buildWorkbook(){
           const rr = rows.length + 1;
           if (!catRowRanges[cat]) catRowRanges[cat] = [rr, rr]; else catRowRanges[cat][1] = rr;
           rows.push([
-            s, cat, m.name,
+            cat, m.name, s,
             {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}",${FEX_STREAM},"${s}"${ac})`},
             {f:`IF($B$${totalRow}=0,0,D${rr}/$B$${totalRow})`},
             {f:`SUMIFS(${FEX_W},${FEX_MATID},"${m.id}",${FEX_STREAM},"${s}"${ac},${FEX_CP},1)`},
             {f:`IF(D${rr}=0,0,F${rr}/D${rr})`},
-            {f:`INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(C${rr},'Materials Master'!$B$2:$B$${MM_LAST},0))`}
+            {f:`INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(B${rr},'Materials Master'!$B$2:$B$${MM_LAST},0))`}
           ]);
         });
       });
@@ -2231,32 +1818,18 @@ function buildWorkbook(){
   ];
   XLSX.utils.book_append_sheet(wb, makeSheet(notesRows), 'Notes & Assumptions');
 
-  // QA_Reconciliation — compares pool bag weight against the REPRESENTATIVE sorted sample
-  // (both known-composition bags and non-representative finds are deliberately excluded from
-  // each other's side of the ledger, so comparing raw totals would flag them as false
-  // mismatches). Known-composition and non-representative totals are shown separately so
-  // an auditor can see at a glance how much weight each mechanism is accounting for.
-  const qaRows = [['QA — Pre-sort pool weight vs. representative sorted sample'], [],
-    ['area','stream','presort_pool_lbs','known_composition_lbs','sorted_representative_lbs','non_representative_lbs','variance_lbs','variance_pct','flag']];
+  // QA_Reconciliation
+  const qaRows = [['QA — Pre-sort bag weights vs. sorted material weights'], [],
+    ['area','stream','presort_total_lbs','sorted_total_lbs','variance_lbs','variance_pct','flag']];
   areas.forEach(a => {
     STREAMS.forEach(s => {
       const rr = qaRows.length + 1;
-      if (isCombinedWeighSort(s)){
-        qaRows.push([a.name, s, 'n/a', 'n/a',
-          {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr})`},
-          {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"Yes")`},
-          'n/a', 'n/a', 'combined weigh-and-sort — no separate pre-sort step to compare'
-        ]);
-        return;
-      }
       qaRows.push([a.name, s,
-        {f:`SUMIFS(${PSW_W},${PSW_AREA},A${rr},${PSW_STREAM},B${rr},${PSW_KNOWN},"")`},
-        {f:`SUMIFS(${PSW_W},${PSW_AREA},A${rr},${PSW_STREAM},B${rr},${PSW_KNOWN},"<>")`},
-        {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"No")`},
-        {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"Yes")`},
-        {f:`E${rr}-C${rr}`},
-        {f:`IF(C${rr}=0,"n/a",G${rr}/C${rr})`},
-        {f:`IF(AND(C${rr}=0,E${rr}=0),"no data yet",IF(C${rr}=0,"no presort pool data",IF(E${rr}=0,"NOT YET SORTED",IF(ABS(H${rr})>0.15,"CHECK >15% variance","OK"))))`}
+        {f:`SUMIFS(${PSW_W},${PSW_AREA},A${rr},${PSW_STREAM},B${rr})`},
+        {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr})`},
+        {f:`D${rr}-C${rr}`},
+        {f:`IF(C${rr}=0,"n/a",E${rr}/C${rr})`},
+        {f:`IF(AND(C${rr}=0,D${rr}=0),"no data yet",IF(C${rr}=0,"no presort data",IF(D${rr}=0,"NOT YET SORTED",IF(ABS(F${rr})>0.15,"CHECK >15% variance","OK"))))`}
       ]);
     });
   });
@@ -2278,7 +1851,7 @@ function sheetRows(wb, name){
 }
 
 function parseImportedWorkbook(wb){
-  const result = {materials:null, areas:null, streamConfig:null, auditMeta:{}, sortedEntries:[], presortEntries:[]};
+  const result = {materials:null, areas:null, auditMeta:{}, sortedEntries:[], presortEntries:[]};
 
   // Materials Master — column POSITIONS have changed twice now (single target_stream ->
   // one Yes/No column per stream, accepted_in_program moving from computed to its own
@@ -2318,22 +1891,8 @@ function parseImportedWorkbook(wb){
 
   const areaRows = sheetRows(wb, 'Areas');
   if (areaRows && areaRows.length > 1){
-    const areaHeader = areaRows[0].map(h => (h == null ? '' : String(h)));
-    const defMatIdx = areaHeader.indexOf('default_material_id');
     result.areas = areaRows.slice(1).filter(r => r[0]).map(r => ({
-      id:r[0], name:r[1], rollup:r[2],
-      defaultMaterialId: (defMatIdx >= 0 && r[defMatIdx]) ? r[defMatIdx] : null
-    }));
-  }
-
-  // Streams — combined_weigh_sort is a newer column; older exports won't have it, so
-  // every stream just defaults to the normal bagged/sampled workflow.
-  const streamSheetRows = sheetRows(wb, 'Streams');
-  if (streamSheetRows && streamSheetRows.length > 1){
-    const header = streamSheetRows[0].map(h => (h == null ? '' : String(h)));
-    const cwsIdx = header.indexOf('combined_weigh_sort');
-    result.streamConfig = streamSheetRows.slice(1).filter(r => r[0]).map(r => ({
-      name: r[0], combinedWeighSort: cwsIdx >= 0 ? r[cwsIdx] === 'Yes' : false
+      id:r[0], name:r[1], rollup:r[2]
     }));
   }
 
@@ -2355,7 +1914,7 @@ function parseImportedWorkbook(wb){
     const fsHeader = fsRows[0].map(h => (h == null ? '' : String(h)));
     const streamIdx = fsHeader.indexOf('stream'), areaIdx = fsHeader.indexOf('area'),
           matIdx = fsHeader.indexOf('material_id'), wIdx = fsHeader.indexOf('weight_lbs'),
-          nonRepIdx = fsHeader.indexOf('non_representative'), noteIdx = fsHeader.indexOf('notes');
+          noteIdx = fsHeader.indexOf('notes');
     fsRows.slice(1).forEach(r => {
       if (!r || !r[streamIdx] || !r[areaIdx] || !r[matIdx]) return;
       const mat = materialsForLookup.find(m => m.id === r[matIdx]);
@@ -2363,7 +1922,6 @@ function parseImportedWorkbook(wb){
         area: r[areaIdx], stream: r[streamIdx], materialId: r[matIdx],
         materialName: mat ? mat.name : r[matIdx],
         weight: parseFloat(r[wIdx]) || 0,
-        nonRepresentative: nonRepIdx >= 0 ? r[nonRepIdx] === 'Yes' : false,
         note: (noteIdx >= 0 ? r[noteIdx] : '') || '', ts: Date.now() + Math.random()
       });
     });
@@ -2373,13 +1931,11 @@ function parseImportedWorkbook(wb){
   if (psRows && psRows.length > 1){
     const psHeader = psRows[0].map(h => (h == null ? '' : String(h)));
     const streamIdx = psHeader.indexOf('stream'), areaIdx = psHeader.indexOf('area'),
-          wIdx = psHeader.indexOf('weight_lbs'), knownIdx = psHeader.indexOf('known_material_id'),
-          noteIdx = psHeader.indexOf('notes');
+          wIdx = psHeader.indexOf('weight_lbs'), noteIdx = psHeader.indexOf('notes');
     psRows.slice(1).forEach(r => {
       if (!r || !r[streamIdx] || !r[areaIdx]) return;
       result.presortEntries.push({
         area: r[areaIdx], stream: r[streamIdx], weight: parseFloat(r[wIdx]) || 0,
-        knownMaterialId: (knownIdx >= 0 && r[knownIdx]) ? r[knownIdx] : null,
         note: (noteIdx >= 0 ? r[noteIdx] : '') || '', ts: Date.now() + Math.random()
       });
     });
@@ -2420,11 +1976,10 @@ document.getElementById('replaceImportBtn').onclick = async () => {
   if (!pendingImport) return;
   if (pendingImport.materials) materials = pendingImport.materials;
   if (pendingImport.areas) areas = pendingImport.areas;
-  if (pendingImport.streamConfig) applyStreamConfig(pendingImport.streamConfig);
   auditMeta = {...auditMeta, ...pendingImport.auditMeta};
   sortedEntries = pendingImport.sortedEntries;
   presortEntries = pendingImport.presortEntries;
-  await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta(); await saveSorted(); await savePresort();
+  await saveMaterials(); await saveAreas(); await saveMeta(); await saveSorted(); await savePresort();
   document.getElementById('importModal').classList.remove('show');
   pendingImport = null;
   renderAll();
@@ -2446,13 +2001,6 @@ document.getElementById('mergeImportBtn').onclick = async () => {
       if (existing) Object.assign(existing, ia); else areas.push(ia);
     });
   }
-  if (pendingImport.streamConfig){
-    pendingImport.streamConfig.forEach(isc => {
-      const existing = streamConfig.find(s => s.name === isc.name);
-      if (existing) Object.assign(existing, isc); else streamConfig.push(isc);
-    });
-    applyStreamConfig(streamConfig);
-  }
   Object.keys(pendingImport.auditMeta).forEach(k => {
     if (!auditMeta[k]) auditMeta[k] = pendingImport.auditMeta[k];
   });
@@ -2471,7 +2019,7 @@ document.getElementById('mergeImportBtn').onclick = async () => {
     if (!existingPresortKeys.has(presortKey(e))){ presortEntries.push(e); existingPresortKeys.add(presortKey(e)); addedPresort++; }
   });
 
-  await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta(); await saveSorted(); await savePresort();
+  await saveMaterials(); await saveAreas(); await saveMeta(); await saveSorted(); await savePresort();
   document.getElementById('importModal').classList.remove('show');
   pendingImport = null;
   renderAll();
