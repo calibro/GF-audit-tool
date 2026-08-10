@@ -643,11 +643,12 @@ function categoriesForStream(stream){
 }
 
 // ============================================================
-// Persistence (window.storage — personal, not shared).
-// This requires connectivity to the Claude platform to actually persist;
-// if the device is fully offline, saves will fail silently (status shown
-// in the header) but entries stay in memory for this session — export
-// to Excel works fully offline regardless, so export often as a backup.
+// Persistence (browser localStorage — this browser/device only, not shared across
+// devices). Works fully offline, with no external connectivity of any kind required —
+// it's local to the browser. Saves only fail if storage itself is unavailable (private
+// browsing in some older browsers, or the quota is full), which is what the status
+// indicator in the header reflects — export to Excel works regardless, so export often
+// as a backup.
 // ============================================================
 let saveOk = true;
 function setSaveStatus(ok){
@@ -655,22 +656,22 @@ function setSaveStatus(ok){
   const el = document.getElementById('saveStatus');
   el.innerHTML = ok
     ? '<span class="dot ok"></span>saved'
-    : '<span class="dot offline"></span>offline — not saved, export to back up';
+    : '<span class="dot offline"></span>storage blocked — not saved, export to back up';
 }
-async function loadState(){
-  try { const s = await window.storage.get('sortedEntries'); if (s) sortedEntries = JSON.parse(s.value); } catch(e){}
-  try { const p = await window.storage.get('presortEntries'); if (p) presortEntries = JSON.parse(p.value); } catch(e){}
-  try { const a = await window.storage.get('auditMeta'); if (a) auditMeta = {...auditMeta, ...JSON.parse(a.value)}; } catch(e){}
-  try { const m = await window.storage.get('materials'); if (m) materials = JSON.parse(m.value); } catch(e){}
-  try { const ar = await window.storage.get('areas'); if (ar) areas = JSON.parse(ar.value); } catch(e){}
-  try { const sc = await window.storage.get('streamConfig'); if (sc) applyStreamConfig(JSON.parse(sc.value)); } catch(e){}
+function loadState(){
+  try { const s = localStorage.getItem('sortedEntries'); if (s) sortedEntries = JSON.parse(s); } catch(e){}
+  try { const p = localStorage.getItem('presortEntries'); if (p) presortEntries = JSON.parse(p); } catch(e){}
+  try { const a = localStorage.getItem('auditMeta'); if (a) auditMeta = {...auditMeta, ...JSON.parse(a)}; } catch(e){}
+  try { const m = localStorage.getItem('materials'); if (m) materials = JSON.parse(m); } catch(e){}
+  try { const ar = localStorage.getItem('areas'); if (ar) areas = JSON.parse(ar); } catch(e){}
+  try { const sc = localStorage.getItem('streamConfig'); if (sc) applyStreamConfig(JSON.parse(sc)); } catch(e){}
 }
-async function saveSorted(){ try { await window.storage.set('sortedEntries', JSON.stringify(sortedEntries), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-async function savePresort(){ try { await window.storage.set('presortEntries', JSON.stringify(presortEntries), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-async function saveMeta(){ try { await window.storage.set('auditMeta', JSON.stringify(auditMeta), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-async function saveMaterials(){ try { await window.storage.set('materials', JSON.stringify(materials), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-async function saveAreas(){ try { await window.storage.set('areas', JSON.stringify(areas), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-async function saveStreamConfig(){ try { await window.storage.set('streamConfig', JSON.stringify(streamConfig), false); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
+function saveSorted(){ try { localStorage.setItem('sortedEntries', JSON.stringify(sortedEntries)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
+function savePresort(){ try { localStorage.setItem('presortEntries', JSON.stringify(presortEntries)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
+function saveMeta(){ try { localStorage.setItem('auditMeta', JSON.stringify(auditMeta)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
+function saveMaterials(){ try { localStorage.setItem('materials', JSON.stringify(materials)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
+function saveAreas(){ try { localStorage.setItem('areas', JSON.stringify(areas)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
+function saveStreamConfig(){ try { localStorage.setItem('streamConfig', JSON.stringify(streamConfig)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
 
 // ============================================================
 // UI helpers
@@ -3300,8 +3301,8 @@ document.getElementById('exportBtn').onclick = () => {
 // ============================================================
 // Init
 // ============================================================
-(async function init(){
-  await loadState();
+(function init(){
+  loadState();
   renderAll();
 })();
 </script>
