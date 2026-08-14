@@ -18,7 +18,7 @@
   *{box-sizing:border-box;}
   body{
     margin:0; background:var(--paper); color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-family:Arial,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     -webkit-tap-highlight-color:transparent;
   }
   header{
@@ -43,6 +43,10 @@
   main{padding:14px 12px 100px; max-width:950px; margin:0 auto;}
   .panel{display:none;}
   .panel.active{display:block;}
+  /* Sticks the Areas scope chips (Summaries/Charts) right below the already-sticky nav.tabs
+     bar, so the scope stays reachable while scrolling through long tables/charts — top is
+     set from nav.tabs' own measured height in JS, see stickScopeChipsTop(). */
+  .scope-sticky{position:sticky; z-index:18; background:var(--paper); margin:0 -12px; padding:10px 12px 8px;}
   .section-label{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#6c675a; margin:18px 0 8px; font-weight:700;}
   .section-label:first-child{margin-top:0;}
   .chips{display:flex; flex-wrap:wrap; gap:8px;}
@@ -99,7 +103,7 @@
   .chart-download-btn:hover{background:var(--brand-light);}
   .chart-svg-wrap{width:100%; overflow:hidden;}
   .chart-svg-wrap svg{width:100%; height:auto; display:block;}
-  .copy-table-btn{font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; border:1.5px solid var(--brand); background:#fff; color:var(--brand-dark); cursor:pointer; white-space:nowrap; flex-shrink:0;}
+  .copy-table-btn{font-size:12px; font-weight:600; padding:5px 12px; border-radius:6px; border:1.5px solid var(--brand); background:#fff; color:var(--brand-dark); cursor:pointer; white-space:nowrap; flex-shrink:0;}
   .copy-table-btn:hover{background:var(--brand-light);}
   .copy-table-btn:active{background:var(--brand); color:#fff;}
   table.analysis{width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:6px;}
@@ -161,9 +165,10 @@
   .info-field label{display:block; font-size:11px; text-transform:uppercase; color:#6c675a; font-weight:700; margin-bottom:4px;}
   .info-field input{width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;}
   .mm-cat-header{
-    background:var(--brand-light); font-weight:700; font-size:12px; padding:8px 10px; margin-top:14px;
-    border-radius:6px; color:var(--brand-dark);
+    background:var(--brand-light); font-weight:700; padding:10px 12px; border-radius:8px; color:var(--brand-dark);
+    display:flex; justify-content:space-between; align-items:center; cursor:pointer;
   }
+  .mm-cat-header-title{font-size:16px; font-weight:700; color:var(--brand-dark);}
   .mm-category-divider{
     background:#e9e7e0; font-weight:700; font-size:13px; color:#5c584d; padding:8px 10px; margin-top:18px;
     border-radius:6px; text-transform:uppercase; letter-spacing:0.03em;
@@ -180,7 +185,7 @@
   }
   .mm-card-fields-row{display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;}
   .mm-card-fields-row .mm-field{flex:0 1 160px;}
-  .mm-label{font-size:10px; color:#8a8578; display:block; margin-bottom:2px;}
+  .mm-label{font-size:10px; font-weight:700; color:#6c675a; display:block; margin-bottom:2px;}
   .mm-field{flex:1 1 140px; min-width:120px;}
   .mm-targets{flex:1 1 240px; min-width:220px;}
   .mm-target-chips{display:flex; flex-wrap:wrap; gap:4px;}
@@ -194,15 +199,11 @@
   .mm-badge{font-size:11px; padding:4px 8px; border-radius:12px; font-weight:600; white-space:nowrap;}
   .mm-badge.yes{background:var(--brand-light); color:var(--brand-dark);}
   .mm-badge.no{background:#f0ece2; color:#8a8578;}
-  .mm-del-btn{background:none; border:1px solid var(--danger); color:var(--danger); font-size:15px; cursor:pointer; padding:6px 12px; border-radius:6px; flex:0 0 auto; line-height:1;}
+  .mm-del-btn{background:none; border:1px solid var(--danger); color:var(--danger); font-size:12px; cursor:pointer; padding:3px 9px; border-radius:6px; flex:0 0 auto; line-height:1.4;}
   .area-row{display:flex; align-items:flex-end; gap:6px; padding:10px 4px; border-bottom:1px solid var(--line); flex-wrap:nowrap;}
   .area-field{flex:1 1 0; min-width:0;}
   .area-field input, .area-field select{width:100%; padding:8px 10px; border-radius:6px; border:1.5px solid var(--line); font-size:13px; box-sizing:border-box;}
-  .area-del-btn{flex:0 0 auto; font-size:15px; padding:9px 12px; line-height:1;}
-  .stream-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 4px; border-bottom:1px solid var(--line);}
-  .stream-row:last-child{border-bottom:none;}
-  .stream-row-name{font-size:13px; font-weight:600;}
-  .stream-row-toggle{display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;}
+  .area-del-btn{flex:0 0 auto; align-self:center;}
   .add-area-btn{margin-top:12px; background:var(--brand-light); color:var(--brand-dark); border:none; border-radius:8px; padding:10px 14px; font-size:13px; font-weight:700; cursor:pointer;}
   .info-icon{
     width:18px; height:18px; min-width:18px; border-radius:50%; border:1.5px solid #8a8578; background:#fff;
@@ -215,9 +216,6 @@
     font-size:12.5px; color:#4a4740; line-height:1.4; margin:2px 0 4px;
   }
   table.log th.num, table.log td.num{text-align:right;}
-  .mm-cat-header{
-    display:flex; justify-content:space-between; align-items:center; cursor:pointer;
-  }
   .mm-chevron{transition:transform .15s; font-size:13px;}
   .mm-chevron.open{transform:rotate(90deg);}
   .mm-cat-body{display:none;}
@@ -273,21 +271,22 @@
 
     <div class="section-label" style="margin-top:28px; font-size:14px; color:var(--brand-dark);">Audit configuration</div>
 
-    <div class="mm-cat-header" id="areasMainToggle" style="margin-top:10px; padding:10px 12px; background:var(--brand-light); border-radius:8px;">
-      <span style="font-size:16px; font-weight:700; color:var(--brand-dark);">Areas — define the points of generation for this site</span>
+    <div class="mm-cat-header" id="areasMainToggle" style="margin-top:10px;">
+      <span class="mm-cat-header-title">Areas — define the points of generation for this site</span>
       <span class="mm-chevron" id="areasMainChevron">▶</span>
     </div>
     <p class="note">Renaming an area does not update entries already logged under its old name — do this before the audit starts, not mid-session.</p>
     <div id="areasForm"></div>
 
-    <div class="mm-cat-header" id="streamsMainToggle" style="margin-top:24px; padding:10px 12px; background:var(--brand-light); border-radius:8px;">
-      <span style="font-size:16px; font-weight:700; color:var(--brand-dark);">Streams — mark any that are weighed and sorted in one step</span>
+    <div class="mm-cat-header" id="streamsMainToggle" style="margin-top:24px;">
+      <span class="mm-cat-header-title">Streams — the waste/recycling streams collected on-site</span>
       <span class="mm-chevron" id="streamsMainChevron">▶</span>
     </div>
+    <p class="note">Renaming a stream updates every material's target list automatically, but does not update entries already logged under its old name — do this before the audit starts, not mid-session. Trash is the built-in landfill baseline and can't be renamed or removed.</p>
     <div id="streamsForm"></div>
 
-    <div class="mm-cat-header" id="mmMainToggle" style="margin-top:24px; padding:10px 12px; background:var(--brand-light); border-radius:8px;">
-      <span style="font-size:16px; font-weight:700; color:var(--brand-dark);">Materials Master — edit if this site's program differs</span>
+    <div class="mm-cat-header" id="mmMainToggle" style="margin-top:24px;">
+      <span class="mm-cat-header-title">Materials Master — edit if this site's program differs</span>
       <span class="mm-chevron" id="mmMainChevron">▶</span>
     </div>
     <div id="materialsMasterForm"></div>
@@ -369,15 +368,19 @@
 
   <!-- ============ SUMMARIES ============ -->
   <div class="panel" id="panel-summaries">
-    <div class="section-label">Areas</div>
-    <div class="chips" id="summaryScopeChips"></div>
+    <div class="scope-sticky">
+      <div class="section-label">Areas</div>
+      <div class="chips" id="summaryScopeChips"></div>
+    </div>
     <div id="summaryContent"></div>
   </div>
 
   <!-- ============ CHARTS ============ -->
   <div class="panel" id="panel-charts">
-    <div class="section-label">Areas</div>
-    <div class="chips" id="chartsScopeChips"></div>
+    <div class="scope-sticky">
+      <div class="section-label">Areas</div>
+      <div class="chips" id="chartsScopeChips"></div>
+    </div>
     <div id="chartsContent"></div>
   </div>
 
@@ -536,16 +539,25 @@ const DEFAULT_AREAS = [
 ];
 
 const DEFAULT_STREAM_CONFIG = [
-  {name:'Trash', combinedWeighSort:false},
-  {name:'GMPC Recycling', combinedWeighSort:false},
-  {name:'Organics Recycling', combinedWeighSort:false},
+  // protected: Trash is hardcoded as the "not a real diversion" baseline in several places
+  // (materialCorrectlyPlacedIn, the Materials Master target-locking logic, the Excel export
+  // formulas) — renaming or deleting it would silently break those, so it's the one stream
+  // whose name/deletion is locked in the UI. Every other property (including
+  // combinedWeighSort) still applies to it normally.
+  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
+  {name:'GMPC Recycling', combinedWeighSort:false, excludeSoiled:false},
+  // excludeSoiled: soiled/contaminated variants of recyclables (Soiled Cardboard, Soiled
+  // Glass, etc.) aren't offered as sortable options for these streams — see
+  // materialsForStream(). Carried on the stream object itself (not matched by name) so it
+  // survives a rename.
+  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
   // Combined weigh-and-sort: loose/bulky material that's weighed and categorized in one
   // action rather than bagged-then-sampled. For these streams the Pre-Sort Bags tab is
   // suppressed entirely, and the stream's total is just the sum of Sorted Weights — there's
   // no separate "pool" to extrapolate against, since everything is directly observed.
-  {name:'Cardboard Recycling', combinedWeighSort:true},
-  {name:'Paper Recycling', combinedWeighSort:false},
-  {name:'Terracycle', combinedWeighSort:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
+  {name:'Paper Recycling', combinedWeighSort:false, excludeSoiled:false},
+  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false},
 ];
 // STREAMS stays a flat array of names — nearly all existing code (STREAMS.forEach,
 // STREAMS.includes, Materials Master's per-stream target columns) only ever needed the
@@ -555,6 +567,10 @@ let STREAMS = streamConfig.map(s => s.name);
 function isCombinedWeighSort(streamName){
   const cfg = streamConfig.find(s => s.name === streamName);
   return cfg ? !!cfg.combinedWeighSort : false;
+}
+function streamExcludesSoiled(streamName){
+  const cfg = streamConfig.find(s => s.name === streamName);
+  return cfg ? !!cfg.excludeSoiled : false;
 }
 function applyStreamConfig(newConfig){
   streamConfig = newConfig;
@@ -601,7 +617,6 @@ const MATERIAL_INFO = {
 };
 
 const SOILED_IDS = new Set(['FIB02','FIB05','FIB07','GLA02','MET02','PLA02']);
-const NO_SOILED_STREAMS = new Set(['Trash','Organics Recycling']);
 
 const AUDIT_ID = '120PARK-2025';
 
@@ -634,7 +649,7 @@ let editingSortedTs = null;
 let editingPresortTs = null;
 
 function materialsForStream(stream){
-  if (NO_SOILED_STREAMS.has(stream)) return materials.filter(m => !SOILED_IDS.has(m.id));
+  if (streamExcludesSoiled(stream)) return materials.filter(m => !SOILED_IDS.has(m.id));
   return materials;
 }
 function categoriesForStream(stream){
@@ -1020,16 +1035,46 @@ function renderStreamsForm(){
   const box = document.getElementById('streamsForm');
   box.innerHTML = '';
   if (!streamsOpen) return;
-  streamConfig.forEach(s => {
+  streamConfig.forEach((s, idx) => {
     const row = document.createElement('div');
-    row.className = 'stream-row';
+    row.className = 'area-row';
 
-    const nameEl = document.createElement('span');
-    nameEl.className = 'stream-row-name';
-    nameEl.textContent = s.name;
+    const nameWrap = document.createElement('div');
+    nameWrap.className = 'area-field';
+    const nameLabel = document.createElement('span');
+    nameLabel.className = 'mm-label';
+    nameLabel.textContent = 'Stream name';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = s.name;
+    if (s.protected){
+      nameInput.disabled = true;
+    } else {
+      // Renaming propagates to every material's target list (targets are matched by name,
+      // so an un-propagated rename would silently strip that stream as a valid target
+      // everywhere) — but, like renaming an Area, does NOT touch entries already logged
+      // under the old stream name.
+      nameInput.addEventListener('change', () => {
+        const newName = nameInput.value.trim();
+        if (!newName || newName === s.name){ nameInput.value = s.name; return; }
+        if (streamConfig.some(other => other !== s && other.name === newName)){
+          showToast('A stream with that name already exists');
+          nameInput.value = s.name;
+          return;
+        }
+        const oldName = s.name;
+        s.name = newName;
+        materials.forEach(m => { m.targets = m.targets.map(t => t === oldName ? newName : t); });
+        applyStreamConfig(streamConfig);
+        saveStreamConfig(); saveMaterials();
+        renderAll();
+      });
+    }
+    nameWrap.appendChild(nameLabel); nameWrap.appendChild(nameInput);
 
     const toggleWrap = document.createElement('label');
-    toggleWrap.className = 'stream-row-toggle';
+    toggleWrap.className = 'toggle-field';
+    toggleWrap.style.cssText = 'flex:1 1 260px; align-self:center;';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = !!s.combinedWeighSort;
@@ -1045,9 +1090,48 @@ function renderStreamsForm(){
     lab.textContent = 'Combined weigh-and-sort (no separate bagging)';
     toggleWrap.appendChild(cb); toggleWrap.appendChild(lab);
 
-    row.appendChild(nameEl); row.appendChild(toggleWrap);
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del-btn area-del-btn';
+    delBtn.textContent = '✕';
+    if (s.protected){
+      delBtn.disabled = true;
+      delBtn.style.cssText = 'opacity:0.35; cursor:not-allowed;';
+      delBtn.title = 'Trash can’t be removed — it’s the built-in landfill baseline the rest of the tool measures diversion against.';
+    } else {
+      delBtn.onclick = () => {
+        if (streamConfig.length <= 1) { showToast('At least one stream is required'); return; }
+        const removedName = s.name;
+        streamConfig.splice(idx, 1);
+        applyStreamConfig(streamConfig);
+        // A material's target list can't reference a stream that no longer exists — strip
+        // it, and if that leaves nothing, fall back to Trash (same rule as everywhere else),
+        // unless the material is Unacceptable, which can legitimately have no target at all.
+        materials.forEach(m => {
+          m.targets = m.targets.filter(t => t !== removedName);
+          if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = ['Trash'];
+        });
+        saveStreamConfig(); saveMaterials();
+        renderAll();
+        showToast('Removed ' + removedName);
+      };
+    }
+
+    row.appendChild(nameWrap); row.appendChild(toggleWrap); row.appendChild(delBtn);
     box.appendChild(row);
   });
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-area-btn';
+  addBtn.textContent = '+ Add stream';
+  addBtn.onclick = () => {
+    let n = 1, name = 'NEW STREAM';
+    while (streamConfig.some(s => s.name === name)) { n++; name = 'NEW STREAM ' + n; }
+    streamConfig.push({name, combinedWeighSort:false, excludeSoiled:false});
+    applyStreamConfig(streamConfig);
+    saveStreamConfig();
+    renderAll();
+  };
+  box.appendChild(addBtn);
 }
 document.getElementById('streamsMainToggle').onclick = () => { streamsOpen = !streamsOpen; renderStreamsForm(); };
 function makeSelectField(label, options, value, onChange){
@@ -1062,6 +1146,34 @@ function makeSelectField(label, options, value, onChange){
     opt.value = o; opt.textContent = o;
     if (o === value) opt.selected = true;
     sel.appendChild(opt);
+  });
+  sel.addEventListener('change', () => onChange(sel.value));
+  wrap.appendChild(lab); wrap.appendChild(sel);
+  return wrap;
+}
+
+// Same as makeSelectField, but for picking a material specifically — grouped into
+// <optgroup>s by category so a long flat list (25+ materials) isn't just one undifferentiated
+// scroll to hunt through.
+function makeMaterialSelectField(label, materialsList, value, onChange){
+  const wrap = document.createElement('div');
+  wrap.className = 'mm-field';
+  const lab = document.createElement('span');
+  lab.className = 'mm-label';
+  lab.textContent = label;
+  const sel = document.createElement('select');
+  CATEGORY_ORDER.forEach(cat => {
+    const inCat = materialsList.filter(m => m.category === cat);
+    if (!inCat.length) return;
+    const group = document.createElement('optgroup');
+    group.label = cat;
+    inCat.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name; opt.textContent = m.name;
+      if (m.name === value) opt.selected = true;
+      group.appendChild(opt);
+    });
+    sel.appendChild(group);
   });
   sel.addEventListener('change', () => onChange(sel.value));
   wrap.appendChild(lab); wrap.appendChild(sel);
@@ -1200,7 +1312,7 @@ function renderPresortKnownToggle(){
   wrap.appendChild(cb); wrap.appendChild(lab);
   box.appendChild(wrap);
   if (presortSel.knownMaterialId !== null){
-    const sel = makeSelectField('Material', materials.map(m => m.name),
+    const sel = makeMaterialSelectField('Material', materials,
       materials.find(m => m.id === presortSel.knownMaterialId)?.name || materials[0].name,
       v => { presortSel.knownMaterialId = materials.find(m => m.name === v).id; renderAll(); });
     sel.style.marginTop = '8px';
@@ -1842,7 +1954,11 @@ function buildAlluvialSvg(title, flow){
         srcCursor[s] = y0bottom;
         const y1top = tgtCursor[t], y1bottom = y1top + link.value*targetScale;
         tgtCursor[t] = y1bottom;
-        svg += `<path d="${ribbonPath(x1,y0top,y0bottom,x2,y1top,y1bottom)}" fill="${colorFn(s,t)}" fill-opacity="${opacity}" stroke="none" />`;
+        // A matching stroke (same color/opacity as the fill) keeps adjacent same-source
+        // ribbons knitted together with no visible seam between them — without it, touching
+        // ribbon edges can show a faint antialiasing hairline even though they're the same color.
+        const ribbonColor = colorFn(s,t);
+        svg += `<path d="${ribbonPath(x1,y0top,y0bottom,x2,y1top,y1bottom)}" fill="${ribbonColor}" fill-opacity="${opacity}" stroke="${ribbonColor}" stroke-opacity="${opacity}" stroke-width="1" stroke-linejoin="round" />`;
       });
     });
     return svg;
@@ -1924,6 +2040,88 @@ function buildAlluvialSvg(title, flow){
   </svg>`;
 }
 
+// ============================================================
+// Waste Stream Contamination — same matrix as the Summaries table of the same name
+// (one row per rollup group, one column per stream, cell = share of that stream's weight
+// that doesn't belong there), laid out as a ranked bar-per-cell table instead of a plain
+// text grid. Always the full rollup breakdown regardless of the Area scope chips — same
+// reasoning as the diversion charts, there's no useful "single area" version of a
+// group-comparison table.
+// ============================================================
+function computeContaminationByStream(){
+  const fex = computeExtrapolatedRows();
+  function rowFor(label, areaNames, isTotal){
+    const cells = STREAMS.map(s => {
+      const total = areaNames.reduce((sum,an) => sum + streamWeightForArea(an, s), 0);
+      const belongs = fex.filter(r => areaNames.includes(r.area) && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
+      const contamination = total === 0 ? 0 : 1 - belongs/total;
+      return {stream: s, pct: contamination, hasData: total > 0.005};
+    });
+    return {label, cells, isTotal};
+  }
+  const rollups = [...new Set(areas.map(a => a.rollup))];
+  const rows = rollups.map(rg => rowFor(rg, areas.filter(a => a.rollup === rg).map(a => a.name), false));
+  rows.push(rowFor('Total', areas.map(a => a.name), true));
+  return rows;
+}
+
+const CONTAMINATION_COLOR = '#a1372c'; // --danger
+
+function buildContaminationSvg(title, rows){
+  const streamsList = STREAMS;
+  const ML = 14, MR = 14, nameColW = 150, colW = Math.max(90, (760 - nameColW) / Math.max(1, streamsList.length));
+  const W = ML + nameColW + streamsList.length * colW + MR;
+  const headerLine1Y = 34, headerLine2Y = 47, bodyStartY = 58;
+  const rowH = 54, barH = 6, MB = 14;
+
+  if (!rows.length){
+    const H = 160;
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+      <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
+      <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
+    </svg>`;
+  }
+
+  const H = bodyStartY + rows.length * rowH + MB;
+  let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
+  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="700" fill="#5c584d">Area</text>`;
+
+  streamsList.forEach((s, i) => {
+    const cx = ML + nameColW + i*colW + colW/2;
+    const words = s.split(' ');
+    const lines = words.length > 1
+      ? [words.slice(0, Math.ceil(words.length/2)).join(' '), words.slice(Math.ceil(words.length/2)).join(' ')]
+      : [s];
+    svg += `<text x="${cx}" y="${headerLine1Y}" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1a1a">${escapeHtml(lines[0])}</text>`;
+    if (lines[1]) svg += `<text x="${cx}" y="${headerLine2Y}" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1a1a">${escapeHtml(lines[1])}</text>`;
+  });
+  svg += `<line x1="${ML}" y1="${bodyStartY-4}" x2="${W-MR}" y2="${bodyStartY-4}" stroke="#1a1a1a" stroke-width="1.5" />`;
+
+  rows.forEach((r, ri) => {
+    const rowTop = bodyStartY + ri*rowH;
+    if (r.isTotal){
+      svg += `<line x1="${ML}" y1="${rowTop}" x2="${W-MR}" y2="${rowTop}" stroke="#c7c2b4" stroke-width="1" stroke-dasharray="3 3" />`;
+    }
+    svg += `<text x="${ML}" y="${rowTop+rowH/2+4}" font-size="12" font-weight="${r.isTotal ? 700 : 600}" fill="#1a1a1a">${escapeHtml(r.label)}</text>`;
+    r.cells.forEach((c, i) => {
+      const colX = ML + nameColW + i*colW;
+      const barW = colW - 24;
+      const barX = colX + 12;
+      const pctY = rowTop + 20, barY = rowTop + 26;
+      if (!c.hasData){
+        svg += `<text x="${barX}" y="${pctY}" font-size="11" fill="#b4b2a9">—</text>`;
+        return;
+      }
+      const fillW = Math.max(2, c.pct * barW);
+      svg += `<text x="${barX}" y="${pctY}" font-size="13" font-weight="700" fill="${CONTAMINATION_COLOR}">${pct(c.pct)}</text>`;
+      svg += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="3" fill="#e9e7e0" />`;
+      svg += `<rect x="${barX}" y="${barY}" width="${fillW}" height="${barH}" rx="3" fill="${CONTAMINATION_COLOR}" />`;
+    });
+  });
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">${svg}</svg>`;
+}
+
 function computeCategoryBreakdown(scope){
   const rows = computeExtrapolatedRows();
   const areaNames = scope === null ? areas.map(a => a.name) : [scope];
@@ -1943,6 +2141,91 @@ function computeCategoryBreakdown(scope){
     // circle (which wraps back to meet the start), instead of scattering them wherever
     // their category happened to fall in CATEGORY_ORDER, so their callouts stack cleanly.
     .sort((a,b) => b.value - a.value);
+}
+
+// Per-material companion to computeCategoryBreakdown — same scope, same grand total (so its
+// percentages line up with the donut's), just broken out one row per material instead of
+// rolled up to category.
+function computeMaterialBreakdown(scope){
+  const rows = computeExtrapolatedRows();
+  const areaNames = scope === null ? areas.map(a => a.name) : [scope];
+  const totals = {};
+  materials.forEach(m => totals[m.id] = 0);
+  rows.forEach(r => {
+    if (areaNames.includes(r.area) && totals[r.materialId] !== undefined) totals[r.materialId] += r.weight;
+  });
+  const grandTotal = Object.values(totals).reduce((s,v) => s+v, 0);
+  const materialRows = materials
+    .map(m => ({id: m.id, name: m.name, category: m.category, divertible: m.divertible, weight: totals[m.id]}))
+    .filter(m => m.weight > 0.005)
+    .map(m => ({...m, pct: grandTotal ? m.weight/grandTotal : 0}));
+
+  // Grouped by category (biggest category first, same ordering the donut uses), and within
+  // each category biggest material first — rather than one flat weight-sorted list, so
+  // materials of the same type land next to each other instead of scattered by size alone.
+  const categoryTotals = {};
+  materialRows.forEach(m => { categoryTotals[m.category] = (categoryTotals[m.category]||0) + m.weight; });
+  return materialRows.sort((a,b) =>
+    a.category === b.category ? b.weight - a.weight : categoryTotals[b.category] - categoryTotals[a.category]
+  );
+}
+
+// Built as SVG (like the Characterization/Contamination charts) rather than an HTML table —
+// that's what lets this card use the same Download PNG pipeline as every other chart
+// (downloadChartCard just grabs the card's <svg>), instead of needing a separate export path.
+function buildMaterialTableSvg(title, materialRows){
+  const ML = 14, MR = 14, nameColW = 300, numColW = 100, divColW = 110;
+  const W = ML + nameColW + numColW*2 + divColW + MR;
+  const headerY = 20, bodyStartY = 32, catHeaderH = 22, rowH = 20, MB = 12;
+
+  if (!materialRows.length){
+    const H = 120;
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+      <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
+      <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
+    </svg>`;
+  }
+
+  // materialRows is already sorted category-then-weight (see computeMaterialBreakdown), so
+  // consecutive same-category rows are already contiguous — just group them as encountered.
+  const groups = [];
+  materialRows.forEach(m => {
+    const g = groups[groups.length - 1];
+    if (!g || g.category !== m.category) groups.push({category: m.category, materials: [m]});
+    else g.materials.push(m);
+  });
+
+  let bodyH = 0;
+  groups.forEach(g => { bodyH += catHeaderH + g.materials.length * rowH; });
+  const H = bodyStartY + bodyH + MB;
+
+  const col2R = ML + nameColW + numColW, col3R = col2R + numColW, col4X = col3R + 12;
+
+  let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
+  svg += `<text x="${ML}" y="${headerY}" font-size="11" font-weight="700" fill="#5c584d">Material</text>`;
+  svg += `<text x="${col2R-8}" y="${headerY}" text-anchor="end" font-size="11" font-weight="700" fill="#1a1a1a">Weight (lbs.)</text>`;
+  svg += `<text x="${col3R-8}" y="${headerY}" text-anchor="end" font-size="11" font-weight="700" fill="#1a1a1a">% of Total</text>`;
+  svg += `<text x="${col4X}" y="${headerY}" font-size="11" font-weight="700" fill="#1a1a1a">Divertible?</text>`;
+  svg += `<line x1="${ML}" y1="${bodyStartY-10}" x2="${W-MR}" y2="${bodyStartY-10}" stroke="#1a1a1a" stroke-width="1.5" />`;
+
+  let y = bodyStartY;
+  groups.forEach(g => {
+    svg += `<rect x="${ML}" y="${y}" width="${W-ML-MR}" height="${catHeaderH-6}" fill="#e9e7e0" rx="3" />
+      <text x="${ML+8}" y="${y+(catHeaderH-6)/2+4}" font-size="10.5" font-weight="700" fill="#5c584d">${escapeHtml(g.category.toUpperCase())}</text>`;
+    y += catHeaderH;
+    g.materials.forEach(m => {
+      const dotColor = CATEGORY_COLORS[m.category] || '#999';
+      const textY = y + rowH/2 + 3;
+      svg += `<circle cx="${ML+4}" cy="${y+rowH/2}" r="3.5" fill="${dotColor}" />`;
+      svg += `<text x="${ML+14}" y="${textY}" font-size="11" fill="#1a1a1a">${escapeHtml(truncateLabel(m.name, 42))}</text>`;
+      svg += `<text x="${col2R-8}" y="${textY}" text-anchor="end" font-size="11" fill="#1a1a1a">${lbs(m.weight)}</text>`;
+      svg += `<text x="${col3R-8}" y="${textY}" text-anchor="end" font-size="11" fill="#1a1a1a">${pct(m.pct)}</text>`;
+      svg += `<text x="${col4X}" y="${textY}" font-size="11" fill="#1a1a1a">${escapeHtml(m.divertible)}</text>`;
+      y += rowH;
+    });
+  });
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">${svg}</svg>`;
 }
 
 // Builds a donut chart as a self-contained SVG string, title included, so
@@ -2096,8 +2379,8 @@ function computeDiversionByArea(){
   return groups.filter(g => g.isTotal || g.current > 0 || g.potential > 0);
 }
 
-const DIVERSION_CURRENT_COLOR = '#1f5c4c'; // --brand
-const DIVERSION_POTENTIAL_COLOR = '#c98a1f'; // --amber
+const DIVERSION_CURRENT_COLOR = '#c98a1f'; // --amber
+const DIVERSION_POTENTIAL_COLOR = '#1f5c4c'; // --brand
 
 // Grouped bar chart as a self-contained SVG — two bars (current / potential rate) per
 // group, fixed 0-100% axis so bar heights are comparable across exports, and the Total
@@ -2304,10 +2587,14 @@ function renderChartsScopeChips(){
 // accepted, non-Trash placement (an actual diversion win). Amber: it's a target (e.g. a
 // non-accepted material's locked Trash target) but not a "diversion" in that sense — just
 // correctly landfilled. Red: this stream ISN'T one of the material's targets at all —
-// contamination, wherever it's found (including materials with no target anywhere).
-const PLACEMENT_COLORS = { correct: '#2f7a4f', neutral: '#c98a1f', contamination: '#a1372c' }; // --ok / --amber / --danger
-const PLACEMENT_LIGHT_COLORS = { correct: '#dcebe6', neutral: '#faedd3', contamination: '#f6dedb' }; // --brand-light / --amber-light / --danger-light
-function placementKind(correctlyPlaced, belongsHere){
+// contamination, wherever it's found. Purple: the material itself is marked Unacceptable
+// (e.g. e-waste, textiles) — every one of its cells would otherwise fall into the red
+// "contamination" bucket too (it has no target anywhere), but that's a different kind of
+// problem than a recyclable simply ending up in the wrong stream, so it gets its own color.
+const PLACEMENT_COLORS = { correct: '#2f7a4f', neutral: '#c98a1f', contamination: '#a1372c', unacceptable: '#7b4098' }; // --ok / --amber / --danger / purple
+const PLACEMENT_LIGHT_COLORS = { correct: '#dcebe6', neutral: '#faedd3', contamination: '#f6dedb', unacceptable: '#e8dcef' }; // --brand-light / --amber-light / --danger-light / light purple
+function placementKind(correctlyPlaced, belongsHere, divertible){
+  if (divertible === 'Unacceptable') return 'unacceptable';
   if (correctlyPlaced) return 'correct';
   if (belongsHere) return 'neutral';
   return 'contamination';
@@ -2332,7 +2619,7 @@ function computeCharacterizationMatrix(scope, hideZeroRows){
     .map(cat => ({
       category: cat,
       materials: materials.filter(m => m.category === cat).map(m => ({
-        id: m.id, name: m.name,
+        id: m.id, name: m.name, divertible: m.divertible,
         values: STREAMS.map(s => cell(m.id, s)),
       })),
     }))
@@ -2376,8 +2663,9 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
   // Legend
   const legendItems = [
     ['Correctly diverted', PLACEMENT_COLORS.correct],
-    ['Not divertible (belongs in Trash)', PLACEMENT_COLORS.neutral],
+    ['Not divertible', PLACEMENT_COLORS.neutral],
     ['Contamination — wrong stream', PLACEMENT_COLORS.contamination],
+    ['Unacceptable material', PLACEMENT_COLORS.unacceptable],
   ];
   let lx = ML;
   legendItems.forEach(([label, color]) => {
@@ -2385,6 +2673,8 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
       <text x="${lx+14}" y="${legendY}" font-size="10.5" fill="#3a3a38">${escapeHtml(label)}</text>`;
     lx += 26 + label.length * 5.6;
   });
+
+  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="700" fill="#5c584d">Material</text>`;
 
   // Column headers (wrapped to two lines on the middle space, if any)
   streamsList.forEach((s, i) => {
@@ -2411,7 +2701,7 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
         const value = m.values[i];
         const trackX = ML + nameColW + i*streamColW + 6;
         const trackY = rowY + (rowH-trackH)/2;
-        const kind = placementKind(value.correctlyPlaced, value.belongsHere);
+        const kind = placementKind(value.correctlyPlaced, value.belongsHere, m.divertible);
         const lightColor = PLACEMENT_LIGHT_COLORS[kind];
         // The track itself carries the placement tint, not just the fill — so a 0-value cell
         // still reads as "this stream isn't/is a correct target for this material" instead of
@@ -2448,6 +2738,7 @@ function chartCardHtml(title, svg, footerHtml){
     </div>`;
 }
 
+
 function renderChartsTab(){
   renderChartsScopeChips();
   const container = document.getElementById('chartsContent');
@@ -2457,6 +2748,9 @@ function renderChartsTab(){
 
   const title1 = 'Breakdown of Total Waste Stream by Material Type';
   const donutData = computeCategoryBreakdown(chartsScope);
+
+  const title1b = 'Breakdown of Total Waste Stream by Material Type — Table';
+  const materialRows = computeMaterialBreakdown(chartsScope);
 
   // Always the full per-area breakdown regardless of the Overall/Area scope chips above —
   // those chips scope the donut to one area at a time, but this chart's whole point is
@@ -2472,6 +2766,11 @@ function renderChartsTab(){
   // the potential rate marked as a threshold further along.
   const title2c = 'Current v Potential Diversion — Track View';
 
+  // Same matrix as the Summaries tab's "Waste Stream Contamination" table — also always the
+  // full rollup breakdown, same reasoning as the diversion charts above.
+  const title2d = 'Waste Stream Contamination';
+  const contaminationRows = computeContaminationByStream();
+
   const title3 = 'Waste Stream Characterization (lbs.)';
   const matrix = computeCharacterizationMatrix(chartsScope, charHideZeroRows);
   const char3ToggleHtml = `<label class="toggle-field" style="margin-top:12px;">
@@ -2485,11 +2784,13 @@ function renderChartsTab(){
 
   container.innerHTML =
     chartCardHtml(title1, buildDonutSvg(title1, donutData)) +
+    chartCardHtml(title1b, buildMaterialTableSvg(title1b, materialRows)) +
     chartCardHtml(title2, buildGroupedBarSvg(title2, diversionGroups)) +
     chartCardHtml(title2b, buildDumbbellSvg(title2b, diversionGroups)) +
     chartCardHtml(title2c, buildDiversionTrackSvg(title2c, diversionGroups)) +
     chartCardHtml(title0, buildAlluvialSvg(title0, flow)) +
-    chartCardHtml(title3, buildCharacterizationSvg(title3, matrix, charSharedScale), char3ToggleHtml);
+    chartCardHtml(title3, buildCharacterizationSvg(title3, matrix, charSharedScale), char3ToggleHtml) +
+    chartCardHtml(title2d, buildContaminationSvg(title2d, contaminationRows));
 }
 window.toggleCharScale = function(checked){
   charSharedScale = checked;
@@ -2540,7 +2841,43 @@ function renderSummaryTab(){
   html += renderAnalysisTable('Total Waste Generation — Day of Audit',
     ['Waste Stream','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted'], rowsHtml);
 
-  // ---- Table 2: Waste Stream Breakdown by Material ----
+  // ---- Table: Breakdown of Total Waste Stream by Material Type ----
+  // Same data (and same sort — biggest first) as the donut chart of the same name on the
+  // Charts tab, just as a copyable table here instead of a visual.
+  const catBreakdownTotals = {};
+  CATEGORY_ORDER.forEach(cat => catBreakdownTotals[cat] = 0);
+  scoped.forEach(r => { catBreakdownTotals[r.category] += r.weight; });
+  const catBreakdownRows = CATEGORY_ORDER
+    .map(cat => ({cat, weight: catBreakdownTotals[cat]}))
+    .filter(r => r.weight > 0.005)
+    .sort((a,b) => b.weight - a.weight);
+  const catBreakdownTotal = catBreakdownRows.reduce((s,r) => s + r.weight, 0);
+  let tCatHtml = catBreakdownRows.map(r =>
+    `<tr><td>${r.cat}</td><td class="num">${lbs(r.weight)}</td><td class="num">${pct(grandTotal?r.weight/grandTotal:0)}</td></tr>`
+  ).join('');
+  tCatHtml += `<tr class="total-row"><td>Total</td><td class="num">${lbs(catBreakdownTotal)}</td><td class="num">${pct(grandTotal?catBreakdownTotal/grandTotal:0)}</td></tr>`;
+  html += renderAnalysisTable('Breakdown of Total Waste Stream by Material Type', ['Category','Weight (lbs.)','% of Total'], tCatHtml);
+
+  // ---- Table 2a: Waste Characterization (no stream) ----
+  // Same per-material rows as Table 2b below, aggregated across streams — one row per
+  // material instead of one row per material x stream, for a quicker read when the stream
+  // breakdown itself isn't what's needed.
+  let t2aHtml = '';
+  CATEGORY_ORDER.forEach(cat => {
+    materials.filter(m => m.category === cat).forEach(m => {
+      const matData = scoped.filter(r => r.materialId === m.id);
+      const weight = matData.reduce((sum,r) => sum + r.weight, 0);
+      if (weight === 0) return;
+      const diverted = matData.filter(r => r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
+      t2aHtml += `<tr><td>${cat}</td><td>${m.name}</td><td class="num">${lbs(weight)}</td>
+        <td class="num">${pct(grandTotal?weight/grandTotal:0)}</td><td class="num">${lbs(diverted)}</td>
+        <td class="num">${pct(weight?diverted/weight:0)}</td><td>${m.divertible}</td></tr>`;
+    });
+  });
+  html += renderAnalysisTable('Waste Characterization (no stream)',
+    ['Category','Material','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted','Divertible?'], t2aHtml);
+
+  // ---- Table 2b: Waste Stream Breakdown by Material (by stream) ----
   // One row per (category, material, stream) combination that actually has weight —
   // Category is repeated on every row (not blanked after the first) and Waste Stream is
   // its own column, so this can be pasted straight into a pivot table or another tool
@@ -2563,7 +2900,7 @@ function renderSummaryTab(){
     });
     catTotals[cat] = catWeight;
   });
-  html += renderAnalysisTable('Waste Characterization',
+  html += renderAnalysisTable('Waste Characterization (by Stream)',
     ['Waste Stream','Category','Material','Weight (lbs.)','% of Total','Diverted (lbs.)','% Diverted','Divertible?'], t2Html);
 
   // ---- Table 3: Total Waste Consumption (by category) ----
@@ -2999,8 +3336,11 @@ function buildWorkbook(){
       rollups.forEach(rg => {
         const rr = rows.length + 1;
         const areaNamesInRollup = areas.filter(a => a.rollup === rg).map(a => a.name);
+        // Sum presortTotalFormula across every stream (not just one hardcoded name) — it
+        // already picks PSW vs FSW per stream based on that stream's own combined-weigh-sort
+        // flag, so this stays correct regardless of which streams are combined or renamed.
         const totalExpr = areaNamesInRollup.map(an =>
-          `SUMIFS(${PSW_W},${PSW_AREA},"${an}")+SUMIFS(${FSW_W},${FSW_AREA},"${an}",${FSW_STREAM},"Cardboard Recycling")`
+          STREAMS.map(s => presortTotalFormula(an, s)).join('+')
         ).join('+');
         rows.push([rg,
           {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_CP},1)/(${totalExpr}))`},
@@ -3011,7 +3351,7 @@ function buildWorkbook(){
       const divEnd = rows.length;
       const divTot = rows.length + 1;
       const allAreaTotalExpr = areas.map(a =>
-        `SUMIFS(${PSW_W},${PSW_AREA},"${a.name}")+SUMIFS(${FSW_W},${FSW_AREA},"${a.name}",${FSW_STREAM},"Cardboard Recycling")`
+        STREAMS.map(s => presortTotalFormula(a.name, s)).join('+')
       ).join('+');
       rows.push(['Total',
         {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_CP},1)/(${allAreaTotalExpr}))`},
@@ -3298,12 +3638,26 @@ document.getElementById('exportBtn').onclick = () => {
   showToast('Excel file downloaded');
 };
 
+// nav.tabs' own height varies with font rendering/zoom, so this measures it rather than
+// hardcoding a pixel guess — .scope-sticky should start sticking exactly where nav.tabs
+// (itself sticky at its own --nav-top) stops.
+function updateScopeStickyTop(){
+  const nav = document.querySelector('nav.tabs');
+  const els = document.querySelectorAll('.scope-sticky');
+  if (!nav || !els.length) return;
+  const navTop = parseFloat(getComputedStyle(nav).top) || 0;
+  const top = navTop + nav.offsetHeight;
+  els.forEach(el => { el.style.top = top + 'px'; });
+}
+window.addEventListener('resize', updateScopeStickyTop);
+
 // ============================================================
 // Init
 // ============================================================
 (function init(){
   loadState();
   renderAll();
+  updateScopeStickyTop();
 })();
 </script>
 </body>
