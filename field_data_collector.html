@@ -1737,7 +1737,7 @@ function computeExtrapolatedRows(){
         const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
         const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
         rows.push({area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
-                   weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), rollup:a.rollup});
+                   weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m), rollup:a.rollup});
       });
     });
   });
