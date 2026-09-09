@@ -96,6 +96,7 @@
   table.log{width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;}
   .summary-table-title{font-size:17px; font-weight:800; color:var(--brand-dark); margin:36px 0 10px; padding-top:20px; border-top:2px solid var(--brand-light); display:flex; align-items:baseline; justify-content:space-between; gap:12px;}
   .summary-table-title:first-child{margin-top:24px; padding-top:0; border-top:none;}
+  .table-actions{display:flex; align-items:center; gap:8px; flex-shrink:0;}
   .chart-card{background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-top:18px; margin-bottom:20px;}
   .chart-card-header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;}
   .chart-card-title{font-size:15px; font-weight:800; color:var(--brand-dark);}
@@ -221,9 +222,10 @@
   .mm-cat-body{display:none;}
   .mm-cat-body.open{display:block;}
   .session-btn{
-    background:transparent; border:1px solid #3d6b5c; color:#dcebe6; font-size:11px; font-weight:600;
-    padding:4px 10px; border-radius:999px; cursor:pointer;
+    background:var(--amber); border:1px solid var(--amber); color:#fff; font-size:13px; font-weight:700;
+    padding:8px 16px; border-radius:999px; cursor:pointer;
   }
+  .session-btn:hover{background:#b47b1a; border-color:#b47b1a;}
   .modal-overlay{
     position:fixed; inset:0; background:rgba(18,29,25,0.55); z-index:100; display:none;
     align-items:center; justify-content:center; padding:20px;
@@ -238,6 +240,23 @@
   }
   .modal-actions{display:flex; gap:10px;}
   .modal-actions .btn{flex:1;}
+  #printExportRoot{display:none;}
+  .print-page-title{font-size:22px; font-weight:800; color:var(--brand-dark); margin:0 0 2px;}
+  .print-page-meta{font-size:12px; color:#6c675a; margin:0 0 16px;}
+  @media print{
+    body *{visibility:hidden;}
+    #printExportRoot, #printExportRoot *{visibility:visible;}
+    #printExportRoot{display:block; position:absolute; top:0; left:0; width:100%;}
+    #printExportRoot .print-page{page-break-after:always;}
+    #printExportRoot .print-page:last-child{page-break-after:auto;}
+    /* Colored table headers/rows are stripped by default when printing — this keeps them. */
+    #printExportRoot *{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    #printExportRoot table.analysis{font-size:10.5px;}
+    #printExportRoot .summary-table-title{font-size:14px; margin:22px 0 8px; padding-top:12px;}
+    #printExportRoot .summary-table-title:first-of-type{margin-top:0;}
+    #printExportRoot .table-actions{display:none;} /* Copy/Image buttons make no sense on paper */
+    @page{size:A4; margin:15mm;}
+  }
 </style>
 </head>
 <body>
@@ -373,6 +392,7 @@
       <div class="chips" id="summaryScopeChips"></div>
     </div>
     <div id="summaryContent"></div>
+    <button class="btn btn-primary" id="exportAllAreasPdfBtn" style="width:100%; margin-top:24px;">⬇ Export all areas (PDF)</button>
   </div>
 
   <!-- ============ CHARTS ============ -->
@@ -435,7 +455,7 @@
 <div class="modal-overlay" id="newSessionModal">
   <div class="modal-box">
     <h3>Start a new session?</h3>
-    <p>This permanently deletes all logged pre-sort bags and sorted weight entries on this device. Audit Info and Materials Master settings are kept. Export first if you haven't already.</p>
+    <p>This permanently deletes all logged pre-sort bags and sorted weight entries on this device, and resets Audit Info, Areas, Streams, and Materials Master back to the defaults. Export first if you haven't already.</p>
     <p>Type <b>DELETE</b> to confirm.</p>
     <input type="text" id="deleteConfirmInput" placeholder="Type DELETE" autocomplete="off" autocapitalize="characters" />
     <div class="modal-actions">
@@ -459,6 +479,11 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Populated just before printing (see exportAllAreasPdf) and hidden the rest of the time —
+     window.print() with the @media print rules below is what turns this into an A4 PDF via
+     the browser's own "Save as PDF" print destination, no PDF library needed. -->
+<div id="printExportRoot"></div>
 
 <script>
 /* SheetJS is inlined below (no CDN / network call — works fully offline once this page has loaded once) */
@@ -1628,10 +1653,15 @@ document.getElementById('deleteConfirmInput').addEventListener('input', (e) => {
 document.getElementById('confirmNewSessionBtn').onclick = async () => {
   if (document.getElementById('deleteConfirmInput').value.trim().toUpperCase() !== 'DELETE') return;
   sortedEntries = []; presortEntries = [];
-  await saveSorted(); await savePresort();
+  materials = DEFAULT_MATERIALS.map(m => ({...m}));
+  areas = DEFAULT_AREAS.map(a => ({...a}));
+  applyStreamConfig(DEFAULT_STREAM_CONFIG.map(s => ({...s})));
+  AUDIT_FIELDS.forEach(f => auditMeta[f.key] = f.default);
+  auditMeta.auditDate = new Date().toISOString().slice(0,10);
+  await saveSorted(); await savePresort(); await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta();
   document.getElementById('newSessionModal').classList.remove('show');
   renderAll();
-  showToast('New session started — all entries cleared');
+  showToast('New session started — everything reset to defaults');
 };
 
 
@@ -1735,9 +1765,103 @@ function renderAnalysisTable(title, headers, bodyRowsHtml, extraClass){
   const headerHtml = headers.map(h =>
     `<th onclick="sortAnalysisTableHeader(this)">${h}<span class="sort-arrow"></span></th>`
   ).join('');
-  return `<div class="summary-table-title"><span>${title}</span><button type="button" class="copy-table-btn" onclick="copyAnalysisTable(this)">⧉ Copy table</button></div>
+  return `<div class="summary-table-title"><span>${title}</span>
+      <span class="table-actions">
+        <button type="button" class="copy-table-btn" onclick="copyAnalysisTable(this)">⧉ Copy table</button>
+        <button type="button" class="copy-table-btn" onclick="downloadAnalysisTableImage(this)">⬇ Image</button>
+      </span>
+    </div>
     <table class="analysis ${extraClass||''}"><tr>${headerHtml}</tr>${bodyRowsHtml}</table>`;
 }
+// Draws any rendered <table> onto a canvas, mirroring the analysis-table CSS closely enough
+// for a clean standalone image — shared by the per-table "Image" button and the all-areas
+// PDF export, so both use one drawing implementation instead of two.
+function renderTableToCanvas(table, title){
+  const trs = [...table.querySelectorAll('tr')];
+  if (!trs.length) return null;
+  const rows = trs.map(tr => ({
+    isTotal: tr.classList.contains('total-row'),
+    isCat: tr.classList.contains('cat-row'),
+    cells: [...tr.children].map(cell => {
+      const clone = cell.cloneNode(true);
+      clone.querySelectorAll('.sort-arrow').forEach(el => el.remove());
+      return { text: clone.textContent.trim(), isHeader: cell.tagName === 'TH', isNum: cell.classList.contains('num') };
+    }),
+  }));
+  const colCount = Math.max(...rows.map(r => r.cells.length));
+  const pad = 10, rowH = 26, titleH = title ? 34 : 0, fontSize = 12;
+  const measure = document.createElement('canvas').getContext('2d');
+  const colWidths = new Array(colCount).fill(30);
+  rows.forEach(r => {
+    r.cells.forEach((c, i) => {
+      measure.font = (c.isHeader || r.isTotal) ? `700 ${fontSize}px Arial` : `${fontSize}px Arial`;
+      const w = measure.measureText(c.text).width + pad*2;
+      if (w > colWidths[i]) colWidths[i] = w;
+    });
+  });
+  const totalW = colWidths.reduce((a,b) => a+b, 0);
+  const totalH = titleH + rows.length*rowH + 4;
+  const scale = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = totalW*scale; canvas.height = totalH*scale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, totalW, totalH);
+  let y = 0;
+  if (title){
+    ctx.fillStyle = '#123a30';
+    ctx.font = '800 15px Arial';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(title, pad, titleH/2);
+    y = titleH;
+  }
+  rows.forEach(r => {
+    const isHeaderRow = r.cells.length > 0 && r.cells.every(c => c.isHeader);
+    let x = 0;
+    if (isHeaderRow){
+      ctx.fillStyle = '#1f5c4c';
+      ctx.fillRect(0, y, totalW, rowH);
+    } else if (r.isTotal){
+      ctx.strokeStyle = '#1f5c4c'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(totalW, y); ctx.stroke();
+    }
+    r.cells.forEach((c, i) => {
+      const w = colWidths[i];
+      ctx.fillStyle = isHeaderRow ? '#ffffff' : '#16241f';
+      ctx.font = (isHeaderRow || r.isTotal || (r.isCat && i === 0)) ? `700 ${fontSize}px Arial` : `${fontSize}px Arial`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = c.isNum ? 'right' : 'left';
+      ctx.fillText(c.text, c.isNum ? x+w-pad : x+pad, y+rowH/2);
+      x += w;
+    });
+    if (!isHeaderRow){
+      ctx.strokeStyle = '#d8d3c6'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, y+rowH); ctx.lineTo(totalW, y+rowH); ctx.stroke();
+    }
+    y += rowH;
+  });
+  return canvas;
+}
+function downloadCanvasAsPng(canvas, filename){
+  canvas.toBlob(blob => {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = URL.createObjectURL(blob);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(link.href), 30000);
+  }, 'image/png');
+}
+window.downloadAnalysisTableImage = function(btn){
+  const wrap = btn.closest('.summary-table-title');
+  const table = wrap.nextElementSibling;
+  const title = wrap.querySelector('span').textContent;
+  if (!table){ showToast('Nothing to download'); return; }
+  const canvas = renderTableToCanvas(table, title);
+  if (!canvas){ showToast('Nothing to download'); return; }
+  downloadCanvasAsPng(canvas, title.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'') + '.png');
+};
 // Copies the whole table — header row and every data row, in reading order (respects
 // whatever sort is currently applied) — as tab-separated text. That's the format both
 // Excel/Sheets and RAWGraphs expect when pasting in a multi-column table.
@@ -1839,9 +1963,17 @@ function renderSummaryScopeChips(){
 // teal, since cardboard is a Fibers material; Organics <- its own matching swatch); Glass,
 // Plastics and Unacceptable extend the same family since the reference only had 5 colors
 // for our 7 categories.
+// Client's official brand palette (5 colors: Black, Dark Green, Light Green, Sand, Yellow).
+// Only 5 colors for 7 categories, so Glass and Unacceptable use a tint/shade derived from
+// Light Green and Yellow respectively, rather than a color outside the brand family.
 const CATEGORY_COLORS = {
-  Fibers: '#1fac8c', Glass: '#2f6f9e', Metals: '#5f7a72', Plastics: '#16bfa0',
-  Organics: '#6b2e10', Unacceptable: '#8a2e1f', Other: '#f28c28'
+  Fibers: '#c5b9ab', // Sand
+  Glass: '#73b3a2', // Light Green, lightened
+  Metals: '#000000', // Black
+  Plastics: '#017455', // Light Green
+  Organics: '#3e441e', // Dark Green
+  Unacceptable: '#6d6023', // Yellow, darkened
+  Other: '#f3d64e', // Yellow
 };
 let chartsScope = null; // null = Overall, else an area name
 let charSharedScale = false; // false = each stream column scaled to its own max; true = one scale for all columns
@@ -2807,17 +2939,18 @@ window.toggleCharHideZero = function(checked){
   renderChartsTab();
 };
 
-function renderSummaryTab(){
-  renderSummaryScopeChips();
-  const container = document.getElementById('summaryContent');
-  const isOverall = summaryScope === null;
+// All the Summaries tables for one scope (null = Overall, else an area name) — a plain
+// function of scope, not the live summaryScope global, so it can be called repeatedly for
+// each area (see buildAllAreasSummaryHtml) without disturbing what's on screen.
+function buildSummaryTablesHtml(scope){
+  const isOverall = scope === null;
   const fex = computeExtrapolatedRows();
-  const scoped = isOverall ? fex : fex.filter(r => r.area === summaryScope);
+  const scoped = isOverall ? fex : fex.filter(r => r.area === scope);
   const unsortedAreas = areas.filter(a => !a.defaultMaterialId && areaPoolOnlyPresortLive(a.name) > 0 && areaTotalSortedLive(a.name) === 0);
-  const scopedUnsorted = isOverall ? unsortedAreas : unsortedAreas.filter(a => a.name === summaryScope);
+  const scopedUnsorted = isOverall ? unsortedAreas : unsortedAreas.filter(a => a.name === scope);
   const activeAreaNames = isOverall
     ? areas.filter(a => !unsortedAreas.includes(a)).map(a => a.name)
-    : (scopedUnsorted.length ? [] : [summaryScope]);
+    : (scopedUnsorted.length ? [] : [scope]);
 
   // Direct pre-sort total for one area+stream — always correct regardless of whether that
   // specific stream was sorted (mirrors presortTotalFormula() in the Excel export exactly).
@@ -2963,7 +3096,11 @@ function renderSummaryTab(){
     html += renderAnalysisTable('Current v Potential Diversion', ['Generation Area','Current Diversion Rate','Potential Diversion Rate','Gap'], t5Html);
   }
 
-  container.innerHTML = html;
+  return html;
+}
+function renderSummaryTab(){
+  renderSummaryScopeChips();
+  document.getElementById('summaryContent').innerHTML = buildSummaryTablesHtml(summaryScope);
 }
 
 // ============================================================
@@ -3661,6 +3798,34 @@ document.getElementById('exportBtn').onclick = () => {
   const dateStr = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `120_Park_Ave_Field_Data_${dateStr}.xlsx`);
   showToast('Excel file downloaded');
+};
+
+// All Summaries tables for "Overall" plus every area, one printed page per scope — reuses
+// buildSummaryTablesHtml exactly as the live Summaries tab does, so this can never drift
+// from what's shown on screen.
+function buildAllAreasSummaryHtml(){
+  const scopes = [{name: 'Overall', scope: null}, ...areas.map(a => ({name: a.name, scope: a.name}))];
+  const metaLine = [auditMeta.clientName, auditMeta.siteName, auditMeta.hauler].filter(Boolean).join(' · ') || 'Client · Site · Hauler';
+  return scopes.map(({name, scope}) => `
+    <section class="print-page">
+      <div class="print-page-title">${escapeHtml(name)}</div>
+      <div class="print-page-meta">${escapeHtml(metaLine)}${auditMeta.auditDate ? ' · ' + escapeHtml(auditMeta.auditDate) : ''}</div>
+      ${buildSummaryTablesHtml(scope)}
+    </section>
+  `).join('');
+}
+document.getElementById('exportAllAreasPdfBtn').onclick = () => {
+  if (sortedEntries.length === 0 && presortEntries.length === 0){
+    showToast('Nothing logged yet');
+    return;
+  }
+  const root = document.getElementById('printExportRoot');
+  root.innerHTML = buildAllAreasSummaryHtml();
+  // afterprint cleans up regardless of whether the user actually saved a PDF or cancelled —
+  // the content only needs to exist for the moment the print dialog reads it.
+  const cleanup = () => { root.innerHTML = ''; window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  window.print();
 };
 
 // nav.tabs' own height varies with font rendering/zoom, so this measures it rather than
