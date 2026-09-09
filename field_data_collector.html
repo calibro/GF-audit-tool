@@ -26,6 +26,7 @@
     position:sticky; top:0; z-index:20;
   }
   header h1{margin:0; font-size:16px; font-weight:700; letter-spacing:.2px;}
+  .header-tagline{margin:2px 0 0; font-size:10px; color:#bcd4cb; font-weight:400;}
   .status-line{display:flex; justify-content:space-between; align-items:center; margin-top:4px;}
   .status-line p{margin:0; font-size:11.5px; color:#bcd4cb;}
   .save-status{font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px;}
@@ -165,6 +166,9 @@
   @media(min-width:520px){.info-form{grid-template-columns:1fr 1fr;}}
   .info-field label{display:block; font-size:11px; text-transform:uppercase; color:#6c675a; font-weight:700; margin-bottom:4px;}
   .info-field input{width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;}
+  .scenario-picker{margin:10px 0 20px; max-width:420px;}
+  .scenario-picker label{display:block; font-size:11px; text-transform:uppercase; color:#6c675a; font-weight:700; margin-bottom:4px;}
+  .scenario-picker select{width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid var(--line); font-size:14px; background:#fff; color:var(--ink); font-family:inherit;}
   .mm-cat-header{
     background:var(--brand-light); font-weight:700; padding:10px 12px; border-radius:8px; color:var(--brand-dark);
     display:flex; justify-content:space-between; align-items:center; cursor:pointer;
@@ -263,6 +267,7 @@
 
 <header>
   <h1>Great Forest Audit Tool</h1>
+  <p class="header-tagline">Prototype developed by Calibro for Great Forest</p>
   <div class="status-line">
     <p id="headerSubtitle">Client &middot; Site &middot; Hauler</p>
     <span style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
@@ -289,6 +294,11 @@
     <div class="info-form" id="auditInfoForm"></div>
 
     <div class="section-label" style="margin-top:28px; font-size:14px; color:var(--brand-dark);">Audit configuration</div>
+
+    <div class="scenario-picker">
+      <label for="scenarioSelect">Configuration scenario</label>
+      <select id="scenarioSelect"></select>
+    </div>
 
     <div class="mm-cat-header" id="areasMainToggle" style="margin-top:10px;">
       <span class="mm-cat-header-title">Areas — define the points of generation for this site</span>
@@ -561,8 +571,6 @@ function materialHasDivertiblePath(m){ return m.accepted === 'Yes' && m.targets.
 const DEFAULT_AREAS = [
   {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
   {id:'CAFE_BOH', name:'CAFÉ BOH', rollup:'BOH', defaultMaterialId:null},
-  {id:'LOC_C', name:'LOCATION C', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'LOC_D', name:'LOCATION D', rollup:'Rest of Building', defaultMaterialId:null},
   // Bathroom waste is routinely never sorted (sanitary reasons) but is reliably almost all
   // paper towels/toilet paper — rather than showing as an unlabeled "Area Waste" lump, this
   // default assumption lets it flow into the normal material breakdown like everything else.
@@ -590,6 +598,121 @@ const DEFAULT_STREAM_CONFIG = [
   {name:'Paper Recycling', combinedWeighSort:false, excludeSoiled:false},
   {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false},
 ];
+
+// ============================================================
+// Configuration scenarios — presets that swap Areas/Streams/Materials Master together as a
+// unit, for clients who run the same handful of program setups across sites. Scenario 1 is
+// exactly today's defaults (unchanged). Scenario 2/3 are starting points, not final client
+// data — Great Forest can rename/edit anything after picking one, same as always; picking a
+// different scenario just seeds the three sections instead of leaving them blank.
+// ============================================================
+const SCENARIO_2_MATERIALS = [
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
+  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['Single-Stream Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
+  ['FIB06','Beverage Cartons','Fibers','Yes',['Single-Stream Recycling'],'Yes'],
+  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
+  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Single-Stream Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Single-Stream Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
+  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['Single-Stream Recycling'],'Yes'],
+  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
+  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
+  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
+  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
+  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
+  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
+  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['OTH01','Snack Wrappers (Composites)','Other','No',['Trash'],'No'],
+  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
+].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
+const SCENARIO_2_AREAS = [
+  {id:'SALES', name:'SALES FLOOR', rollup:'Front of House', defaultMaterialId:null},
+  {id:'STOCK', name:'STOCKROOM', rollup:'Back of House', defaultMaterialId:null},
+  {id:'BREAK', name:'BREAK ROOM', rollup:'Back of House', defaultMaterialId:null},
+  {id:'OFFICE2', name:'OFFICE', rollup:'Back of House', defaultMaterialId:null},
+  {id:'DOCK2', name:'LOADING DOCK', rollup:'Back of House', defaultMaterialId:null},
+];
+const SCENARIO_2_STREAM_CONFIG = [
+  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
+  {name:'Single-Stream Recycling', combinedWeighSort:false, excludeSoiled:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
+  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
+];
+
+const SCENARIO_3_MATERIALS = [
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
+  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['Paper Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
+  ['FIB06','Beverage Cartons','Fibers','Yes',['Paper Recycling'],'Yes'],
+  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
+  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Glass Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Metal & Plastic Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
+  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['Metal & Plastic Recycling'],'Yes'],
+  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
+  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
+  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
+  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
+  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
+  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
+  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
+  ['OTH01','Snack Wrappers (Composites)','Other','Yes',['Terracycle'],'No'],
+  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
+  ['OTH03','Electronics / E-Waste','Other','Yes',['Electronics Recycling'],'Yes'],
+].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
+const SCENARIO_3_AREAS = [
+  {id:'LOBBY3', name:'LOBBY', rollup:'Rest of Building', defaultMaterialId:null},
+  {id:'SUITES3', name:'TENANT SUITES', rollup:'Rest of Building', defaultMaterialId:null},
+  {id:'CAFE3', name:'CAFETERIA', rollup:'BOH', defaultMaterialId:null},
+  {id:'DOCK3', name:'LOADING DOCK', rollup:'BOH', defaultMaterialId:null},
+  {id:'MAIL3', name:'MAIL ROOM', rollup:'Rest of Building', defaultMaterialId:null},
+];
+const SCENARIO_3_STREAM_CONFIG = [
+  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
+  {name:'Paper Recycling', combinedWeighSort:false, excludeSoiled:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
+  {name:'Glass Recycling', combinedWeighSort:false, excludeSoiled:true},
+  {name:'Metal & Plastic Recycling', combinedWeighSort:false, excludeSoiled:false},
+  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
+  {name:'Electronics Recycling', combinedWeighSort:true, excludeSoiled:false},
+  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false},
+];
+
+const SCENARIOS = [
+  {
+    id:'scenario1', label:'Scenario 1',
+    description:'Standard office/retail program — GMPC, Cardboard, Paper, Organics Recycling and TerraCycle.',
+    materials:DEFAULT_MATERIALS, areas:DEFAULT_AREAS, streamConfig:DEFAULT_STREAM_CONFIG,
+  },
+  {
+    id:'scenario2', label:'Scenario 2',
+    description:'Simplified single-stream program — Single-Stream Recycling, Cardboard Recycling and Organics Recycling only.',
+    materials:SCENARIO_2_MATERIALS, areas:SCENARIO_2_AREAS, streamConfig:SCENARIO_2_STREAM_CONFIG,
+  },
+  {
+    id:'scenario3', label:'Scenario 3',
+    description:'Expanded multi-stream program — separate Paper, Glass and Metal & Plastic recycling, plus Electronics Recycling and TerraCycle.',
+    materials:SCENARIO_3_MATERIALS, areas:SCENARIO_3_AREAS, streamConfig:SCENARIO_3_STREAM_CONFIG,
+  },
+];
+
 // STREAMS stays a flat array of names — nearly all existing code (STREAMS.forEach,
 // STREAMS.includes, Materials Master's per-stream target columns) only ever needed the
 // name, not the config, so this keeps that code working unchanged.
@@ -667,6 +790,13 @@ const AUDIT_FIELDS = [
 // ============================================================
 let materials = DEFAULT_MATERIALS.map(m => ({...m}));
 let areas = DEFAULT_AREAS.map(a => ({...a}));
+// Which scenario preset Areas/Streams/Materials Master currently reflect, and whether the
+// user has since hand-edited any of those three sections — set by markScenarioEdited() via
+// saveMaterials/saveAreas/saveStreamConfig, cleared by applyScenario(). `applyingScenario`
+// suppresses that tracking while a scenario itself is being applied (that's not a user edit).
+let activeScenarioId = 'scenario1';
+let scenarioEdited = false;
+let applyingScenario = false;
 let auditMeta = {};
 AUDIT_FIELDS.forEach(f => auditMeta[f.key] = f.default);
 auditMeta.auditDate = new Date().toISOString().slice(0,10); // YYYY-MM-DD
@@ -711,13 +841,63 @@ function loadState(){
   try { const m = localStorage.getItem('materials'); if (m) materials = JSON.parse(m); } catch(e){}
   try { const ar = localStorage.getItem('areas'); if (ar) areas = JSON.parse(ar); } catch(e){}
   try { const sc = localStorage.getItem('streamConfig'); if (sc) applyStreamConfig(JSON.parse(sc)); } catch(e){}
+  try { const si = localStorage.getItem('activeScenarioId'); if (si) activeScenarioId = si; } catch(e){}
+  try { const se = localStorage.getItem('scenarioEdited'); if (se) scenarioEdited = JSON.parse(se); } catch(e){}
 }
 function saveSorted(){ try { localStorage.setItem('sortedEntries', JSON.stringify(sortedEntries)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
 function savePresort(){ try { localStorage.setItem('presortEntries', JSON.stringify(presortEntries)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
 function saveMeta(){ try { localStorage.setItem('auditMeta', JSON.stringify(auditMeta)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-function saveMaterials(){ try { localStorage.setItem('materials', JSON.stringify(materials)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-function saveAreas(){ try { localStorage.setItem('areas', JSON.stringify(areas)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
-function saveStreamConfig(){ try { localStorage.setItem('streamConfig', JSON.stringify(streamConfig)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
+function saveScenarioState(){ try { localStorage.setItem('activeScenarioId', activeScenarioId); localStorage.setItem('scenarioEdited', JSON.stringify(scenarioEdited)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } }
+// Any hand-edit to Areas, Streams, or Materials Master (outside of applyScenario() itself)
+// marks the active scenario "(edited)" in the picker, so it's obvious the live config has
+// drifted from the preset it started from.
+function markScenarioEdited(){
+  if (applyingScenario) return;
+  if (!scenarioEdited){ scenarioEdited = true; saveScenarioState(); }
+  renderScenarioSelect();
+}
+function saveMaterials(){ try { localStorage.setItem('materials', JSON.stringify(materials)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
+function saveAreas(){ try { localStorage.setItem('areas', JSON.stringify(areas)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
+function saveStreamConfig(){ try { localStorage.setItem('streamConfig', JSON.stringify(streamConfig)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
+
+// Replaces Areas/Streams/Materials Master wholesale with one scenario preset (deep-copied so
+// later edits never mutate the SCENARIOS constant itself), then clears the "(edited)" flag —
+// this is the one legitimate way to reach a clean, unedited scenario state.
+function applyScenario(scenarioId){
+  const sc = SCENARIOS.find(s => s.id === scenarioId);
+  if (!sc) return;
+  applyingScenario = true;
+  materials = sc.materials.map(m => ({...m, targets:[...m.targets]}));
+  areas = sc.areas.map(a => ({...a}));
+  applyStreamConfig(sc.streamConfig.map(s => ({...s})));
+  saveMaterials(); saveAreas(); saveStreamConfig();
+  applyingScenario = false;
+  activeScenarioId = scenarioId;
+  scenarioEdited = false;
+  saveScenarioState();
+  renderAll();
+}
+function renderScenarioSelect(){
+  const sel = document.getElementById('scenarioSelect');
+  if (!sel) return;
+  sel.innerHTML = '';
+  SCENARIOS.forEach(sc => {
+    const opt = document.createElement('option');
+    opt.value = sc.id;
+    opt.textContent = sc.label + (sc.id === activeScenarioId && scenarioEdited ? ' (edited)' : '');
+    if (sc.id === activeScenarioId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+document.getElementById('scenarioSelect').onchange = (e) => {
+  const newId = e.target.value;
+  if (newId === activeScenarioId && !scenarioEdited) return;
+  const target = SCENARIOS.find(s => s.id === newId);
+  const ok = confirm('Switch to "' + target.label + '"? This replaces the current Areas, Streams, and Materials Master with that scenario’s preset. Sorted/Pre-Sort entries already logged are kept but may no longer match the new area or material names.');
+  if (!ok){ renderScenarioSelect(); return; }
+  applyScenario(newId);
+  showToast(target.label + ' applied');
+};
 
 // ============================================================
 // UI helpers
@@ -1502,6 +1682,7 @@ function renderSortedReview(){
 
 function renderAll(){
   renderHeader();
+  renderScenarioSelect();
   renderAuditInfoForm(); renderAreasForm(); renderStreamsForm(); renderMaterialsMasterForm();
   renderSortedAreas(); renderSortedStreams(); renderSortedCategories(); renderSortedMaterials();
   renderSortedNonRepToggle(); renderSortedAddButton(); renderSortedContext();
@@ -1653,12 +1834,20 @@ document.getElementById('deleteConfirmInput').addEventListener('input', (e) => {
 document.getElementById('confirmNewSessionBtn').onclick = async () => {
   if (document.getElementById('deleteConfirmInput').value.trim().toUpperCase() !== 'DELETE') return;
   sortedEntries = []; presortEntries = [];
+  applyingScenario = true;
   materials = DEFAULT_MATERIALS.map(m => ({...m}));
   areas = DEFAULT_AREAS.map(a => ({...a}));
   applyStreamConfig(DEFAULT_STREAM_CONFIG.map(s => ({...s})));
+  activeScenarioId = SCENARIOS[0].id;
+  scenarioEdited = false;
   AUDIT_FIELDS.forEach(f => auditMeta[f.key] = f.default);
   auditMeta.auditDate = new Date().toISOString().slice(0,10);
+  // applyingScenario must still be true through these saves — saveMaterials/saveAreas/
+  // saveStreamConfig would otherwise see scenarioEdited=false and immediately flip it back
+  // to true via markScenarioEdited(), undoing the reset just above.
   await saveSorted(); await savePresort(); await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta();
+  applyingScenario = false;
+  saveScenarioState();
   document.getElementById('newSessionModal').classList.remove('show');
   renderAll();
   showToast('New session started — everything reset to defaults');
