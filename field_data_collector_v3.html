@@ -526,12 +526,6 @@ const DEFAULT_MATERIALS = [
 function materialAccepted(m){ return m.accepted; }
 function materialBelongsIn(m, stream){ return m.targets.includes(stream); }
 function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && stream !== 'Trash'; }
-// "Accepted: Yes" alone doesn't mean there's actually anywhere for the material to go — it
-// could still have no target stream configured (or only Trash), in which case it can never
-// become correctly placed no matter how it's sorted. Potential Diversion Rate should only
-// count material that has a genuine non-Trash destination, same as Current Diversion Rate
-// already requires — otherwise Potential silently includes weight with no real path to it.
-function materialHasDivertiblePath(m){ return m.accepted === 'Yes' && m.targets.some(t => t !== 'Trash'); }
 
 const DEFAULT_AREAS = [
   {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
@@ -1679,7 +1673,7 @@ function computeExtrapolatedRows(){
           const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
           const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
           rows.push({area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
-                     weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m), rollup:a.rollup});
+                     weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), rollup:a.rollup});
         });
         return;
       }
@@ -2371,12 +2365,12 @@ function computeDiversionByArea(){
     const total = areaTotalPresortLive(a.name);
     const aData = fex.filter(r => r.area === a.name);
     const diverted = aData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-    const potential = aData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+    const potential = aData.filter(r => r.accepted === 'Yes').reduce((s,r) => s + r.weight, 0);
     return {label: a.name, current: total ? diverted/total : 0, potential: total ? potential/total : 0};
   });
   const allTotal = areas.reduce((s,a) => s + areaTotalPresortLive(a.name), 0);
   const allDiverted = fex.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-  const allPotential = fex.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+  const allPotential = fex.filter(r => r.accepted === 'Yes').reduce((s,r) => s + r.weight, 0);
   groups.push({label: 'Total', current: allTotal ? allDiverted/allTotal : 0, potential: allTotal ? allPotential/allTotal : 0, isTotal: true});
   // An area sitting at 0% current AND 0% potential has nothing divertible either way (e.g.
   // Bathroom's default material isn't accepted anywhere) — a flat pair of empty bars is just
@@ -2953,7 +2947,7 @@ function renderSummaryTab(){
       const total = areaNames.reduce((s,an) => s + areaTotalPresortLive(an), 0);
       const rgData = fex.filter(r => r.rollup === rg);
       const diverted = rgData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-      const potential = rgData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+      const potential = rgData.filter(r => r.accepted === 'Yes').reduce((s,r) => s + r.weight, 0);
       allTotal += total; allDiverted += diverted; allPotential += potential;
       const curRate = total ? diverted/total : 0, potRate = total ? potential/total : 0;
       t5Html += `<tr><td>${rg}</td><td class="num">${pct(curRate)}</td><td class="num">${pct(potRate)}</td><td class="num">${pct(potRate-curRate)}</td></tr>`;
@@ -3038,21 +3032,6 @@ function buildWorkbook(){
       chain = `IF(${streamRef}="${STREAMS[i]}",${indexExpr},${chain})`;
     }
     return chain;
-  }
-
-  // Does this material have a real (non-Trash) target configured at all? Trash is always
-  // STREAMS[0] (see the column-order note above), so this sums every OTHER target column's
-  // Yes for the material's row — a material accepted:Yes but with no real target otherwise
-  // (or only Trash) has nowhere to actually go, so it shouldn't count toward Potential
-  // Diversion even though it's "accepted" — same fix as materialHasDivertiblePath() in the app.
-  function mmHasRealTargetExpr(materialIdRef){
-    const materialRowMatch = `MATCH(${materialIdRef},'Materials Master'!$A$2:$A$${MM_LAST},0)`;
-    const nonTrashChecks = [];
-    for (let i = 1; i < STREAMS.length; i++){
-      const col = colLetter(targetColStart + i);
-      nonTrashChecks.push(`(INDEX('Materials Master'!$${col}$2:$${col}$${MM_LAST},${materialRowMatch})="Yes")`);
-    }
-    return nonTrashChecks.length ? `(${nonTrashChecks.join('+')})>0` : 'FALSE';
   }
 
   // Areas
@@ -3165,7 +3144,7 @@ function buildWorkbook(){
   }
 
   // ---- Fact_Extrapolated sheet ----
-  const fexRows = [['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','rollup_group','belongs_here','has_divertible_path']];
+  const fexRows = [['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','rollup_group','belongs_here']];
   areas.forEach(a => {
     STREAMS.forEach(s => {
       const combined = isCombinedWeighSort(s);
@@ -3213,11 +3192,7 @@ function buildWorkbook(){
         // in Trash (correctly placed as non-divertible), so 1-belongs_here correctly measures
         // what share of Trash is actually divertible material thrown away wrongly.
         const belongsHereExpr = {f:`IF(${belongsExpr},1,0)`};
-        // "has_divertible_path" — accepted AND has some real (non-Trash) target configured;
-        // this, not accepted_in_program alone, is what Potential Diversion Rate should sum,
-        // since accepted:Yes with no real target can never actually become correctly_placed.
-        const hasPathExpr = {f:`IF(AND(${acceptedExpr}="Yes",${mmHasRealTargetExpr(matRef)}),1,0)`};
-        fexRows.push([a.name, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr]);
+        fexRows.push([a.name, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr]);
       });
     });
   });
@@ -3231,9 +3206,9 @@ function buildWorkbook(){
   const FEX_CAT = `Fact_Extrapolated!$E$2:$E$${FEX_LAST}`;
   const FEX_W = `Fact_Extrapolated!$F$2:$F$${FEX_LAST}`;
   const FEX_CP = `Fact_Extrapolated!$G$2:$G$${FEX_LAST}`;
+  const FEX_ACCEPT = `Fact_Extrapolated!$H$2:$H$${FEX_LAST}`;
   const FEX_ROLLUP = `Fact_Extrapolated!$I$2:$I$${FEX_LAST}`;
   const FEX_BELONGS = `Fact_Extrapolated!$J$2:$J$${FEX_LAST}`;
-  const FEX_HASPATH = `Fact_Extrapolated!$K$2:$K$${FEX_LAST}`;
 
   function buildSummarySheetRows(areaName, isOverall){
     const ac = areaName ? `,${FEX_AREA},"${areaName}"` : '';
@@ -3369,7 +3344,7 @@ function buildWorkbook(){
         ).join('+');
         rows.push([rg,
           {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_CP},1)/(${totalExpr}))`},
-          {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_HASPATH},1)/(${totalExpr}))`},
+          {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_ACCEPT},"Yes")/(${totalExpr}))`},
           {f:`C${rr}-B${rr}`}
         ]);
       });
@@ -3380,7 +3355,7 @@ function buildWorkbook(){
       ).join('+');
       rows.push(['Total',
         {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_CP},1)/(${allAreaTotalExpr}))`},
-        {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_HASPATH},1)/(${allAreaTotalExpr}))`},
+        {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ACCEPT},"Yes")/(${allAreaTotalExpr}))`},
         {f:`C${divTot}-B${divTot}`}
       ]);
       // fix sign convention on the per-rollup rows to match: gap = potential - current (positive)
