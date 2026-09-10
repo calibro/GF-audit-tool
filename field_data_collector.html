@@ -184,6 +184,19 @@
   .mm-add-form{display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; padding:12px;}
   .mm-card-header{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
   .mm-name{display:flex; align-items:center; gap:6px; font-size:14px; font-weight:600; flex:1 1 auto; min-width:0; overflow-wrap:anywhere;}
+  .mm-name-input{
+    flex:1 1 auto; min-width:0; font-size:14px; font-weight:600; font-family:inherit; color:var(--ink);
+    padding:6px 8px; border:1.5px solid transparent; border-radius:6px; background:transparent;
+  }
+  .mm-name-input:hover{border-color:var(--line);}
+  .mm-name-input:focus{border-color:var(--brand); background:#fff; outline:none;}
+  .reorder-btns{display:flex; flex-direction:column; gap:2px; flex:0 0 auto; align-self:center;}
+  .reorder-btn{
+    background:none; border:1px solid var(--line); color:#6c675a; font-size:9px; line-height:1;
+    cursor:pointer; padding:3px 6px; border-radius:4px;
+  }
+  .reorder-btn:disabled{opacity:0.3; cursor:not-allowed;}
+  .reorder-btn:not(:disabled):hover{background:var(--brand-light); border-color:var(--brand); color:var(--brand-dark);}
   select{
     font-size:13px; padding:8px 8px; border-radius:6px; border:1.5px solid var(--line); background:#fff;
     color:var(--ink); flex:1 1 100px; font-family:inherit;
@@ -304,14 +317,14 @@
       <span class="mm-cat-header-title">Areas — define the points of generation for this site</span>
       <span class="mm-chevron" id="areasMainChevron">▶</span>
     </div>
-    <p class="note">Renaming an area does not update entries already logged under its old name — do this before the audit starts, not mid-session.</p>
+    <p class="note">Renaming an area updates every logged entry to match. Removing an area also deletes any entries logged under it.</p>
     <div id="areasForm"></div>
 
     <div class="mm-cat-header" id="streamsMainToggle" style="margin-top:24px;">
       <span class="mm-cat-header-title">Streams — the waste/recycling streams collected on-site</span>
       <span class="mm-chevron" id="streamsMainChevron">▶</span>
     </div>
-    <p class="note">Renaming a stream updates every material's target list automatically, but does not update entries already logged under its old name — do this before the audit starts, not mid-session. Trash is the built-in landfill baseline and can't be renamed or removed.</p>
+    <p class="note">Renaming a stream updates every material's target list and every logged entry to match. Removing a stream also deletes any entries logged under it. One stream is the landfill baseline every diversion figure is measured against — it can be renamed and reassigned (“Set as baseline”), but not deleted.</p>
     <div id="streamsForm"></div>
 
     <div class="mm-cat-header" id="mmMainToggle" style="margin-top:24px;">
@@ -475,6 +488,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box">
+    <h3 id="confirmModalTitle"></h3>
+    <p id="confirmModalMsg"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="confirmModalCancel">Cancel</button>
+      <button class="btn btn-danger" id="confirmModalOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="importModal">
   <div class="modal-box">
     <h3 style="color:var(--brand-dark);">Import session file</h3>
@@ -560,13 +584,25 @@ const DEFAULT_MATERIALS = [
 // (e.g. a hauler may not actually take something even though a stream exists for it).
 function materialAccepted(m){ return m.accepted; }
 function materialBelongsIn(m, stream){ return m.targets.includes(stream); }
-function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && stream !== 'Trash'; }
-// "Accepted: Yes" alone doesn't mean there's actually anywhere for the material to go — it
-// could still have no target stream configured (or only Trash), in which case it can never
-// become correctly placed no matter how it's sorted. Potential Diversion Rate should only
-// count material that has a genuine non-Trash destination, same as Current Diversion Rate
-// already requires — otherwise Potential silently includes weight with no real path to it.
-function materialHasDivertiblePath(m){ return m.accepted === 'Yes' && m.targets.some(t => t !== 'Trash'); }
+// The disposal / landfill stream — the one flagged `protected` in the stream config. Weight
+// sent here is, by definition, NOT diverted, so it's the baseline the whole tool measures
+// diversion against. The math must resolve it by the protected flag, never by a hardcoded
+// name, so the stream stays renameable. If nothing is flagged (a partial/legacy import, or
+// a config built from the "Empty" scenario before a baseline was picked) it falls back to
+// the first stream, then to the string 'Trash' when there are no streams at all.
+function landfillStreamName(){
+  const flagged = streamConfig.find(s => s.protected);
+  return (flagged || streamConfig[0] || {}).name || 'Trash';
+}
+function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && stream !== landfillStreamName(); }
+// Potential Diversion Rate is the ceiling: everything that *could* be diverted in this
+// program if it were placed perfectly. That's driven by "currently divertible" (actually
+// recyclable/compostable here), NOT "accepted in program" — a material can be accepted (e.g.
+// allowed into a waste stream as non-hazardous solid waste) without being divertible (Film
+// Plastics, PPE, Waste Disposal Bags are the concrete cases). Counting accepted-but-not-
+// divertible weight would inflate the Potential ceiling. Still require a genuine non-landfill
+// target — a material marked divertible with nowhere to divert it to shouldn't count either.
+function materialHasDivertiblePath(m){ return m.divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName()); }
 
 const DEFAULT_AREAS = [
   {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
@@ -710,6 +746,12 @@ const SCENARIOS = [
     id:'scenario3', label:'Scenario 3',
     description:'Expanded multi-stream program — separate Paper, Glass and Metal & Plastic recycling, plus Electronics Recycling and TerraCycle.',
     materials:SCENARIO_3_MATERIALS, areas:SCENARIO_3_AREAS, streamConfig:SCENARIO_3_STREAM_CONFIG,
+  },
+  {
+    id:'empty', label:'Empty',
+    description:'Start from scratch — just the Trash landfill baseline, no areas, materials or recycling streams. Rename Trash to match the site and build the rest.',
+    materials:[], areas:[],
+    streamConfig:[{name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true}],
   },
 ];
 
@@ -860,17 +902,45 @@ function saveMaterials(){ try { localStorage.setItem('materials', JSON.stringify
 function saveAreas(){ try { localStorage.setItem('areas', JSON.stringify(areas)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
 function saveStreamConfig(){ try { localStorage.setItem('streamConfig', JSON.stringify(streamConfig)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
 
-// Replaces Areas/Streams/Materials Master wholesale with one scenario preset (deep-copied so
-// later edits never mutate the SCENARIOS constant itself), then clears the "(edited)" flag —
-// this is the one legitimate way to reach a clean, unedited scenario state.
+// Generic confirm dialog — the app's own modal, never window.confirm() (some embedded
+// webviews suppress it). Pass {title, message, confirmLabel, danger, onConfirm, onCancel}.
+let _confirmOnOk = null, _confirmOnCancel = null;
+function openConfirm({title, message, confirmLabel = 'Confirm', danger = true, onConfirm = null, onCancel = null}){
+  const h = document.getElementById('confirmModalTitle');
+  h.textContent = title;
+  h.style.color = danger ? 'var(--danger)' : 'var(--brand-dark)';
+  document.getElementById('confirmModalMsg').textContent = message;
+  const ok = document.getElementById('confirmModalOk');
+  ok.textContent = confirmLabel;
+  ok.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+  _confirmOnOk = onConfirm; _confirmOnCancel = onCancel;
+  document.getElementById('confirmModal').classList.add('show');
+}
+document.getElementById('confirmModalOk').onclick = () => {
+  const cb = _confirmOnOk; _confirmOnOk = null; _confirmOnCancel = null;
+  document.getElementById('confirmModal').classList.remove('show');
+  if (cb) cb();
+};
+document.getElementById('confirmModalCancel').onclick = () => {
+  const cb = _confirmOnCancel; _confirmOnOk = null; _confirmOnCancel = null;
+  document.getElementById('confirmModal').classList.remove('show');
+  if (cb) cb();
+};
+
+// Switching scenario is a fresh start — like "Start a new session" it clears every logged
+// entry (they'd otherwise reference areas/streams/materials the new preset may not have),
+// then swaps in the preset's Areas/Streams/Materials Master (deep-copied so later edits never
+// mutate the SCENARIOS constant) and clears the "(edited)" flag.
 function applyScenario(scenarioId){
   const sc = SCENARIOS.find(s => s.id === scenarioId);
   if (!sc) return;
   applyingScenario = true;
+  sortedEntries = []; presortEntries = [];
+  cancelEditSorted(); cancelEditPresort();
   materials = sc.materials.map(m => ({...m, targets:[...m.targets]}));
   areas = sc.areas.map(a => ({...a}));
   applyStreamConfig(sc.streamConfig.map(s => ({...s})));
-  saveMaterials(); saveAreas(); saveStreamConfig();
+  saveMaterials(); saveAreas(); saveStreamConfig(); saveSorted(); savePresort();
   applyingScenario = false;
   activeScenarioId = scenarioId;
   scenarioEdited = false;
@@ -893,10 +963,20 @@ document.getElementById('scenarioSelect').onchange = (e) => {
   const newId = e.target.value;
   if (newId === activeScenarioId && !scenarioEdited) return;
   const target = SCENARIOS.find(s => s.id === newId);
-  const ok = confirm('Switch to "' + target.label + '"? This replaces the current Areas, Streams, and Materials Master with that scenario’s preset. Sorted/Pre-Sort entries already logged are kept but may no longer match the new area or material names.');
-  if (!ok){ renderScenarioSelect(); return; }
-  applyScenario(newId);
-  showToast(target.label + ' applied');
+  if (!target){ renderScenarioSelect(); return; }
+  const logged = sortedEntries.length + presortEntries.length;
+  const msg = 'This replaces the current Areas, Streams, and Materials Master with the "' + target.label + '" preset.'
+    + (logged > 0
+        ? ' All ' + logged + ' logged ' + (logged === 1 ? 'entry' : 'entries') + ' (sorted weights and pre-sort bags) will be deleted, the same as starting a new session.'
+        : '');
+  openConfirm({
+    title: 'Switch to ' + target.label + '?',
+    message: msg,
+    confirmLabel: logged > 0 ? 'Switch & start a new session' : 'Switch',
+    danger: logged > 0,
+    onConfirm: () => { applyScenario(newId); showToast(target.label + ' applied'); },
+    onCancel: () => renderScenarioSelect()
+  });
 };
 
 // ============================================================
@@ -970,9 +1050,9 @@ function makeTargetChips(m){
           // collection streams this tool tracks, so finding them anywhere (including Trash)
           // is itself worth flagging. Every other material still needs at least one target,
           // or it'd be uncategorizable in every report.
-          if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = ['Trash'];
+          if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = [landfillStreamName()];
         } else {
-          m.targets = m.targets.filter(t => t !== 'Trash').concat([s]);
+          m.targets = m.targets.filter(t => t !== landfillStreamName()).concat([s]);
         }
         saveMaterials();
         renderMaterialsMasterForm();
@@ -1005,11 +1085,11 @@ function renderMaterialsMasterForm(){
   CATEGORY_ORDER.forEach(cat => {
     const header = document.createElement('div');
     header.className = 'mm-category-divider';
-    const count = materials.filter(m => m.category === cat).length;
-    header.innerHTML = `${cat} <span class="mm-category-count">(${count})</span>`;
+    const catMaterials = materials.filter(m => m.category === cat);
+    header.innerHTML = `${cat} <span class="mm-category-count">(${catMaterials.length})</span>`;
     box.appendChild(header);
 
-    materials.filter(m => m.category === cat).forEach(m => {
+    catMaterials.forEach((m, posInCat) => {
       const card = document.createElement('div');
       card.className = 'mm-card';
 
@@ -1020,9 +1100,28 @@ function renderMaterialsMasterForm(){
 
       const name = document.createElement('div');
       name.className = 'mm-name';
-      const nameText = document.createElement('span');
-      nameText.textContent = m.name;
-      name.appendChild(nameText);
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'mm-name-input';
+      nameInput.value = m.name;
+      nameInput.setAttribute('aria-label', 'Material name');
+      // Mirrors stream renaming: commit on change, reject empty/duplicate. Logic everywhere
+      // references material_id, but sorted entries also cache the display name, so push the
+      // new name onto those too.
+      nameInput.addEventListener('change', () => {
+        const newName = nameInput.value.trim();
+        if (!newName || newName === m.name){ nameInput.value = m.name; return; }
+        if (materials.some(other => other !== m && other.name === newName)){
+          showToast('A material with that name already exists');
+          nameInput.value = m.name;
+          return;
+        }
+        m.name = newName;
+        sortedEntries.forEach(e => { if (e.materialId === m.id) e.materialName = newName; });
+        saveMaterials(); saveSorted();
+        renderAll();
+      });
+      name.appendChild(nameInput);
       if (MATERIAL_INFO[m.id]){
         const infoBtn = document.createElement('button');
         infoBtn.type = 'button';
@@ -1042,20 +1141,52 @@ function renderMaterialsMasterForm(){
       delBtn.textContent = '✕';
       delBtn.title = 'Remove ' + m.name;
       delBtn.onclick = () => {
-        materials = materials.filter(x => x.id !== m.id);
-        saveMaterials();
-        renderAll();
-        showToast('Removed ' + m.name);
+        const removedName = m.name, removedId = m.id;
+        const nSorted = sortedEntries.filter(e => e.materialId === removedId).length;
+        const nKnownBags = presortEntries.filter(e => e.knownMaterialId === removedId).length;
+        const doRemove = () => {
+          materials = materials.filter(x => x.id !== removedId);
+          // Sorted entries are per-material — they go with it. Pre-sort bags are just
+          // weighed bags; they keep their weight but lose the now-meaningless known-
+          // composition tag.
+          sortedEntries = sortedEntries.filter(e => e.materialId !== removedId);
+          presortEntries.forEach(e => { if (e.knownMaterialId === removedId) e.knownMaterialId = null; });
+          areas.forEach(a => { if (a.defaultMaterialId === removedId) a.defaultMaterialId = null; });
+          cancelEditSorted(); cancelEditPresort();
+          saveMaterials(); saveSorted(); savePresort(); saveAreas();
+          renderAll();
+          showToast('Removed ' + removedName);
+        };
+        if (nSorted > 0 || nKnownBags > 0){
+          const parts = [];
+          if (nSorted > 0) parts.push(nSorted + ' sorted weight ' + (nSorted === 1 ? 'entry' : 'entries') + ' will be deleted');
+          if (nKnownBags > 0) parts.push(nKnownBags + ' pre-sort ' + (nKnownBags === 1 ? 'bag' : 'bags') + ' will lose its known-composition tag');
+          openConfirm({
+            title: 'Remove ' + removedName + '?',
+            message: 'This material is already in use: ' + parts.join(', ') + '.',
+            confirmLabel: 'Remove material',
+            onConfirm: doRemove
+          });
+        } else {
+          doRemove();
+        }
       };
 
-      headerRow.appendChild(name); headerRow.appendChild(delBtn);
+      headerRow.appendChild(name);
+      headerRow.appendChild(makeReorderControl(
+        () => moveMaterialWithinCategory(m, -1),
+        () => moveMaterialWithinCategory(m, +1),
+        posInCat > 0,
+        posInCat < catMaterials.length - 1
+      ));
+      headerRow.appendChild(delBtn);
 
       // Second line: Accepted, target streams, then Divertible — all together in one row.
       const fieldsRow = document.createElement('div');
       fieldsRow.className = 'mm-card-fields-row';
       fieldsRow.appendChild(makeSelectField('Accepted', ACCEPT_OPTIONS, m.accepted, v => {
         m.accepted = v;
-        if (v !== 'Yes') m.targets = (m.divertible === 'Unacceptable') ? [] : ['Trash'];
+        if (v !== 'Yes') m.targets = (m.divertible === 'Unacceptable') ? [] : [landfillStreamName()];
         saveMaterials();
         renderMaterialsMasterForm();
       }));
@@ -1114,7 +1245,7 @@ function renderMaterialsMasterForm(){
     form.appendChild(makeSelectField('Category', CATEGORY_ORDER, mmNewMaterial.category, v => { mmNewMaterial.category = v; }));
     form.appendChild(makeSelectField('Accepted', ACCEPT_OPTIONS, mmNewMaterial.accepted, v => {
       mmNewMaterial.accepted = v;
-      if (v !== 'Yes') mmNewMaterial.targets = (mmNewMaterial.divertible === 'Unacceptable') ? [] : ['Trash'];
+      if (v !== 'Yes') mmNewMaterial.targets = (mmNewMaterial.divertible === 'Unacceptable') ? [] : [landfillStreamName()];
       renderMaterialsMasterForm();
     }));
 
@@ -1193,7 +1324,22 @@ function renderAreasForm(){
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.value = a.name;
-    nameInput.addEventListener('change', () => { a.name = nameInput.value.trim() || a.name; saveAreas(); renderAll(); });
+    // A rename propagates to every logged sorted/pre-sort entry stored under the old name.
+    nameInput.addEventListener('change', () => {
+      const newName = nameInput.value.trim();
+      if (!newName || newName === a.name){ nameInput.value = a.name; return; }
+      if (areas.some(other => other !== a && other.name === newName)){
+        showToast('An area with that name already exists');
+        nameInput.value = a.name;
+        return;
+      }
+      const oldName = a.name;
+      a.name = newName;
+      sortedEntries.forEach(e => { if (e.area === oldName) e.area = newName; });
+      presortEntries.forEach(e => { if (e.area === oldName) e.area = newName; });
+      saveAreas(); saveSorted(); savePresort();
+      renderAll();
+    });
     nameWrap.appendChild(nameLabel); nameWrap.appendChild(nameInput);
 
     const rollupWrap = document.createElement('div');
@@ -1222,7 +1368,31 @@ function renderAreasForm(){
     delBtn.textContent = '✕';
     delBtn.onclick = () => {
       if (areas.length <= 1) { showToast('At least one area is required'); return; }
-      areas.splice(idx, 1); saveAreas(); renderAll();
+      const removedName = a.name;
+      const nSorted = sortedEntries.filter(e => e.area === removedName).length;
+      const nPresort = presortEntries.filter(e => e.area === removedName).length;
+      const doRemove = () => {
+        areas.splice(idx, 1);
+        sortedEntries = sortedEntries.filter(e => e.area !== removedName);
+        presortEntries = presortEntries.filter(e => e.area !== removedName);
+        cancelEditSorted(); cancelEditPresort();
+        saveAreas(); saveSorted(); savePresort();
+        renderAll();
+        showToast('Removed ' + removedName);
+      };
+      const used = nSorted + nPresort;
+      if (used > 0){
+        openConfirm({
+          title: 'Remove ' + removedName + '?',
+          message: used + ' logged ' + (used === 1 ? 'entry references' : 'entries reference') + ' this area ('
+            + nSorted + ' sorted, ' + nPresort + ' pre-sort). Removing the area deletes '
+            + (used === 1 ? 'that entry' : 'those entries') + ' too.',
+          confirmLabel: 'Remove area & entries',
+          onConfirm: doRemove
+        });
+      } else {
+        doRemove();
+      }
     };
 
     row.appendChild(nameWrap); row.appendChild(rollupWrap); row.appendChild(defaultMatField); row.appendChild(delBtn);
@@ -1239,6 +1409,45 @@ function renderAreasForm(){
   box.appendChild(addBtn);
 }
 document.getElementById('areasMainToggle').onclick = () => { areasOpen = !areasOpen; renderAreasForm(); };
+
+// Up/down reorder control shared by Streams and Materials Master. Plain buttons, not
+// drag-and-drop, so it stays touch-friendly and needs no pointer-event bookkeeping.
+function makeReorderControl(onUp, onDown, canUp, canDown){
+  const wrap = document.createElement('div');
+  wrap.className = 'reorder-btns';
+  const up = document.createElement('button');
+  up.type = 'button'; up.className = 'reorder-btn'; up.textContent = '▲';
+  up.title = 'Move up'; up.setAttribute('aria-label', 'Move up');
+  up.disabled = !canUp; up.onclick = onUp;
+  const down = document.createElement('button');
+  down.type = 'button'; down.className = 'reorder-btn'; down.textContent = '▼';
+  down.title = 'Move down'; down.setAttribute('aria-label', 'Move down');
+  down.disabled = !canDown; down.onclick = onDown;
+  wrap.appendChild(up); wrap.appendChild(down);
+  return wrap;
+}
+function moveStream(idx, dir){
+  const j = idx + dir;
+  if (j < 0 || j >= streamConfig.length) return;
+  [streamConfig[idx], streamConfig[j]] = [streamConfig[j], streamConfig[idx]];
+  applyStreamConfig(streamConfig);
+  saveStreamConfig();
+  renderAll();
+}
+// Reorders a material within its category only. The materials array is flat and categories
+// aren't guaranteed contiguous in it (added materials append to the end), so this finds the
+// nearest same-category neighbour in the given direction and swaps with that — leaving every
+// other category's internal order untouched.
+function moveMaterialWithinCategory(m, dir){
+  const i = materials.indexOf(m);
+  if (i < 0) return;
+  let j = i + dir;
+  while (j >= 0 && j < materials.length && materials[j].category !== m.category) j += dir;
+  if (j < 0 || j >= materials.length || materials[j].category !== m.category) return;
+  [materials[i], materials[j]] = [materials[j], materials[i]];
+  saveMaterials();
+  renderAll();
+}
 
 let streamsOpen = false;
 function renderStreamsForm(){
@@ -1258,29 +1467,28 @@ function renderStreamsForm(){
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.value = s.name;
-    if (s.protected){
-      nameInput.disabled = true;
-    } else {
-      // Renaming propagates to every material's target list (targets are matched by name,
-      // so an un-propagated rename would silently strip that stream as a valid target
-      // everywhere) — but, like renaming an Area, does NOT touch entries already logged
-      // under the old stream name.
-      nameInput.addEventListener('change', () => {
-        const newName = nameInput.value.trim();
-        if (!newName || newName === s.name){ nameInput.value = s.name; return; }
-        if (streamConfig.some(other => other !== s && other.name === newName)){
-          showToast('A stream with that name already exists');
-          nameInput.value = s.name;
-          return;
-        }
-        const oldName = s.name;
-        s.name = newName;
-        materials.forEach(m => { m.targets = m.targets.map(t => t === oldName ? newName : t); });
-        applyStreamConfig(streamConfig);
-        saveStreamConfig(); saveMaterials();
-        renderAll();
-      });
-    }
+    // Every stream — including the protected landfill stream — can be renamed. Deletion
+    // protection and rename protection are separate concerns; only deletion stays blocked
+    // below. A rename propagates everywhere the old name is stored: every material's target
+    // list, and every logged sorted/pre-sort entry. The calculation engine finds the
+    // landfill stream by its `protected` flag, not by name, so renaming it stays safe.
+    nameInput.addEventListener('change', () => {
+      const newName = nameInput.value.trim();
+      if (!newName || newName === s.name){ nameInput.value = s.name; return; }
+      if (streamConfig.some(other => other !== s && other.name === newName)){
+        showToast('A stream with that name already exists');
+        nameInput.value = s.name;
+        return;
+      }
+      const oldName = s.name;
+      s.name = newName;
+      materials.forEach(m => { m.targets = m.targets.map(t => t === oldName ? newName : t); });
+      sortedEntries.forEach(e => { if (e.stream === oldName) e.stream = newName; });
+      presortEntries.forEach(e => { if (e.stream === oldName) e.stream = newName; });
+      applyStreamConfig(streamConfig);
+      saveStreamConfig(); saveMaterials(); saveSorted(); savePresort();
+      renderAll();
+    });
     nameWrap.appendChild(nameLabel); nameWrap.appendChild(nameInput);
 
     const toggleWrap = document.createElement('label');
@@ -1301,33 +1509,89 @@ function renderStreamsForm(){
     lab.textContent = 'Combined weigh-and-sort (no separate bagging)';
     toggleWrap.appendChild(cb); toggleWrap.appendChild(lab);
 
+    // Landfill-baseline control — exactly one stream is the disposal baseline every
+    // diversion figure is measured against. On that stream it's a locked badge; on the
+    // others, a button that moves the flag here.
+    const baseWrap = document.createElement('div');
+    baseWrap.style.cssText = 'flex:0 0 auto; align-self:center;';
+    if (s.protected){
+      const badge = document.createElement('span');
+      badge.className = 'mm-badge yes';
+      badge.textContent = 'Landfill baseline';
+      badge.title = 'Weight in this stream counts as sent to landfill — the baseline diversion is measured against. It can be renamed, just not deleted.';
+      baseWrap.appendChild(badge);
+    } else {
+      const setBtn = document.createElement('button');
+      setBtn.type = 'button';
+      setBtn.className = 'reorder-btn';
+      setBtn.style.cssText = 'padding:4px 8px; font-size:10px;';
+      setBtn.textContent = 'Set as baseline';
+      setBtn.title = 'Make this the landfill / disposal stream — the baseline every diversion figure is measured against.';
+      setBtn.onclick = () => {
+        streamConfig.forEach(x => { x.protected = (x === s); });
+        applyStreamConfig(streamConfig);
+        saveStreamConfig();
+        renderAll();
+        showToast(s.name + ' is now the landfill baseline');
+      };
+      baseWrap.appendChild(setBtn);
+    }
+
     const delBtn = document.createElement('button');
     delBtn.className = 'del-btn area-del-btn';
     delBtn.textContent = '✕';
     if (s.protected){
       delBtn.disabled = true;
       delBtn.style.cssText = 'opacity:0.35; cursor:not-allowed;';
-      delBtn.title = 'Trash can’t be removed — it’s the built-in landfill baseline the rest of the tool measures diversion against.';
+      delBtn.title = s.name + ' can’t be removed — it’s the landfill baseline the rest of the tool measures diversion against. Set another stream as the baseline first.';
     } else {
       delBtn.onclick = () => {
         if (streamConfig.length <= 1) { showToast('At least one stream is required'); return; }
         const removedName = s.name;
-        streamConfig.splice(idx, 1);
-        applyStreamConfig(streamConfig);
-        // A material's target list can't reference a stream that no longer exists — strip
-        // it, and if that leaves nothing, fall back to Trash (same rule as everywhere else),
-        // unless the material is Unacceptable, which can legitimately have no target at all.
-        materials.forEach(m => {
-          m.targets = m.targets.filter(t => t !== removedName);
-          if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = ['Trash'];
-        });
-        saveStreamConfig(); saveMaterials();
-        renderAll();
-        showToast('Removed ' + removedName);
+        const nSorted = sortedEntries.filter(e => e.stream === removedName).length;
+        const nPresort = presortEntries.filter(e => e.stream === removedName).length;
+        const doRemove = () => {
+          streamConfig.splice(idx, 1);
+          applyStreamConfig(streamConfig);
+          // A material's target list can't reference a stream that no longer exists — strip
+          // it, and if that leaves nothing, fall back to the landfill stream (same rule as
+          // everywhere else), unless the material is Unacceptable, which can legitimately
+          // have no target at all.
+          materials.forEach(m => {
+            m.targets = m.targets.filter(t => t !== removedName);
+            if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = [landfillStreamName()];
+          });
+          sortedEntries = sortedEntries.filter(e => e.stream !== removedName);
+          presortEntries = presortEntries.filter(e => e.stream !== removedName);
+          cancelEditSorted(); cancelEditPresort();
+          saveStreamConfig(); saveMaterials(); saveSorted(); savePresort();
+          renderAll();
+          showToast('Removed ' + removedName);
+        };
+        const used = nSorted + nPresort;
+        if (used > 0){
+          openConfirm({
+            title: 'Remove ' + removedName + '?',
+            message: used + ' logged ' + (used === 1 ? 'entry references' : 'entries reference') + ' this stream ('
+              + nSorted + ' sorted, ' + nPresort + ' pre-sort). Removing the stream deletes '
+              + (used === 1 ? 'that entry' : 'those entries') + ' too.',
+            confirmLabel: 'Remove stream & entries',
+            onConfirm: doRemove
+          });
+        } else {
+          doRemove();
+        }
       };
     }
 
-    row.appendChild(nameWrap); row.appendChild(toggleWrap); row.appendChild(delBtn);
+    row.appendChild(nameWrap); row.appendChild(toggleWrap); row.appendChild(baseWrap);
+    row.appendChild(makeReorderControl(
+      () => moveStream(idx, -1),
+      () => moveStream(idx, +1),
+      idx > 0,
+      idx < streamConfig.length - 1
+    ));
+    row.appendChild(delBtn);
     box.appendChild(row);
   });
 
@@ -1337,10 +1601,14 @@ function renderStreamsForm(){
   addBtn.onclick = () => {
     let n = 1, name = 'NEW STREAM';
     while (streamConfig.some(s => s.name === name)) { n++; name = 'NEW STREAM ' + n; }
-    streamConfig.push({name, combinedWeighSort:false, excludeSoiled:false});
+    // First stream in a from-scratch config becomes the landfill baseline automatically —
+    // it can be reassigned with "Set as baseline" on any other row.
+    const firstBaseline = !streamConfig.some(s => s.protected);
+    streamConfig.push({name, combinedWeighSort:false, excludeSoiled:false, protected: firstBaseline});
     applyStreamConfig(streamConfig);
     saveStreamConfig();
     renderAll();
+    if (firstBaseline) showToast(name + ' added as the landfill baseline — rename it to match your site');
   };
   box.appendChild(addBtn);
 }
@@ -3339,6 +3607,12 @@ function buildWorkbook(){
   const firstTargetCol = colLetter(targetColStart);
   const lastTargetCol = colLetter(targetColStart + STREAMS.length - 1);
   const acceptedCol = 'E';
+  const divertibleCol = 'D';
+  // The disposal/landfill stream, resolved by the `protected` flag (not a hardcoded name),
+  // baked into the formulas below as a literal so a renamed protected stream still stays
+  // excluded from diversion credit. Doubled quotes keep it a valid Excel string literal.
+  const landfillName = landfillStreamName();
+  const landfillNameEsc = landfillName.replace(/"/g, '""');
   const mmHeader = ['material_id','material_name','material_category','currently_divertible','accepted_in_program',
                      ...STREAMS.map(s => `target: ${s}`)];
   const mmRows = [mmHeader];
@@ -3366,19 +3640,21 @@ function buildWorkbook(){
     return chain;
   }
 
-  // Does this material have a real (non-Trash) target configured at all? Trash is always
-  // STREAMS[0] (see the column-order note above), so this sums every OTHER target column's
-  // Yes for the material's row — a material accepted:Yes but with no real target otherwise
-  // (or only Trash) has nowhere to actually go, so it shouldn't count toward Potential
-  // Diversion even though it's "accepted" — same fix as materialHasDivertiblePath() in the app.
+  // Does this material have a real (non-landfill) target configured at all? Sums the Yes in
+  // every target column EXCEPT the protected landfill stream's — a material with no real
+  // target otherwise (or only the landfill stream) has nowhere to actually go, so it
+  // shouldn't count toward Potential Diversion even if it's marked divertible (same second
+  // condition as materialHasDivertiblePath() in the app). The landfill column is found by
+  // name, not by position, so a reordered protected stream is still excluded correctly.
   function mmHasRealTargetExpr(materialIdRef){
     const materialRowMatch = `MATCH(${materialIdRef},'Materials Master'!$A$2:$A$${MM_LAST},0)`;
-    const nonTrashChecks = [];
-    for (let i = 1; i < STREAMS.length; i++){
+    const nonLandfillChecks = [];
+    for (let i = 0; i < STREAMS.length; i++){
+      if (STREAMS[i] === landfillName) continue;
       const col = colLetter(targetColStart + i);
-      nonTrashChecks.push(`(INDEX('Materials Master'!$${col}$2:$${col}$${MM_LAST},${materialRowMatch})="Yes")`);
+      nonLandfillChecks.push(`(INDEX('Materials Master'!$${col}$2:$${col}$${MM_LAST},${materialRowMatch})="Yes")`);
     }
-    return nonTrashChecks.length ? `(${nonTrashChecks.join('+')})>0` : 'FALSE';
+    return nonLandfillChecks.length ? `(${nonLandfillChecks.join('+')})>0` : 'FALSE';
   }
 
   // Areas
@@ -3387,9 +3663,10 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, makeSheet(areaRows), 'Areas');
   const AREAS_LAST = areaRows.length;
 
-  // Streams
-  const streamRows = [['stream_name','combined_weigh_sort']];
-  streamConfig.forEach(s => streamRows.push([s.name, s.combinedWeighSort ? 'Yes' : 'No']));
+  // Streams — `protected` marks the landfill baseline stream so a re-import keeps the
+  // diversion math anchored to the same stream even if it's been renamed.
+  const streamRows = [['stream_name','combined_weigh_sort','protected']];
+  streamConfig.forEach(s => streamRows.push([s.name, s.combinedWeighSort ? 'Yes' : 'No', s.protected ? 'Yes' : 'No']));
   XLSX.utils.book_append_sheet(wb, makeSheet(streamRows), 'Streams');
 
   // Fact_SortedWeights
@@ -3529,20 +3806,25 @@ function buildWorkbook(){
         }
         const belongsExpr = `${mmBelongsExpr(matRef, streamRef)}="Yes"`;
         const acceptedExpr = `INDEX('Materials Master'!$${acceptedCol}$2:$${acceptedCol}$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
+        const divertibleExpr = `INDEX('Materials Master'!$${divertibleCol}$2:$${divertibleCol}$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
         // "diverted" — properly recycled/composted elsewhere (this row's stream is one of the
         // material's target streams, it's actually accepted in the program, AND it's not
         // literally Trash — being correctly placed IN Trash isn't "diversion", that's the point).
-        const cpExpr = {f:`IF(AND(${belongsExpr},${acceptedExpr}="Yes",${streamRef}<>"Trash"),1,0)`};
+        const cpExpr = {f:`IF(AND(${belongsExpr},${acceptedExpr}="Yes",${streamRef}<>"${landfillNameEsc}"),1,0)`};
         const rollupExpr = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$B$2:$B$${AREAS_LAST},0)),"")`};
         // "belongs_here" — is this row's stream one of the material's target streams at all
         // (Trash included)? For materials whose only target IS Trash, this is true when found
         // in Trash (correctly placed as non-divertible), so 1-belongs_here correctly measures
         // what share of Trash is actually divertible material thrown away wrongly.
         const belongsHereExpr = {f:`IF(${belongsExpr},1,0)`};
-        // "has_divertible_path" — accepted AND has some real (non-Trash) target configured;
-        // this, not accepted_in_program alone, is what Potential Diversion Rate should sum,
-        // since accepted:Yes with no real target can never actually become correctly_placed.
-        const hasPathExpr = {f:`IF(AND(${acceptedExpr}="Yes",${mmHasRealTargetExpr(matRef)}),1,0)`};
+        // "has_divertible_path" — currently_divertible AND has some real (non-Trash) target
+        // configured; this, not accepted_in_program, is what Potential Diversion Rate sums.
+        // A material can be accepted (allowed into a waste stream) without being divertible
+        // (actually recyclable/compostable here) — e.g. Film Plastics, PPE, Waste Disposal
+        // Bags — and counting that weight would inflate the Potential ceiling. A material
+        // marked divertible with no real target still can't become correctly_placed, so both
+        // conditions are required.
+        const hasPathExpr = {f:`IF(AND(${divertibleExpr}="Yes",${mmHasRealTargetExpr(matRef)}),1,0)`};
         fexRows.push([a.name, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr]);
       });
     });
@@ -3805,7 +4087,11 @@ function parseImportedWorkbook(wb){
       } else {
         targets = [];
       }
-      if (targets.length === 0) targets = ['Trash']; // every material needs at least one target
+      // Every material needs at least one target; fall back to the landfill stream. (This
+      // runs before the imported Streams sheet is parsed below, so it uses the current
+      // session's landfill stream name — fine, this only fires for a material with no
+      // targets at all in the file.)
+      if (targets.length === 0) targets = [landfillStreamName()];
       return {
         id: r[0], name: r[1],
         category: catIdx >= 0 ? r[catIdx] : r[2],
@@ -3826,15 +4112,25 @@ function parseImportedWorkbook(wb){
     }));
   }
 
-  // Streams — combined_weigh_sort is a newer column; older exports won't have it, so
-  // every stream just defaults to the normal bagged/sampled workflow.
+  // Streams — combined_weigh_sort and protected are newer columns; older exports won't have
+  // them, so every stream defaults to the normal bagged/sampled workflow, and the landfill
+  // baseline is restored by matching the stream historically named 'Trash'.
   const streamSheetRows = sheetRows(wb, 'Streams');
   if (streamSheetRows && streamSheetRows.length > 1){
     const header = streamSheetRows[0].map(h => (h == null ? '' : String(h)));
     const cwsIdx = header.indexOf('combined_weigh_sort');
+    const protIdx = header.indexOf('protected');
     result.streamConfig = streamSheetRows.slice(1).filter(r => r[0]).map(r => ({
-      name: r[0], combinedWeighSort: cwsIdx >= 0 ? r[cwsIdx] === 'Yes' : false
+      name: r[0],
+      combinedWeighSort: cwsIdx >= 0 ? r[cwsIdx] === 'Yes' : false,
+      protected: protIdx >= 0 ? r[protIdx] === 'Yes' : false
     }));
+    // Legacy file with no `protected` column: the landfill baseline was always the stream
+    // literally named 'Trash'. Re-flag it so the diversion math keeps an anchor.
+    if (protIdx < 0 && !result.streamConfig.some(s => s.protected)){
+      const t = result.streamConfig.find(s => s.name.toLowerCase() === 'trash');
+      if (t) t.protected = true;
+    }
   }
 
   const infoRows = sheetRows(wb, 'Audit Info');
@@ -3979,14 +4275,13 @@ document.getElementById('mergeImportBtn').onclick = async () => {
 };
 
 document.getElementById('exportBtn').onclick = () => {
-  if (sortedEntries.length === 0 && presortEntries.length === 0){
-    showToast('Nothing logged yet');
-    return;
-  }
+  // Allowed with no entries logged: the file still carries the full Areas / Streams /
+  // Materials Master config, which is how a configuration is shared or saved as a template.
   const wb = buildWorkbook();
   const dateStr = new Date().toISOString().slice(0,10);
+  const configOnly = sortedEntries.length === 0 && presortEntries.length === 0;
   XLSX.writeFile(wb, `120_Park_Ave_Field_Data_${dateStr}.xlsx`);
-  showToast('Excel file downloaded');
+  showToast(configOnly ? 'Config exported (no entries logged yet)' : 'Excel file downloaded');
 };
 
 // All Summaries tables for "Overall" plus every area, one printed page per scope — reuses
