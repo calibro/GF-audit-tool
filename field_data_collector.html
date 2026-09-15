@@ -34,6 +34,10 @@
   .dot.ok{background:var(--ok);}
   .dot.offline{background:var(--amber);}
   nav.tabs{
+    /* top is a fallback for the instant before JS runs — the real value is measured off
+       header's actual rendered height (see updateStickyOffsets()), since header wraps to a
+       taller box at some widths/zoom levels than this guess assumes, which used to let nav
+       lock at a `top` still underneath it once scrolled. */
     display:flex; background:var(--brand); position:sticky; top:52px; z-index:19; overflow-x:auto;
   }
   nav.tabs button{
@@ -42,15 +46,53 @@
   }
   nav.tabs button.active{color:#fff; border-bottom-color:var(--amber); background:rgba(255,255,255,0.06);}
   main{padding:14px 12px 100px; max-width:950px; margin:0 auto;}
+  /* Summaries/Charts break out of the standard centered 950px column — their filter sidebar
+     needs real width to sit beside the report, so .wide drops the cap and lets .scope-layout
+     use the full viewport instead. Toggled from JS in switchTab(). */
+  main.wide{max-width:none; margin:0;}
   .panel{display:none;}
   .panel.active{display:block;}
-  /* Sticks the Areas scope chips (Summaries/Charts) right below the already-sticky nav.tabs
-     bar, so the scope stays reachable while scrolling through long tables/charts — top is
-     set from nav.tabs' own measured height in JS, see stickScopeChipsTop(). */
-  .scope-sticky{position:sticky; z-index:18; background:var(--paper); margin:0 -12px; padding:10px 12px 8px;}
+  /* Tenant/Area filter column (Summaries/Charts) — a plain (unboxed) list occupying ~20% of
+     the row, sticking below the already-sticky nav.tabs bar as the report scrolls. The report
+     column next to it is capped at a max-width so lines of table text stay readable; on a
+     wide screen the leftover space simply sits empty to its right (grid tracks below aren't
+     `fr`, so they never stretch past their own cap) rather than being split into two gutters
+     by auto-centering. top is set from nav.tabs' own measured height in JS, see
+     updateStickyOffsets(). Below a certain width there's no room for two columns, so it
+     drops to a single stacked one instead (media query below). */
+  .scope-layout{display:grid; grid-template-columns:minmax(200px,20%) minmax(0,1100px); gap:40px; align-items:start;}
+  .scope-sidebar{position:sticky; max-height:calc(100vh - 90px); overflow-y:auto;}
+  .scope-main{min-width:0;}
+  @media(max-width:860px){
+    .scope-layout{display:block;}
+    .scope-sidebar{position:static; margin-bottom:20px;}
+  }
+  .scope-check-list{display:flex; flex-direction:column; gap:1px;}
+  .scope-check-row{display:flex; align-items:center; gap:9px; padding:6px 4px; cursor:pointer; border-radius:6px; user-select:none;}
+  .scope-check-row:hover{background:rgba(0,0,0,0.045);}
+  .scope-check-box{
+    flex:0 0 auto; width:17px; height:17px; border-radius:4px; border:1.5px solid var(--line);
+    background:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:700;
+  }
+  .scope-check-box.checked{background:var(--brand); border-color:var(--brand);}
+  .scope-check-text{font-size:13.5px; color:var(--ink); line-height:1.3;}
+  .scope-check-text b{font-weight:700;}
+  .scope-check-sub{color:#8a8578; font-size:11.5px; margin-left:6px;}
   .section-label{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#6c675a; margin:18px 0 8px; font-weight:700;}
   .section-label:first-child{margin-top:0;}
   .chips{display:flex; flex-wrap:wrap; gap:8px;}
+  /* Area-row chip in the Tenants/Areas scope picker — two lines (tenant, then area name) so
+     an area stays identifiable even when its bare name is shared across tenants. */
+  .chip-area{
+    padding:6px 16px; border-radius:999px; border:1.5px solid var(--line); background:var(--panel);
+    cursor:pointer; user-select:none; min-height:40px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; line-height:1.3;
+  }
+  .chip-area .chip-area-tenant{font-size:10px; font-weight:600; color:#8a8578;}
+  .chip-area .chip-area-name{font-size:14px; font-weight:700; color:var(--ink);}
+  .chip-area.selected{background:var(--brand); border-color:var(--brand);}
+  .chip-area.selected .chip-area-tenant{color:#d5e6df;}
+  .chip-area.selected .chip-area-name{color:#fff;}
   .chip{
     padding:10px 14px; border-radius:999px; border:1.5px solid var(--line); background:var(--panel);
     font-size:14px; font-weight:600; cursor:pointer; color:var(--ink); user-select:none;
@@ -95,8 +137,6 @@
   }
   .context-bar b{color:var(--brand-dark);}
   table.log{width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;}
-  .summary-table-title{font-size:17px; font-weight:800; color:var(--brand-dark); margin:36px 0 10px; padding-top:20px; border-top:2px solid var(--brand-light); display:flex; align-items:baseline; justify-content:space-between; gap:12px;}
-  .summary-table-title:first-child{margin-top:24px; padding-top:0; border-top:none;}
   .table-actions{display:flex; align-items:center; gap:8px; flex-shrink:0;}
   .chart-card{background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-top:18px; margin-bottom:20px;}
   .chart-card-header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;}
@@ -128,6 +168,20 @@
   .toggle-field:hover{background:var(--brand-light);}
   .toggle-field input[type="checkbox"]{width:18px; height:18px; accent-color:var(--brand); flex-shrink:0; cursor:pointer;}
   .toggle-field span{font-size:13px; color:var(--ink);}
+  /* Two-way "By Tenant / By Tenant & Area" grouping switch — same purpose as .toggle-field
+     but for an either/or choice rather than an on/off checkbox. */
+  .mini-toggle-label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#6c675a; margin:18px 0 6px;}
+  .mini-toggle{display:inline-flex; border:1.5px solid var(--line); border-radius:8px; overflow:hidden;}
+  .mini-toggle-btn{
+    background:#fff; border:none; padding:8px 14px; font-size:12.5px; font-weight:700; color:#6c675a; cursor:pointer;
+  }
+  .mini-toggle-btn + .mini-toggle-btn{border-left:1.5px solid var(--line);}
+  .mini-toggle-btn.active{background:var(--brand); color:#fff;}
+  /* Summaries' Grouping control — same buttons, but as separate pills instead of one joined
+     segmented control (Charts keeps the joined style; only Summaries asked for this). */
+  .mini-toggle.split{border:none; border-radius:0; overflow:visible; gap:8px;}
+  .mini-toggle.split .mini-toggle-btn{border:1.5px solid var(--line); border-radius:8px;}
+  .mini-toggle.split .mini-toggle-btn + .mini-toggle-btn{border-left:1.5px solid var(--line);}
   /* Edit and Delete are sized/weighted the same (both a bordered pill) so the two sit as a
      matched pair rather than a heavy button next to a bare symbol — and they share one
      action cell instead of two, so column widths don't shift row to row. */
@@ -269,8 +323,8 @@
     /* Colored table headers/rows are stripped by default when printing — this keeps them. */
     #printExportRoot *{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
     #printExportRoot table.analysis{font-size:10.5px;}
-    #printExportRoot .summary-table-title{font-size:14px; margin:22px 0 8px; padding-top:12px;}
-    #printExportRoot .summary-table-title:first-of-type{margin-top:0;}
+    #printExportRoot .chart-card{padding:10px; margin:12px 0;}
+    #printExportRoot .chart-card-title{font-size:14px;}
     #printExportRoot .table-actions{display:none;} /* Copy/Image buttons make no sense on paper */
     @page{size:A4; margin:15mm;}
   }
@@ -336,10 +390,13 @@
 
   <!-- ============ PRE-SORT BAGS ============ -->
   <div class="panel" id="panel-presort">
-    <div class="section-label">1. Area</div>
+    <div class="section-label">1. Tenant</div>
+    <div class="chips" id="presortTenantChips"></div>
+
+    <div class="section-label">2. Area</div>
     <div class="chips" id="presortAreaChips"></div>
 
-    <div class="section-label">2. Stream</div>
+    <div class="section-label">3. Stream</div>
     <div class="chips" id="presortStreamChips"></div>
 
     <div class="field-row">
@@ -370,16 +427,19 @@
 
   <!-- ============ SORTED WEIGHTS ============ -->
   <div class="panel" id="panel-sorted">
-    <div class="section-label">1. Area</div>
+    <div class="section-label">1. Tenant</div>
+    <div class="chips" id="sortedTenantChips"></div>
+
+    <div class="section-label">2. Area</div>
     <div class="chips" id="sortedAreaChips"></div>
 
-    <div class="section-label">2. Stream</div>
+    <div class="section-label">3. Stream</div>
     <div class="chips" id="sortedStreamChips"></div>
 
-    <div class="section-label">3. Category</div>
+    <div class="section-label">4. Category</div>
     <div class="chips" id="sortedCategoryChips"></div>
 
-    <div class="section-label">4. Material</div>
+    <div class="section-label">5. Material</div>
     <div class="material-grid" id="sortedMaterialChips"></div>
 
     <div class="field-row">
@@ -410,21 +470,27 @@
 
   <!-- ============ SUMMARIES ============ -->
   <div class="panel" id="panel-summaries">
-    <div class="scope-sticky">
-      <div class="section-label">Areas</div>
-      <div class="chips" id="summaryScopeChips"></div>
+    <div class="scope-layout">
+      <aside class="scope-sidebar" id="summaryScopeSidebar">
+        <div id="summaryScopeChips"></div>
+      </aside>
+      <div class="scope-main">
+        <div id="summaryContent"></div>
+        <button class="btn btn-primary" id="exportAllSummariesBtn" style="width:100%; margin-top:24px;">⬇ Export all summaries</button>
+      </div>
     </div>
-    <div id="summaryContent"></div>
-    <button class="btn btn-primary" id="exportAllAreasPdfBtn" style="width:100%; margin-top:24px;">⬇ Export all areas (PDF)</button>
   </div>
 
   <!-- ============ CHARTS ============ -->
   <div class="panel" id="panel-charts">
-    <div class="scope-sticky">
-      <div class="section-label">Areas</div>
-      <div class="chips" id="chartsScopeChips"></div>
+    <div class="scope-layout">
+      <aside class="scope-sidebar" id="chartsScopeSidebar">
+        <div id="chartsScopeChips"></div>
+      </aside>
+      <div class="scope-main">
+        <div id="chartsContent"></div>
+      </div>
     </div>
-    <div id="chartsContent"></div>
   </div>
 
   <!-- ============ REVIEW AND EXPORT ============ -->
@@ -550,35 +616,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 // Default config — mirrors Materials Master / Areas / Streams from the workbook
 // (Materials are editable at runtime via the Audit Info tab; these are just the starting defaults)
 // ============================================================
-const DEFAULT_MATERIALS = [
-  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling','GMPC Recycling','Paper Recycling'],'Yes'],
-  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB04','Mixed Paper','Fibers','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
-  ['FIB06','Beverage Cartons','Fibers','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
-  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
-  ['GLA01','Glass Bottles & Jars','Glass','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
-  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
-  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
-  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
-  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
-  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['OTH01','Snack Wrappers (Composites)','Other','Yes',['Terracycle'],'No'],
-  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
-].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
-
 // "Accepted in program" is its own independently-editable field — a material's target
 // stream(s) say where it's *supposed* to go, but acceptance is a separate real-world fact
 // (e.g. a hauler may not actually take something even though a stream exists for it).
@@ -604,148 +641,168 @@ function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, strea
 // target — a material marked divertible with nowhere to divert it to shouldn't count either.
 function materialHasDivertiblePath(m){ return m.divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName()); }
 
-const DEFAULT_AREAS = [
-  {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'CAFE_BOH', name:'CAFÉ BOH', rollup:'BOH', defaultMaterialId:null},
-  // Bathroom waste is routinely never sorted (sanitary reasons) but is reliably almost all
-  // paper towels/toilet paper — rather than showing as an unlabeled "Area Waste" lump, this
-  // default assumption lets it flow into the normal material breakdown like everything else.
-  {id:'BATHROOM', name:'BATHROOM', rollup:'Rest of Building', defaultMaterialId:'ORG02'},
-];
-
-const DEFAULT_STREAM_CONFIG = [
-  // protected: Trash is hardcoded as the "not a real diversion" baseline in several places
-  // (materialCorrectlyPlacedIn, the Materials Master target-locking logic, the Excel export
-  // formulas) — renaming or deleting it would silently break those, so it's the one stream
-  // whose name/deletion is locked in the UI. Every other property (including
-  // combinedWeighSort) still applies to it normally.
-  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
-  {name:'GMPC Recycling', combinedWeighSort:false, excludeSoiled:false},
-  // excludeSoiled: soiled/contaminated variants of recyclables (Soiled Cardboard, Soiled
-  // Glass, etc.) aren't offered as sortable options for these streams — see
-  // materialsForStream(). Carried on the stream object itself (not matched by name) so it
-  // survives a rename.
-  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
-  // Combined weigh-and-sort: loose/bulky material that's weighed and categorized in one
-  // action rather than bagged-then-sampled. For these streams the Pre-Sort Bags tab is
-  // suppressed entirely, and the stream's total is just the sum of Sorted Weights — there's
-  // no separate "pool" to extrapolate against, since everything is directly observed.
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
-  {name:'Paper Recycling', combinedWeighSort:false, excludeSoiled:false},
-  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false},
-];
-
 // ============================================================
 // Configuration scenarios — presets that swap Areas/Streams/Materials Master together as a
-// unit, for clients who run the same handful of program setups across sites. Scenario 1 is
-// exactly today's defaults (unchanged). Scenario 2/3 are starting points, not final client
-// data — Great Forest can rename/edit anything after picking one, same as always; picking a
-// different scenario just seeds the three sections instead of leaving them blank.
+// unit, for clients who run the same handful of program setups across sites. The client's own
+// templates (below) are the only presets; SCENARIOS[0] doubles as the app's built-in starting
+// point (first load, "Start a new session") so there's one source of truth for "default"
+// rather than a separate hardcoded copy that could drift from what the dropdown actually
+// offers.
 // ============================================================
-const SCENARIO_2_MATERIALS = [
-  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling'],'Yes'],
-  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB04','Mixed Paper','Fibers','Yes',['Single-Stream Recycling'],'Yes'],
-  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
-  ['FIB06','Beverage Cartons','Fibers','Yes',['Single-Stream Recycling'],'Yes'],
-  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
-  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
-  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Single-Stream Recycling'],'Yes'],
-  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
-  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Single-Stream Recycling'],'Yes'],
-  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
-  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['Single-Stream Recycling'],'Yes'],
-  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
-  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
-  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
-  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['OTH01','Snack Wrappers (Composites)','Other','No',['Trash'],'No'],
-  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
+
+// Client-supplied configuration templates (Great Forest program templates, imported
+// 2026-09-11) — extracted from the client's own Materials Master/Areas/Streams sheets the
+// same way "Import session file" would read them, so these scenarios match exactly what
+// importing those files directly would produce.
+const SCENARIO_NW_NO_ORG_MATERIALS = [
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB03','Waxed Cardboard','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB06','Gable Top & Aseptic Cartons','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB07','Soiled Cartons','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB08','Coated Paper Cups & Foodware','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','Yes',['Landfill / Incineration'],'Yes'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLA01','Rigid Plastic Containers 1-6 (Accepted)','Plastics','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLA02','Soiled Plastic Containers','Plastics','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLAC1','Rigid Plastic Containers 1-6 (Non-Accepted)','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG01','Food & Plant Waste','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG02','Paper Fibers & Food-Soiled Paper (FSP)','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG03','Fiber-based & PLA Compostable Serviceware','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['UNAC1','Reusable Materials','Unacceptable','Yes',[],'Unacceptable'],
+  ['UNA03','Other Unacceptable','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['GLAC1','Other Glass','Glass','Yes',['Landfill / Incineration'],'No'],
+  ['METC1','Other Metals','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLAC3','Other Rigid Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['PLA03','Film Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['OTHC2','Textiles','Other','Yes',['Landfill / Incineration'],'Unacceptable'],
+  ['PLAC2','Waste Disposal Bags','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORGC2','Other Organics','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['OTHC1','Other Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['OTH02','Other/Residual Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['UNA04','Liquids','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['PLA04','Foams','Plastics','Yes',['Landfill / Incineration'],'No'],
 ].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
-const SCENARIO_2_AREAS = [
-  {id:'SALES', name:'SALES FLOOR', rollup:'Front of House', defaultMaterialId:null},
-  {id:'STOCK', name:'STOCKROOM', rollup:'Back of House', defaultMaterialId:null},
-  {id:'BREAK', name:'BREAK ROOM', rollup:'Back of House', defaultMaterialId:null},
-  {id:'OFFICE2', name:'OFFICE', rollup:'Back of House', defaultMaterialId:null},
-  {id:'DOCK2', name:'LOADING DOCK', rollup:'Back of House', defaultMaterialId:null},
-];
-const SCENARIO_2_STREAM_CONFIG = [
-  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
-  {name:'Single-Stream Recycling', combinedWeighSort:false, excludeSoiled:false},
+// No template areas — unlike CBRE Bloomberg, this is a generic default program not tied to
+// any particular site layout, so it's left for the auditor to define from scratch.
+const SCENARIO_NW_NO_ORG_AREAS = [];
+const SCENARIO_NW_NO_ORG_STREAM_CONFIG = [
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false},
   {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
-  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
 ];
 
-const SCENARIO_3_MATERIALS = [
-  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling'],'Yes'],
-  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB04','Mixed Paper','Fibers','Yes',['Paper Recycling'],'Yes'],
-  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
-  ['FIB06','Beverage Cartons','Fibers','Yes',['Paper Recycling'],'Yes'],
-  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
-  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
-  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Glass Recycling'],'Yes'],
-  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
-  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Metal & Plastic Recycling'],'Yes'],
-  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
-  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['Metal & Plastic Recycling'],'Yes'],
-  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
-  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
-  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
-  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['OTH01','Snack Wrappers (Composites)','Other','Yes',['Terracycle'],'No'],
-  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
-  ['OTH03','Electronics / E-Waste','Other','Yes',['Electronics Recycling'],'Yes'],
+const SCENARIO_NW_WITH_ORG_MATERIALS = [
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Mixed Recycling','Cardboard Recycling','Compost / Organics Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['FIB03','Waxed Cardboard','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['Mixed Recycling','Cardboard Recycling','Compost / Organics Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['FIB06','Gable Top & Aseptic Cartons','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB07','Soiled Cartons','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB08','Coated Paper Cups & Foodware','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','Yes',['Landfill / Incineration'],'Yes'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLA01','Rigid Plastic Containers 1-6 (Accepted)','Plastics','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLA02','Soiled Plastic Containers','Plastics','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLAC1','Rigid Plastic Containers 1-6 (Non-Accepted)','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG01','Food & Plant Waste','Organics','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['ORG02','Paper Fibers & Food-Soiled Paper (FSP)','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG03','Fiber-based & PLA Compostable Serviceware','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['UNAC1','Reusable Materials','Unacceptable','Yes',[],'Unacceptable'],
+  ['UNA03','Other Unacceptable','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['GLAC1','Other Glass','Glass','Yes',['Landfill / Incineration'],'No'],
+  ['METC1','Other Metals','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLAC3','Other Rigid Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['PLA03','Film Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['OTHC2','Textiles','Other','Yes',['Landfill / Incineration'],'Unacceptable'],
+  ['PLAC2','Waste Disposal Bags','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORGC2','Other Organics','Organics','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['OTHC1','Other Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['OTH02','Other/Residual Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['UNA04','Liquids','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['PLA04','Foams','Plastics','Yes',['Landfill / Incineration'],'No'],
 ].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
-const SCENARIO_3_AREAS = [
-  {id:'LOBBY3', name:'LOBBY', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'SUITES3', name:'TENANT SUITES', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'CAFE3', name:'CAFETERIA', rollup:'BOH', defaultMaterialId:null},
-  {id:'DOCK3', name:'LOADING DOCK', rollup:'BOH', defaultMaterialId:null},
-  {id:'MAIL3', name:'MAIL ROOM', rollup:'Rest of Building', defaultMaterialId:null},
-];
-const SCENARIO_3_STREAM_CONFIG = [
-  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
-  {name:'Paper Recycling', combinedWeighSort:false, excludeSoiled:false},
+// No template areas — same reasoning as the no-organics variant above.
+const SCENARIO_NW_WITH_ORG_AREAS = [];
+const SCENARIO_NW_WITH_ORG_STREAM_CONFIG = [
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false},
   {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
-  {name:'Glass Recycling', combinedWeighSort:false, excludeSoiled:true},
-  {name:'Metal & Plastic Recycling', combinedWeighSort:false, excludeSoiled:false},
-  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
-  {name:'Electronics Recycling', combinedWeighSort:true, excludeSoiled:false},
+  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false},
+];
+
+const SCENARIO_CBRE_BLOOMBERG_MATERIALS = [
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Mixed Recycling','Cardboard Recycling','Compost / Organics Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['FIB03','Waxed Cardboard','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['Mixed Recycling','Cardboard Recycling','Compost / Organics Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['FIB06','Gable Top & Aseptic Cartons','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB07','Soiled Cartons','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB08','Coated Paper Cups & Foodware (Non-Compostable)','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','Yes',['Landfill / Incineration'],'Yes'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLA01','Rigid Plastic Containers','Plastics','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLA02','Soiled Plastic Containers','Plastics','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLAC3','Other Rigid Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG01','Food & Plant Waste','Organics','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['ORG02','Paper Fibers & Food-Soiled Paper (FSP)','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG03','Fiber-based Compostable Serviceware','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG04','PLA Compostable Serviceware','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['UNAC1','Reusable Materials','Unacceptable','Yes',[],'Unacceptable'],
+  ['UNA03','Other Unacceptable','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['OTHC3','Snack Wrappers (Composites)','Other','Yes',['Terracycle'],'Yes'],
+  ['GLAC1','Other Glass','Glass','Yes',['Landfill / Incineration'],'No'],
+  ['METC1','Other Metals','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLA03','Film Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['PLAC2','Waste Disposal Bags','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['OTHC2','Textiles','Other','Yes',['Landfill / Incineration'],'Unacceptable'],
+  ['PLA04','Foams','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORGC2','Other Organics','Organics','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['OTHC1','Other Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['OTH02','Other/Residual Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['UNA04','Liquids','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
+const SCENARIO_CBRE_BLOOMBERG_AREAS = [
+  {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
+  {id:'CAFE_BOH', name:'KITCHEN / BACK-OF-HOUSE', rollup:'BOH', defaultMaterialId:null},
+  {id:'BATHROOM', name:'BATHROOM', rollup:'Rest of Building', defaultMaterialId:'ORG02'},
+];
+const SCENARIO_CBRE_BLOOMBERG_STREAM_CONFIG = [
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
+  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false},
   {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false},
 ];
 
 const SCENARIOS = [
   {
-    id:'scenario1', label:'Scenario 1',
-    description:'Standard office/retail program — GMPC, Cardboard, Paper, Organics Recycling and TerraCycle.',
-    materials:DEFAULT_MATERIALS, areas:DEFAULT_AREAS, streamConfig:DEFAULT_STREAM_CONFIG,
+    id:'nationwide-no-organics', label:'Nationwide Default no Organics _ 2026-09-11',
+    description:'Client-supplied template — Landfill/Incineration, Mixed Recycling and Cardboard Recycling; no organics program.',
+    materials:SCENARIO_NW_NO_ORG_MATERIALS, areas:SCENARIO_NW_NO_ORG_AREAS, streamConfig:SCENARIO_NW_NO_ORG_STREAM_CONFIG,
   },
   {
-    id:'scenario2', label:'Scenario 2',
-    description:'Simplified single-stream program — Single-Stream Recycling, Cardboard Recycling and Organics Recycling only.',
-    materials:SCENARIO_2_MATERIALS, areas:SCENARIO_2_AREAS, streamConfig:SCENARIO_2_STREAM_CONFIG,
+    id:'nationwide-with-organics', label:'Nationwide Default with Organics _ 2026-09-11',
+    description:'Client-supplied template — same as the no-organics default, plus Compost / Organics Recycling.',
+    materials:SCENARIO_NW_WITH_ORG_MATERIALS, areas:SCENARIO_NW_WITH_ORG_AREAS, streamConfig:SCENARIO_NW_WITH_ORG_STREAM_CONFIG,
   },
   {
-    id:'scenario3', label:'Scenario 3',
-    description:'Expanded multi-stream program — separate Paper, Glass and Metal & Plastic recycling, plus Electronics Recycling and TerraCycle.',
-    materials:SCENARIO_3_MATERIALS, areas:SCENARIO_3_AREAS, streamConfig:SCENARIO_3_STREAM_CONFIG,
+    id:'cbre-bloomberg', label:'CBRE Bloomberg_2026-09-11',
+    description:'Client-supplied template — Landfill/Incineration, Mixed Recycling, Cardboard Recycling, Compost/Organics Recycling and TerraCycle.',
+    materials:SCENARIO_CBRE_BLOOMBERG_MATERIALS, areas:SCENARIO_CBRE_BLOOMBERG_AREAS, streamConfig:SCENARIO_CBRE_BLOOMBERG_STREAM_CONFIG,
   },
   {
     id:'empty', label:'Empty',
@@ -758,7 +815,7 @@ const SCENARIOS = [
 // STREAMS stays a flat array of names — nearly all existing code (STREAMS.forEach,
 // STREAMS.includes, Materials Master's per-stream target columns) only ever needed the
 // name, not the config, so this keeps that code working unchanged.
-let streamConfig = DEFAULT_STREAM_CONFIG.map(s => ({...s}));
+let streamConfig = SCENARIOS[0].streamConfig.map(s => ({...s}));
 let STREAMS = streamConfig.map(s => s.name);
 function isCombinedWeighSort(streamName){
   const cfg = streamConfig.find(s => s.name === streamName);
@@ -830,13 +887,13 @@ const AUDIT_FIELDS = [
 // ============================================================
 // State
 // ============================================================
-let materials = DEFAULT_MATERIALS.map(m => ({...m}));
-let areas = DEFAULT_AREAS.map(a => ({...a}));
+let materials = SCENARIOS[0].materials.map(m => ({...m}));
+let areas = SCENARIOS[0].areas.map(a => ({...a}));
 // Which scenario preset Areas/Streams/Materials Master currently reflect, and whether the
 // user has since hand-edited any of those three sections — set by markScenarioEdited() via
 // saveMaterials/saveAreas/saveStreamConfig, cleared by applyScenario(). `applyingScenario`
 // suppresses that tracking while a scenario itself is being applied (that's not a user edit).
-let activeScenarioId = 'scenario1';
+let activeScenarioId = SCENARIOS[0].id;
 let scenarioEdited = false;
 let applyingScenario = false;
 let auditMeta = {};
@@ -846,8 +903,11 @@ auditMeta.auditDate = new Date().toISOString().slice(0,10); // YYYY-MM-DD
 let sortedEntries = [];   // {area, stream, materialId, materialName, weight, note, ts}
 let presortEntries = [];  // {area, stream, weight, note, ts}
 
-let sortedSel = {area:null, stream:null, category:null, materialId:null, nonRepresentative:false};
-let presortSel = {area:null, stream:null, knownMaterialId:null};
+// tenant picks WHICH areas the Area step offers (every area shares its rollup with exactly
+// one tenant), and areaId is the one true reference stored on the entry — never a name, since
+// two areas under different tenants can share one (e.g. "Office" at two different tenants).
+let sortedSel = {tenant:null, areaId:null, stream:null, category:null, materialId:null, nonRepresentative:false};
+let presortSel = {tenant:null, areaId:null, stream:null, knownMaterialId:null};
 let editingSortedTs = null;
 let editingPresortTs = null;
 
@@ -1324,20 +1384,21 @@ function renderAreasForm(){
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.value = a.name;
-    // A rename propagates to every logged sorted/pre-sort entry stored under the old name.
+    // Areas are identified by their stable id everywhere (entries, exports, charts) — never
+    // by name — so a rename here needs no propagation to logged entries at all; it just
+    // relabels the same area. Only the name+tenant PAIR needs to stay unique, since that's
+    // what the Tenant → Area picker (data entry, Summaries/Charts scope) shows side by side;
+    // the same area name is fine under two different tenants (e.g. "Office" at two tenants).
     nameInput.addEventListener('change', () => {
       const newName = nameInput.value.trim();
       if (!newName || newName === a.name){ nameInput.value = a.name; return; }
-      if (areas.some(other => other !== a && other.name === newName)){
-        showToast('An area with that name already exists');
+      if (areas.some(other => other !== a && other.name === newName && other.rollup === a.rollup)){
+        showToast('This tenant already has an area with that name');
         nameInput.value = a.name;
         return;
       }
-      const oldName = a.name;
       a.name = newName;
-      sortedEntries.forEach(e => { if (e.area === oldName) e.area = newName; });
-      presortEntries.forEach(e => { if (e.area === oldName) e.area = newName; });
-      saveAreas(); saveSorted(); savePresort();
+      saveAreas();
       renderAll();
     });
     nameWrap.appendChild(nameLabel); nameWrap.appendChild(nameInput);
@@ -1346,11 +1407,23 @@ function renderAreasForm(){
     rollupWrap.className = 'area-field';
     const rollupLabel = document.createElement('span');
     rollupLabel.className = 'mm-label';
-    rollupLabel.textContent = 'Rollup group';
+    rollupLabel.textContent = 'Tenant';
     const rollupInput = document.createElement('input');
     rollupInput.type = 'text';
     rollupInput.value = a.rollup;
-    rollupInput.addEventListener('change', () => { a.rollup = rollupInput.value.trim() || a.rollup; saveAreas(); });
+    // Same id-based identity means a tenant rename needs no entry propagation either — every
+    // area under the old tenant name just carries the new one forward automatically.
+    rollupInput.addEventListener('change', () => {
+      const newRollup = rollupInput.value.trim() || a.rollup;
+      if (newRollup !== a.rollup && areas.some(other => other !== a && other.name === a.name && other.rollup === newRollup)){
+        showToast('That tenant already has an area named "' + a.name + '"');
+        rollupInput.value = a.rollup;
+        return;
+      }
+      a.rollup = newRollup;
+      saveAreas();
+      renderAll();
+    });
     rollupWrap.appendChild(rollupLabel); rollupWrap.appendChild(rollupInput);
 
     const defaultMatOptions = ['None', ...materials.map(m => m.name)];
@@ -1369,12 +1442,13 @@ function renderAreasForm(){
     delBtn.onclick = () => {
       if (areas.length <= 1) { showToast('At least one area is required'); return; }
       const removedName = a.name;
-      const nSorted = sortedEntries.filter(e => e.area === removedName).length;
-      const nPresort = presortEntries.filter(e => e.area === removedName).length;
+      const removedId = a.id;
+      const nSorted = sortedEntries.filter(e => e.areaId === removedId).length;
+      const nPresort = presortEntries.filter(e => e.areaId === removedId).length;
       const doRemove = () => {
         areas.splice(idx, 1);
-        sortedEntries = sortedEntries.filter(e => e.area !== removedName);
-        presortEntries = presortEntries.filter(e => e.area !== removedName);
+        sortedEntries = sortedEntries.filter(e => e.areaId !== removedId);
+        presortEntries = presortEntries.filter(e => e.areaId !== removedId);
         cancelEditSorted(); cancelEditPresort();
         saveAreas(); saveSorted(); savePresort();
         renderAll();
@@ -1403,7 +1477,10 @@ function renderAreasForm(){
   addBtn.className = 'add-area-btn';
   addBtn.textContent = '+ Add area';
   addBtn.onclick = () => {
-    areas.push({id: 'AREA_' + Date.now(), name: 'NEW AREA', rollup: 'Base Building', defaultMaterialId: null});
+    const rollup = 'Base Building';
+    let n = 1, name = 'NEW AREA';
+    while (areas.some(a => a.name === name && a.rollup === rollup)) { n++; name = 'NEW AREA ' + n; }
+    areas.push({id: 'AREA_' + Date.now(), name, rollup, defaultMaterialId: null});
     saveAreas(); renderAll();
   };
   box.appendChild(addBtn);
@@ -1660,11 +1737,25 @@ function makeMaterialSelectField(label, materialsList, value, onChange){
 }
 
 // ---------- Sorted panel rendering ----------
+// Tenant picked first, then Area scoped to that tenant — needed because two areas under
+// different tenants can share a name (e.g. "Office"), so a flat cross-tenant Area list would
+// be ambiguous. sortedSel.areaId (an area's stable id) is the only thing actually stored on
+// the entry; the tenant selection is just what narrows the Area chip list.
+function renderSortedTenants(){
+  const box = document.getElementById('sortedTenantChips');
+  box.innerHTML = '';
+  allTenants().forEach(t => {
+    box.appendChild(chip(t, sortedSel.tenant === t, () => {
+      sortedSel.tenant = t; sortedSel.areaId = null; renderAll();
+    }));
+  });
+}
 function renderSortedAreas(){
   const box = document.getElementById('sortedAreaChips');
   box.innerHTML = '';
-  areas.forEach(a => {
-    box.appendChild(chip(a.name, sortedSel.area === a.name, () => { sortedSel.area = a.name; renderAll(); }));
+  if (!sortedSel.tenant){ box.innerHTML = '<span class="empty-hint">Pick a tenant first</span>'; return; }
+  areas.filter(a => a.rollup === sortedSel.tenant).forEach(a => {
+    box.appendChild(chip(a.name, sortedSel.areaId === a.id, () => { sortedSel.areaId = a.id; renderAll(); }));
   });
 }
 function renderSortedStreams(){
@@ -1703,7 +1794,7 @@ function renderSortedMaterials(){
 function renderSortedAddButton(){
   const btn = document.getElementById('addSortedBtn');
   const cancelBtn = document.getElementById('cancelSortedEditBtn');
-  const ready = sortedSel.area && sortedSel.stream && sortedSel.materialId &&
+  const ready = sortedSel.areaId && sortedSel.stream && sortedSel.materialId &&
                 parseFloat(document.getElementById('sortedWeight').value) > 0;
   btn.disabled = !ready;
   const editing = editingSortedTs !== null;
@@ -1731,7 +1822,7 @@ function renderSortedNonRepToggle(){
   }
 }
 function renderSortedContext(){
-  const ctx = sortedEntries.filter(e => e.area === sortedSel.area && e.stream === sortedSel.stream);
+  const ctx = sortedEntries.filter(e => e.areaId === sortedSel.areaId && e.stream === sortedSel.stream);
   const total = ctx.reduce((s,e) => s + e.weight, 0);
   document.getElementById('sortedContextTotal').textContent = total.toFixed(2) + ' lbs';
   const table = document.getElementById('sortedContextLog');
@@ -1742,7 +1833,7 @@ function renderSortedContext(){
   table.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Material</th><th class="num">Weight</th><th></th></tr>' +
     sortedEntries.slice().reverse().map(e => {
       const idx = sortedEntries.indexOf(e);
-      return `<tr><td>${e.area}</td><td>${e.stream}</td>
+      return `<tr><td>${areaLabel(e.areaId)}</td><td>${e.stream}</td>
         <td>${e.materialName}${nonRepBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
         <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></div></td></tr>`;
@@ -1750,11 +1841,21 @@ function renderSortedContext(){
 }
 
 // ---------- Presort panel rendering ----------
+function renderPresortTenants(){
+  const box = document.getElementById('presortTenantChips');
+  box.innerHTML = '';
+  allTenants().forEach(t => {
+    box.appendChild(chip(t, presortSel.tenant === t, () => {
+      presortSel.tenant = t; presortSel.areaId = null; renderAll();
+    }));
+  });
+}
 function renderPresortAreas(){
   const box = document.getElementById('presortAreaChips');
   box.innerHTML = '';
-  areas.forEach(a => {
-    box.appendChild(chip(a.name, presortSel.area === a.name, () => { presortSel.area = a.name; renderAll(); }));
+  if (!presortSel.tenant){ box.innerHTML = '<span class="empty-hint">Pick a tenant first</span>'; return; }
+  areas.filter(a => a.rollup === presortSel.tenant).forEach(a => {
+    box.appendChild(chip(a.name, presortSel.areaId === a.id, () => { presortSel.areaId = a.id; renderAll(); }));
   });
 }
 function renderPresortStreams(){
@@ -1806,7 +1907,7 @@ function renderPresortKnownToggle(){
 function renderPresortAddButton(){
   const btn = document.getElementById('addPresortBtn');
   const cancelBtn = document.getElementById('cancelPresortEditBtn');
-  const ready = presortSel.area && presortSel.stream &&
+  const ready = presortSel.areaId && presortSel.stream &&
                 parseFloat(document.getElementById('presortWeight').value) > 0;
   btn.disabled = !ready;
   const editing = editingPresortTs !== null;
@@ -1814,7 +1915,7 @@ function renderPresortAddButton(){
   cancelBtn.style.display = editing ? '' : 'none';
 }
 function renderPresortContext(){
-  const ctx = presortEntries.filter(e => e.area === presortSel.area && e.stream === presortSel.stream);
+  const ctx = presortEntries.filter(e => e.areaId === presortSel.areaId && e.stream === presortSel.stream);
   const total = ctx.reduce((s,e) => s + e.weight, 0);
   document.getElementById('presortContextTotal').textContent = ctx.length + ' bags · ' + total.toFixed(2) + ' lbs';
   const table = document.getElementById('presortContextLog');
@@ -1825,7 +1926,7 @@ function renderPresortContext(){
   table.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Weight</th><th></th></tr>' +
     presortEntries.slice().reverse().map(e => {
       const idx = presortEntries.indexOf(e);
-      return `<tr><td>${e.area}</td><td>${e.stream}${knownBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
+      return `<tr><td>${areaLabel(e.areaId)}</td><td>${e.stream}${knownBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
         <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button><button class="del-btn" onclick="deletePresort(${idx})">✕</button></div></td></tr>`;
     }).join('');
@@ -1851,7 +1952,9 @@ let sortedReviewFilters = {area: 'All', stream: 'All', category: 'All', material
 function buildFilterOptions(selectEl, kind){
   if (selectEl.dataset.built === '1') return;
   if (kind === 'area'){
-    selectEl.innerHTML = '<option value="All">All areas</option>' + areas.map(a => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`).join('');
+    // Option value is the area's id (never its name — two areas under different tenants can
+    // share one), label is qualified with the tenant since this list spans every tenant.
+    selectEl.innerHTML = '<option value="All">All areas</option>' + areas.map(a => `<option value="${escapeHtml(a.id)}">${escapeHtml(areaLabel(a.id))}</option>`).join('');
   } else if (kind === 'stream'){
     selectEl.innerHTML = '<option value="All">All streams</option>' + STREAMS.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
   } else if (kind === 'category'){
@@ -1879,7 +1982,7 @@ function renderPresortReview(){
   streamSel.value = presortReviewFilters.stream;
 
   const matchesFilter = e =>
-    (presortReviewFilters.area === 'All' || e.area === presortReviewFilters.area) &&
+    (presortReviewFilters.area === 'All' || e.areaId === presortReviewFilters.area) &&
     (presortReviewFilters.stream === 'All' || e.stream === presortReviewFilters.stream);
 
   const filteredPresort = presortEntries.filter(matchesFilter);
@@ -1890,7 +1993,7 @@ function renderPresortReview(){
     pt.innerHTML = '<tr><th>Area</th><th>Stream</th><th class="num">Wt</th><th></th></tr>' +
       filteredPresort.slice().reverse().map(e => {
         const idx = presortEntries.indexOf(e);
-        return `<tr><td>${e.area}</td><td>${e.stream}${knownBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
+        return `<tr><td>${areaLabel(e.areaId)}</td><td>${e.stream}${knownBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
         <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button><button class="del-btn" onclick="deletePresort(${idx})">✕</button></div></td></tr>`;
       }).join('');
@@ -1927,7 +2030,7 @@ function renderSortedReview(){
   };
 
   const matchesFilter = e =>
-    (sortedReviewFilters.area === 'All' || e.area === sortedReviewFilters.area) &&
+    (sortedReviewFilters.area === 'All' || e.areaId === sortedReviewFilters.area) &&
     (sortedReviewFilters.stream === 'All' || e.stream === sortedReviewFilters.stream) &&
     (sortedReviewFilters.category === 'All' || categoryOf(e) === sortedReviewFilters.category) &&
     (sortedReviewFilters.material === 'All' || e.materialName === sortedReviewFilters.material);
@@ -1940,7 +2043,7 @@ function renderSortedReview(){
     st.innerHTML = '<tr><th>Area</th><th>Stream</th><th>Category</th><th>Material</th><th class="num">Wt</th><th></th></tr>' +
       filteredSorted.slice().reverse().map(e => {
         const idx = sortedEntries.indexOf(e);
-        return `<tr><td>${e.area}</td><td>${e.stream}</td><td>${categoryOf(e)}</td>
+        return `<tr><td>${areaLabel(e.areaId)}</td><td>${e.stream}</td><td>${categoryOf(e)}</td>
         <td>${e.materialName}${nonRepBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
         <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></div></td></tr>`;
@@ -1952,9 +2055,9 @@ function renderAll(){
   renderHeader();
   renderScenarioSelect();
   renderAuditInfoForm(); renderAreasForm(); renderStreamsForm(); renderMaterialsMasterForm();
-  renderSortedAreas(); renderSortedStreams(); renderSortedCategories(); renderSortedMaterials();
+  renderSortedTenants(); renderSortedAreas(); renderSortedStreams(); renderSortedCategories(); renderSortedMaterials();
   renderSortedNonRepToggle(); renderSortedAddButton(); renderSortedContext();
-  renderPresortAreas(); renderPresortStreams(); renderPresortKnownToggle(); renderPresortAddButton(); renderPresortContext();
+  renderPresortTenants(); renderPresortAreas(); renderPresortStreams(); renderPresortKnownToggle(); renderPresortAddButton(); renderPresortContext();
   renderPresortReview(); renderSortedReview();
   renderSummaryTab();
   renderChartsTab();
@@ -1981,7 +2084,9 @@ window.editSorted = function(idx){
   const e = sortedEntries[idx];
   if (!e) return;
   const mat = materials.find(m => m.id === e.materialId);
-  sortedSel.area = e.area;
+  const editArea = areaById(e.areaId);
+  sortedSel.tenant = editArea ? editArea.rollup : null;
+  sortedSel.areaId = e.areaId;
   sortedSel.stream = e.stream;
   sortedSel.category = mat ? mat.category : null;
   sortedSel.materialId = e.materialId;
@@ -1997,7 +2102,9 @@ window.editSorted = function(idx){
 window.editPresort = function(idx){
   const e = presortEntries[idx];
   if (!e) return;
-  presortSel.area = e.area;
+  const editArea = areaById(e.areaId);
+  presortSel.tenant = editArea ? editArea.rollup : null;
+  presortSel.areaId = e.areaId;
   presortSel.stream = e.stream;
   presortSel.knownMaterialId = e.knownMaterialId || null;
   editingPresortTs = e.ts;
@@ -2035,7 +2142,7 @@ document.getElementById('addSortedBtn').onclick = () => {
   if (editingSortedTs !== null){
     const entry = sortedEntries.find(e => e.ts === editingSortedTs);
     if (entry){
-      entry.area = sortedSel.area; entry.stream = sortedSel.stream;
+      entry.areaId = sortedSel.areaId; entry.stream = sortedSel.stream;
       entry.materialId = mat.id; entry.materialName = mat.name;
       entry.weight = w; entry.note = note; entry.nonRepresentative = nonRepresentative;
     }
@@ -2045,7 +2152,7 @@ document.getElementById('addSortedBtn').onclick = () => {
     return;
   }
   sortedEntries.push({
-    area: sortedSel.area, stream: sortedSel.stream,
+    areaId: sortedSel.areaId, stream: sortedSel.stream,
     materialId: mat.id, materialName: mat.name, weight: w, note, nonRepresentative, ts: Date.now()
   });
   document.getElementById('sortedWeight').value = '';
@@ -2066,7 +2173,7 @@ document.getElementById('addPresortBtn').onclick = () => {
   if (editingPresortTs !== null){
     const entry = presortEntries.find(e => e.ts === editingPresortTs);
     if (entry){
-      entry.area = presortSel.area; entry.stream = presortSel.stream;
+      entry.areaId = presortSel.areaId; entry.stream = presortSel.stream;
       entry.weight = w; entry.note = note; entry.knownMaterialId = knownMaterialId;
     }
     cancelEditPresort();
@@ -2074,7 +2181,7 @@ document.getElementById('addPresortBtn').onclick = () => {
     showToast('Bag updated');
     return;
   }
-  presortEntries.push({area: presortSel.area, stream: presortSel.stream, weight: w, note, knownMaterialId, ts: Date.now()});
+  presortEntries.push({areaId: presortSel.areaId, stream: presortSel.stream, weight: w, note, knownMaterialId, ts: Date.now()});
   document.getElementById('presortWeight').value = '';
   document.getElementById('presortNote').value = '';
   presortSel.knownMaterialId = null;
@@ -2103,9 +2210,9 @@ document.getElementById('confirmNewSessionBtn').onclick = async () => {
   if (document.getElementById('deleteConfirmInput').value.trim().toUpperCase() !== 'DELETE') return;
   sortedEntries = []; presortEntries = [];
   applyingScenario = true;
-  materials = DEFAULT_MATERIALS.map(m => ({...m}));
-  areas = DEFAULT_AREAS.map(a => ({...a}));
-  applyStreamConfig(DEFAULT_STREAM_CONFIG.map(s => ({...s})));
+  materials = SCENARIOS[0].materials.map(m => ({...m}));
+  areas = SCENARIOS[0].areas.map(a => ({...a}));
+  applyStreamConfig(SCENARIOS[0].streamConfig.map(s => ({...s})));
   activeScenarioId = SCENARIOS[0].id;
   scenarioEdited = false;
   AUDIT_FIELDS.forEach(f => auditMeta[f.key] = f.default);
@@ -2129,7 +2236,9 @@ function switchTab(tab){
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
+  document.querySelector('main').classList.toggle('wide', tab === 'summaries' || tab === 'charts');
   renderAll();
+  updateStickyOffsets();
 }
 
 function switchReviewSubtab(which){
@@ -2150,8 +2259,20 @@ document.getElementById('subtabSortedBtn').onclick = () => switchReviewSubtab('s
 // multi-target membership logic) so this view and the exported file can
 // never silently drift apart.
 // ============================================================
-let summaryScope = null; // null = Overall, else an area name
+// tenantIds/areaIds null = "every tenant"/"every area in scope" respectively — see
+// resolveScopeAreaIds() and scopeIsOverall().
+let summaryScope = {tenantIds: null, areaIds: null};
+// Grouping for the Overall-only Tables 4/5 (Waste Stream Contamination, Current v Potential
+// Diversion): true = one row per individual Area, labeled with its tenant ("Tenant & Area" —
+// the full breakout, not rolled up either direction); false = one row per Tenant, its areas
+// combined. Some sites want the finer breakout as standard, others don't need it — this is a
+// per-report choice, not a fixed rule, so it defaults to the fuller breakout but stays a toggle.
+let summaryTenantBreakout = true;
 
+// Every row carries areaId (the area's stable id — the one true join key everywhere) AND a
+// resolved area/rollup pair for display and grouping; areaId is what filtering/matching uses,
+// area/rollup are what gets shown. Areas are matched by id, never by name, precisely because
+// two different areas (different tenants) can now legitimately share the same name.
 function computeExtrapolatedRows(){
   const rows = [];
   areas.forEach(a => {
@@ -2162,15 +2283,15 @@ function computeExtrapolatedRows(){
         // here (they're both about inferring the UNOBSERVED rest of a bag, which doesn't
         // exist for this stream type) — every sorted entry just counts as itself.
         materials.forEach(m => {
-          const weight = sortedEntries.filter(e => e.area === a.name && e.stream === s && e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
+          const weight = sortedEntries.filter(e => e.areaId === a.id && e.stream === s && e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
           const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
           const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
-          rows.push({area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
+          rows.push({areaId:a.id, area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
                      weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m), rollup:a.rollup});
         });
         return;
       }
-      const areaStream = e => e.area === a.name && e.stream === s;
+      const areaStream = e => e.areaId === a.id && e.stream === s;
       const poolWeight = presortEntries.filter(e => areaStream(e) && !e.knownMaterialId).reduce((sum,e) => sum + e.weight, 0);
       const repSorted = sortedEntries.filter(e => areaStream(e) && !e.nonRepresentative);
       const nonRepSorted = sortedEntries.filter(e => areaStream(e) && e.nonRepresentative);
@@ -2193,42 +2314,66 @@ function computeExtrapolatedRows(){
         const weight = knownWeight + nonRepWeight + ratioTerm;
         const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
         const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
-        rows.push({area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
+        rows.push({areaId:a.id, area:a.name, stream:s, materialId:m.id, materialName:m.name, category:m.category,
                    weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m), rollup:a.rollup});
       });
     });
   });
   return rows;
 }
-function areaTotalPresortLive(areaName){
-  const bagged = presortEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
-  const combined = sortedEntries.filter(e => e.area === areaName && isCombinedWeighSort(e.stream)).reduce((s,e) => s + e.weight, 0);
+function areaTotalPresortLive(areaId){
+  const bagged = presortEntries.filter(e => e.areaId === areaId).reduce((s,e) => s + e.weight, 0);
+  const combined = sortedEntries.filter(e => e.areaId === areaId && isCombinedWeighSort(e.stream)).reduce((s,e) => s + e.weight, 0);
   return bagged + combined;
 }
 // Pool-only presort weight — excludes known-composition bags, since those don't need a
 // sorted sample to be understood. Used only to detect genuinely "unsorted" areas: pool
 // (mixed/unknown) weight sitting there with zero sorted sample to extrapolate it against.
-function areaPoolOnlyPresortLive(areaName){
-  return presortEntries.filter(e => e.area === areaName && !e.knownMaterialId).reduce((s,e) => s + e.weight, 0);
+function areaPoolOnlyPresortLive(areaId){
+  return presortEntries.filter(e => e.areaId === areaId && !e.knownMaterialId).reduce((s,e) => s + e.weight, 0);
 }
-function areaTotalSortedLive(areaName){
-  return sortedEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
+function areaTotalSortedLive(areaId){
+  return sortedEntries.filter(e => e.areaId === areaId).reduce((s,e) => s + e.weight, 0);
+}
+
+// Every distinct tenant (rollup group value), in the order its first area appears — the list
+// the Tenant step of data entry, and the Tenant level of the Summaries/Charts scope picker,
+// both build their chips/rows from.
+function allTenants(){ return [...new Set(areas.map(a => a.rollup))]; }
+function areaById(id){ return areas.find(a => a.id === id) || null; }
+// Qualified "Name — Tenant" label for an area, safe to show in any context that lists
+// entries across more than one area/tenant at once (the entry-edit context log, Review tab,
+// Excel exports) — since two different areas can now share a bare name, only the pairing
+// with its tenant is guaranteed to identify which one. Contexts already scoped to a single
+// tenant (the data-entry Area chips, once a tenant is picked) just use the area's own name.
+function areaLabel(id){
+  const a = areaById(id);
+  if (!a) return '(removed area)';
+  // Skip the redundant "X — X" when the area's own name already IS the tenant name (the
+  // common case for a tenant with a single, unbroken-out area) — qualifying it against
+  // itself doesn't disambiguate anything, just doubles the label for no reason.
+  return a.name === a.rollup ? a.name : `${a.name} — ${a.rollup}`;
 }
 
 function pct(n){ return (n*100).toFixed(1) + '%'; }
 function lbs(n){ return n.toFixed(2); }
 
+// Framed the same way as a Charts card (.chart-card) — title + actions in a header row, then
+// the table itself.
 function renderAnalysisTable(title, headers, bodyRowsHtml, extraClass){
   const headerHtml = headers.map(h =>
     `<th onclick="sortAnalysisTableHeader(this)">${h}<span class="sort-arrow"></span></th>`
   ).join('');
-  return `<div class="summary-table-title"><span>${title}</span>
+  return `<div class="chart-card">
+    <div class="chart-card-header">
+      <span class="chart-card-title">${title}</span>
       <span class="table-actions">
         <button type="button" class="copy-table-btn" onclick="copyAnalysisTable(this)">⧉ Copy table</button>
         <button type="button" class="copy-table-btn" onclick="downloadAnalysisTableImage(this)">⬇ Image</button>
       </span>
     </div>
-    <table class="analysis ${extraClass||''}"><tr>${headerHtml}</tr>${bodyRowsHtml}</table>`;
+    <table class="analysis ${extraClass||''}"><tr>${headerHtml}</tr>${bodyRowsHtml}</table>
+  </div>`;
 }
 // Draws any rendered <table> onto a canvas, mirroring the analysis-table CSS closely enough
 // for a clean standalone image — shared by the per-table "Image" button and the all-areas
@@ -2311,9 +2456,9 @@ function downloadCanvasAsPng(canvas, filename){
   }, 'image/png');
 }
 window.downloadAnalysisTableImage = function(btn){
-  const wrap = btn.closest('.summary-table-title');
-  const table = wrap.nextElementSibling;
-  const title = wrap.querySelector('span').textContent;
+  const card = btn.closest('.chart-card');
+  const table = card.querySelector('table.analysis');
+  const title = card.querySelector('.chart-card-title').textContent;
   if (!table){ showToast('Nothing to download'); return; }
   const canvas = renderTableToCanvas(table, title);
   if (!canvas){ showToast('Nothing to download'); return; }
@@ -2344,7 +2489,7 @@ function copyTextToClipboard(text){
   });
 }
 window.copyAnalysisTable = function(btn){
-  const table = btn.closest('.summary-table-title').nextElementSibling;
+  const table = btn.closest('.chart-card').querySelector('table.analysis');
   if (!table) return;
   const rows = Array.from(table.querySelectorAll('tr'));
   const text = rows.map(row =>
@@ -2398,13 +2543,110 @@ window.sortAnalysisTableHeader = function(th){
   totalRows.forEach(r => table.appendChild(r));
 };
 
-function renderSummaryScopeChips(){
-  const box = document.getElementById('summaryScopeChips');
+// A single checkbox-style row — custom-drawn (not a native <input>) to match the chip/pill
+// styling used everywhere else in this picker. Fully controlled: the caller re-renders the
+// whole list after every click, so this never needs its own internal checked state.
+function scopeCheckRow(labelHtml, checked, onClick){
+  const row = document.createElement('div');
+  row.className = 'scope-check-row';
+  row.innerHTML = `<span class="scope-check-box${checked ? ' checked' : ''}">${checked ? '✓' : ''}</span><span class="scope-check-text">${labelHtml}</span>`;
+  row.onclick = onClick;
+  return row;
+}
+
+// Shared scope picker for the Summaries and Charts tabs (otherwise duplicated identically).
+// Two independent multi-select checklists: Filter by Tenant (Overall + one row per tenant)
+// and Filter by Area (All areas + one row per individual area, each labeled with its own
+// tenant so it's identifiable even when areas share a name across tenants). The Area list is
+// limited to whichever tenants are currently checked (every area, under "Overall"), and every
+// row toggles independently — any combination of tenants, and within that, any combination of
+// areas (including several areas of the same tenant at once). Changing the Tenant selection
+// always resets Areas back to "All" of the new tenant set — a fresh start, not a merge with
+// whatever was checked before.
+function renderScopeControl({boxElId, scope, onScopeChange}){
+  const box = document.getElementById(boxElId);
   box.innerHTML = '';
-  box.appendChild(chip('Overall', summaryScope === null, () => { summaryScope = null; renderSummaryTab(); }));
-  areas.forEach(a => {
-    box.appendChild(chip(a.name, summaryScope === a.name, () => { summaryScope = a.name; renderSummaryTab(); }));
+  const tenantList = allTenants();
+  const checkedTenants = scope.tenantIds === null ? tenantList : scope.tenantIds;
+
+  const tenantsLabel = document.createElement('div');
+  tenantsLabel.className = 'section-label';
+  tenantsLabel.style.margin = '0 0 6px';
+  tenantsLabel.textContent = 'Filter by Tenant';
+  box.appendChild(tenantsLabel);
+
+  const tenantsList = document.createElement('div');
+  tenantsList.className = 'scope-check-list';
+  tenantsList.appendChild(scopeCheckRow('Overall', scope.tenantIds === null,
+    () => onScopeChange({tenantIds: null, areaIds: null})));
+  tenantList.forEach(t => {
+    const isChecked = checkedTenants.includes(t);
+    tenantsList.appendChild(scopeCheckRow(escapeHtml(t), isChecked, () => {
+      // "Overall" is implicit — every tenant checked — so the first click from there
+      // deselects just this one, leaving the rest on, rather than starting empty.
+      const base = scope.tenantIds === null ? tenantList : scope.tenantIds;
+      let next = isChecked ? base.filter(x => x !== t) : [...base, t];
+      if (next.length === 0) return; // keep at least one tenant checked
+      if (next.length === tenantList.length) next = null; // every tenant checked = "Overall"
+      onScopeChange({tenantIds: next, areaIds: null});
+    }));
   });
+  box.appendChild(tenantsList);
+
+  const areasLabel = document.createElement('div');
+  areasLabel.className = 'section-label';
+  areasLabel.textContent = 'Filter by Area';
+  box.appendChild(areasLabel);
+
+  const areasList = document.createElement('div');
+  areasList.className = 'scope-check-list';
+  const areaList = areas.filter(a => checkedTenants.includes(a.rollup));
+  const checkedAreaIds = scope.areaIds; // null = "All" (every area currently listed)
+  areasList.appendChild(scopeCheckRow('All areas', checkedAreaIds === null,
+    () => onScopeChange({...scope, areaIds: null})));
+  areaList.forEach(a => {
+    const isChecked = checkedAreaIds ? checkedAreaIds.includes(a.id) : true; // under "All", every listed area reads as checked
+    const labelHtml = `<b>${escapeHtml(a.name)}</b><span class="scope-check-sub">${escapeHtml(a.rollup)}</span>`;
+    areasList.appendChild(scopeCheckRow(labelHtml, isChecked, () => {
+      const base = checkedAreaIds || areaList.map(x => x.id);
+      let next = isChecked ? base.filter(id => id !== a.id) : [...base, a.id];
+      if (next.length === 0) return; // keep at least one area checked
+      if (next.length === areaList.length) next = null; // every listed area checked = "All"
+      onScopeChange({...scope, areaIds: next});
+    }));
+  });
+  box.appendChild(areasList);
+}
+
+// Appended to a scope sidebar after the Tenant/Area filters — one shared Grouping control
+// (By Tenant / By Tenant & Area) governing every table or chart on that tab which breaks its
+// numbers out by tenant/area (Summaries' Waste Stream Contamination + Current v Potential
+// Diversion tables, Charts' matching pair), rather than a separate toggle repeated under each
+// one of them. Rendered as two separate pills (not a joined segmented control), per request.
+function appendGroupingControl(boxElId, value, onChange){
+  const box = document.getElementById(boxElId);
+  const label = document.createElement('div');
+  label.className = 'section-label';
+  label.textContent = 'Grouping';
+  box.appendChild(label);
+  const toggle = document.createElement('div');
+  toggle.className = 'mini-toggle split';
+  toggle.innerHTML = `
+    <button type="button" class="mini-toggle-btn${value ? '' : ' active'}">By Tenant</button>
+    <button type="button" class="mini-toggle-btn${value ? ' active' : ''}">By Tenant &amp; Area</button>`;
+  const [byTenantBtn, byAreaBtn] = toggle.querySelectorAll('button');
+  byTenantBtn.onclick = () => onChange(false);
+  byAreaBtn.onclick = () => onChange(true);
+  box.appendChild(toggle);
+}
+
+function renderSummaryScopeChips(){
+  renderScopeControl({
+    boxElId: 'summaryScopeChips',
+    scope: summaryScope,
+    onScopeChange: (v) => { summaryScope = v; renderSummaryTab(); },
+  });
+  appendGroupingControl('summaryScopeChips', summaryTenantBreakout, window.setSummaryBreakout);
 }
 
 // ============================================================
@@ -2432,7 +2674,16 @@ const CATEGORY_COLORS = {
   Unacceptable: '#6d6023', // Yellow, darkened
   Other: '#f3d64e', // Yellow
 };
-let chartsScope = null; // null = Overall, else an area name
+// tenantIds/areaIds null = "every tenant"/"every area in scope" respectively — see
+// resolveScopeAreaIds() and scopeIsOverall().
+let chartsScope = {tenantIds: null, areaIds: null};
+// Grouping for the "Current v Potential Diversion" chart trio and the "Waste Stream
+// Contamination" chart, which — like Summaries Tables 4/5 — always show every group
+// regardless of the scope chips above (there's no useful single-selection version of a
+// group-comparison chart). true = one bar/row per individual Area (labeled with its tenant);
+// false = one per Tenant, areas combined. Shared by both charts so they never disagree about
+// what a "group" means on the same tab.
+let chartsTenantBreakout = true;
 let charSharedScale = false; // false = each stream column scaled to its own max; true = one scale for all columns
 let charHideZeroRows = false; // true = hide materials with 0 weight across every stream
 
@@ -2443,28 +2694,50 @@ let charHideZeroRows = false; // true = hide materials with 0 weight across ever
 // streams); Stream->Outcome splits that same total using the extrapolated correctlyPlaced
 // flag, so the diagram reconciles with that table's Weight/Diverted columns exactly.
 // ============================================================
-function streamWeightForArea(areaName, stream){
-  if (isCombinedWeighSort(stream)) return sortedEntries.filter(e => e.area === areaName && e.stream === stream).reduce((s,e) => s + e.weight, 0);
-  return presortEntries.filter(e => e.area === areaName && e.stream === stream).reduce((s,e) => s + e.weight, 0);
+function streamWeightForArea(areaId, stream){
+  if (isCombinedWeighSort(stream)) return sortedEntries.filter(e => e.areaId === areaId && e.stream === stream).reduce((s,e) => s + e.weight, 0);
+  return presortEntries.filter(e => e.areaId === areaId && e.stream === stream).reduce((s,e) => s + e.weight, 0);
+}
+
+// Resolves a Summaries/Charts scope selection into the list of Area ids it covers (ids, never
+// names — two areas under different tenants can share a name). scope is always
+// {tenantIds, areaIds}, where each is null ("every tenant"/"every area under those tenants")
+// or an explicit array — areaIds is intersected against the tenant-filtered area set so a
+// stale area pick can never leak in after the tenant selection narrows.
+function resolveScopeAreaIds(scope){
+  const tenantAreas = areas.filter(a => scope.tenantIds === null || scope.tenantIds.includes(a.rollup));
+  if (scope.areaIds === null) return tenantAreas.map(a => a.id);
+  const tenantAreaIds = new Set(tenantAreas.map(a => a.id));
+  return scope.areaIds.filter(id => tenantAreaIds.has(id));
+}
+// "Overall" — no filtering applied at all — is when both dimensions are wide open.
+function scopeIsOverall(scope){
+  return scope.tenantIds === null && scope.areaIds === null;
 }
 
 function computeWasteGenerationFlow(scope){
-  const areaNames = scope === null ? areas.map(a => a.name) : [scope];
+  const areaIds = resolveScopeAreaIds(scope);
   const fex = computeExtrapolatedRows();
 
+  // Node label is the qualified "Name — Tenant" form (see areaLabel) rather than the bare
+  // area id or name — Overall can span areas from different tenants that share a bare name,
+  // so only the qualified form is guaranteed to label each node correctly. Truncated to a
+  // safe length for the alluvial chart's left margin — that's the only consumer of this
+  // label, so it's simplest to cap it once here rather than in the SVG layout itself.
   const areaStreamLinks = [];
-  areaNames.forEach(an => {
+  areaIds.forEach(id => {
+    const label = truncateLabel(areaLabel(id), 26);
     STREAMS.forEach(s => {
-      const value = streamWeightForArea(an, s);
-      if (value > 0.005) areaStreamLinks.push({source: an, target: s, value});
+      const value = streamWeightForArea(id, s);
+      if (value > 0.005) areaStreamLinks.push({source: label, target: s, value});
     });
   });
 
   const streamOutcomeLinks = [];
   STREAMS.forEach(s => {
-    const total = areaNames.reduce((sum,an) => sum + streamWeightForArea(an, s), 0);
+    const total = areaIds.reduce((sum,id) => sum + streamWeightForArea(id, s), 0);
     if (total <= 0.005) return;
-    const divertedRaw = fex.filter(r => areaNames.includes(r.area) && r.stream === s && r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
+    const divertedRaw = fex.filter(r => areaIds.includes(r.areaId) && r.stream === s && r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
     const diverted = Math.min(total, divertedRaw); // extrapolation can round past the direct total by a hair — never show more diverted than generated
     const landfilled = Math.max(0, total - diverted);
     if (diverted > 0.005) streamOutcomeLinks.push({source: s, target: 'Diverted', value: diverted});
@@ -2490,13 +2763,16 @@ function ribbonPath(x1,y0top,y0bottom,x2,y1top,y1bottom){
 }
 
 function buildAlluvialSvg(title, flow){
-  const W = 720, H = 560;
+  const W = 780, H = 560;
   const MT = 44, MB = 16;
   const nodeW = 14, nodeGap = 8;
   // Wide margins on both ends — area names sit to the LEFT of col1 (anchor "end") and
   // outcome names sit to the RIGHT of col3 (anchor "start"), so both need real room or their
-  // text runs off the edge of the canvas instead of just getting tight.
-  const ML = 100, MR = 100;
+  // text runs off the edge of the canvas instead of just getting tight. ML is wider than MR —
+  // area labels are now "Name — Tenant" when the name alone would be ambiguous (two areas
+  // under different tenants can share a name), which runs noticeably longer than a stream or
+  // outcome name ever does.
+  const ML = 170, MR = 100;
   const col1X = ML, col3X = W - MR - nodeW, col2X = (col1X + col3X) / 2;
   const plotTop = MT, plotBottom = H - MB, plotH = plotBottom - plotTop;
 
@@ -2589,7 +2865,10 @@ function buildAlluvialSvg(title, flow){
       const labelX = anchor === 'end' ? x - 8 : x + nodeW + 8;
       const midY = (p.y0+p.y1)/2;
       if (p.h < 26){
-        svg += `<text x="${labelX}" y="${midY+4}" text-anchor="${anchor}" font-size="10.5" font-weight="700" fill="#1a1a1a" ${halo}>${escapeHtml(name)} — ${lbs(totals[name])} lbs.</text>`;
+        // Name + weight combined on one line only when the band is tall enough for both —
+        // truncate the WHOLE composed string (not just the name) so a long name doesn't push
+        // the weight, or itself, past the margin this column's labels have to live in.
+        svg += `<text x="${labelX}" y="${midY+4}" text-anchor="${anchor}" font-size="10.5" font-weight="700" fill="#1a1a1a" ${halo}>${escapeHtml(truncateLabel(`${name} — ${lbs(totals[name])} lbs.`, 24))}</text>`;
       } else if (p.h < 40){
         svg += `<text x="${labelX}" y="${midY-2}" text-anchor="${anchor}" font-size="11" font-weight="700" fill="#1a1a1a" ${halo}>${escapeHtml(name)}</text>
           <text x="${labelX}" y="${midY+12}" text-anchor="${anchor}" font-size="10" fill="#5c584d" ${halo}>${lbs(totals[name])} lbs.</text>`;
@@ -2637,26 +2916,29 @@ function buildAlluvialSvg(title, flow){
 
 // ============================================================
 // Waste Stream Contamination — same matrix as the Summaries table of the same name
-// (one row per rollup group, one column per stream, cell = share of that stream's weight
-// that doesn't belong there), laid out as a ranked bar-per-cell table instead of a plain
-// text grid. Always the full rollup breakdown regardless of the Area scope chips — same
-// reasoning as the diversion charts, there's no useful "single area" version of a
-// group-comparison table.
+// (one row per group, one column per stream, cell = share of that stream's weight that
+// doesn't belong there), laid out as a ranked bar-per-cell table instead of a plain text
+// grid. Always the full breakdown regardless of the Overall/Tenant/Area scope chips above —
+// same reasoning as the diversion charts, there's no useful "single selection" version of a
+// group-comparison table. byArea picks the row grouping: one row per individual Area
+// (labeled with its tenant) or one row per Tenant (its areas combined) — some sites want the
+// finer breakout as standard, others don't need it, so it's a toggle, not a fixed rule.
 // ============================================================
-function computeContaminationByStream(){
+function computeContaminationByStream(byArea){
   const fex = computeExtrapolatedRows();
-  function rowFor(label, areaNames, isTotal){
+  function rowFor(label, areaIds, isTotal){
     const cells = STREAMS.map(s => {
-      const total = areaNames.reduce((sum,an) => sum + streamWeightForArea(an, s), 0);
-      const belongs = fex.filter(r => areaNames.includes(r.area) && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
+      const total = areaIds.reduce((sum,id) => sum + streamWeightForArea(id, s), 0);
+      const belongs = fex.filter(r => areaIds.includes(r.areaId) && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
       const contamination = total === 0 ? 0 : 1 - belongs/total;
       return {stream: s, pct: contamination, hasData: total > 0.005};
     });
     return {label, cells, isTotal};
   }
-  const rollups = [...new Set(areas.map(a => a.rollup))];
-  const rows = rollups.map(rg => rowFor(rg, areas.filter(a => a.rollup === rg).map(a => a.name), false));
-  rows.push(rowFor('Total', areas.map(a => a.name), true));
+  const rows = byArea
+    ? areas.map(a => rowFor(areaLabel(a.id), [a.id], false))
+    : allTenants().map(rg => rowFor(rg, areas.filter(a => a.rollup === rg).map(a => a.id), false));
+  rows.push(rowFor('Total', areas.map(a => a.id), true));
   return rows;
 }
 
@@ -2679,7 +2961,7 @@ function buildContaminationSvg(title, rows){
 
   const H = bodyStartY + rows.length * rowH + MB;
   let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
-  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="700" fill="#5c584d">Area</text>`;
+  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="700" fill="#5c584d">Tenant</text>`;
 
   streamsList.forEach((s, i) => {
     const cx = ML + nameColW + i*colW + colW/2;
@@ -2719,11 +3001,11 @@ function buildContaminationSvg(title, rows){
 
 function computeCategoryBreakdown(scope){
   const rows = computeExtrapolatedRows();
-  const areaNames = scope === null ? areas.map(a => a.name) : [scope];
+  const areaIds = resolveScopeAreaIds(scope);
   const totals = {};
   CATEGORY_ORDER.forEach(cat => totals[cat] = 0);
   rows.forEach(r => {
-    if (areaNames.includes(r.area) && totals[r.category] !== undefined){
+    if (areaIds.includes(r.areaId) && totals[r.category] !== undefined){
       totals[r.category] += r.weight;
     }
   });
@@ -2743,11 +3025,11 @@ function computeCategoryBreakdown(scope){
 // rolled up to category.
 function computeMaterialBreakdown(scope){
   const rows = computeExtrapolatedRows();
-  const areaNames = scope === null ? areas.map(a => a.name) : [scope];
+  const areaIds = resolveScopeAreaIds(scope);
   const totals = {};
   materials.forEach(m => totals[m.id] = 0);
   rows.forEach(r => {
-    if (areaNames.includes(r.area) && totals[r.materialId] !== undefined) totals[r.materialId] += r.weight;
+    if (areaIds.includes(r.areaId) && totals[r.materialId] !== undefined) totals[r.materialId] += r.weight;
   });
   const grandTotal = Object.values(totals).reduce((s,v) => s+v, 0);
   const materialRows = materials
@@ -2950,27 +3232,32 @@ window.downloadChartCard = function(btn){
 };
 
 // One group per Area (current program's diversion rate vs. the rate achievable if every
-// accepted material were correctly placed), plus a trailing Total group across all areas —
-// same formula as the Summaries tab's "Current v Potential Diversion" table, just keyed by
-// individual area instead of rollup group, so it lines up with the per-area chip scope used
-// by the rest of the Charts tab.
-function computeDiversionByArea(){
+// accepted material were correctly placed) — or, when byArea is false, one group per Tenant
+// with its areas combined — plus a trailing Total group either way. Same formula as the
+// Summaries tab's "Current v Potential Diversion" table (computeDiversionByArea and that
+// table's row groups are built the same way on purpose, so switching one's grouping and not
+// the other never happens by accident). Some sites want the full area-by-area breakout as
+// standard, others just want it by tenant — this is a per-report choice, not a fixed rule.
+function computeDiversionByArea(byArea){
   const fex = computeExtrapolatedRows();
-  const groups = areas.map(a => {
-    const total = areaTotalPresortLive(a.name);
-    const aData = fex.filter(r => r.area === a.name);
-    const diverted = aData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-    const potential = aData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-    return {label: a.name, current: total ? diverted/total : 0, potential: total ? potential/total : 0};
+  const groupDefs = byArea
+    ? areas.map(a => ({label: areaLabel(a.id), ids: [a.id]}))
+    : allTenants().map(rg => ({label: rg, ids: areas.filter(a => a.rollup === rg).map(a => a.id)}));
+  const groups = groupDefs.map(({label, ids}) => {
+    const total = ids.reduce((s,id) => s + areaTotalPresortLive(id), 0);
+    const gData = fex.filter(r => ids.includes(r.areaId));
+    const diverted = gData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
+    const potential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+    return {label, current: total ? diverted/total : 0, potential: total ? potential/total : 0};
   });
-  const allTotal = areas.reduce((s,a) => s + areaTotalPresortLive(a.name), 0);
+  const allTotal = areas.reduce((s,a) => s + areaTotalPresortLive(a.id), 0);
   const allDiverted = fex.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
   const allPotential = fex.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
   groups.push({label: 'Total', current: allTotal ? allDiverted/allTotal : 0, potential: allTotal ? allPotential/allTotal : 0, isTotal: true});
-  // An area sitting at 0% current AND 0% potential has nothing divertible either way (e.g.
+  // A group sitting at 0% current AND 0% potential has nothing divertible either way (e.g.
   // Bathroom's default material isn't accepted anywhere) — a flat pair of empty bars is just
   // clutter, not information. Total always stays, since it's the one number that summarizes
-  // every area regardless of which ones got filtered out here.
+  // everything regardless of which groups got filtered out here.
   return groups.filter(g => g.isTotal || g.current > 0 || g.potential > 0);
 }
 
@@ -3168,12 +3455,12 @@ function buildDiversionTrackSvg(title, groups){
 }
 
 function renderChartsScopeChips(){
-  const box = document.getElementById('chartsScopeChips');
-  box.innerHTML = '';
-  box.appendChild(chip('Overall', chartsScope === null, () => { chartsScope = null; renderChartsTab(); }));
-  areas.forEach(a => {
-    box.appendChild(chip(a.name, chartsScope === a.name, () => { chartsScope = a.name; renderChartsTab(); }));
+  renderScopeControl({
+    boxElId: 'chartsScopeChips',
+    scope: chartsScope,
+    onScopeChange: (v) => { chartsScope = v; renderChartsTab(); },
   });
+  appendGroupingControl('chartsScopeChips', chartsTenantBreakout, window.setChartsBreakout);
 }
 
 // Per-cell placement color, driven by the material's Target stream(s) — the same field
@@ -3200,12 +3487,12 @@ function placementKind(correctlyPlaced, belongsHere, divertible){
 // each material x stream weight becomes a bar instead of a table cell.
 function computeCharacterizationMatrix(scope, hideZeroRows){
   const fex = computeExtrapolatedRows();
-  const areaNames = scope === null ? areas.map(a => a.name) : [scope];
+  const areaIds = resolveScopeAreaIds(scope);
   // belongsHere/correctlyPlaced depend only on the material + stream (not the area), so
   // every matching row agrees — reading them off the first one is enough.
   const cell = (materialId, stream) => {
     const matched = fex.filter(r => r.materialId === materialId && r.stream === stream);
-    const weight = matched.filter(r => areaNames.includes(r.area)).reduce((s,r) => s + r.weight, 0);
+    const weight = matched.filter(r => areaIds.includes(r.areaId)).reduce((s,r) => s + r.weight, 0);
     const first = matched[0] || {};
     return { weight, belongsHere: !!first.belongsHere, correctlyPlaced: !!first.correctlyPlaced };
   };
@@ -3347,11 +3634,14 @@ function renderChartsTab(){
   const title1b = 'Breakdown of Total Waste Stream by Material Type — Table';
   const materialRows = computeMaterialBreakdown(chartsScope);
 
-  // Always the full per-area breakdown regardless of the Overall/Area scope chips above —
-  // those chips scope the donut to one area at a time, but this chart's whole point is
-  // comparing areas side by side, so there's no useful "single area" version of it.
-  const title2 = 'Current v Potential Diversion by Area';
-  const diversionGroups = computeDiversionByArea();
+  // Always the full breakdown regardless of the Overall/Tenant/Area scope chips above — those
+  // chips scope the donut to one selection at a time, but this chart's whole point is
+  // comparing groups side by side, so there's no useful "single selection" version of it.
+  // Grouping (by individual Area, or rolled up by Tenant) is its own toggle instead —
+  // chartsTenantBreakout, in the sidebar (see appendGroupingControl), shared with the
+  // Contamination chart below.
+  const title2 = chartsTenantBreakout ? 'Current v Potential Diversion by Area' : 'Current v Potential Diversion by Tenant';
+  const diversionGroups = computeDiversionByArea(chartsTenantBreakout);
 
   // Same data as title2, laid out as a dumbbell instead of grouped bars — an alternate view
   // that puts the gap itself front and center rather than two bars to compare by eye.
@@ -3362,9 +3652,9 @@ function renderChartsTab(){
   const title2c = 'Current v Potential Diversion — Track View';
 
   // Same matrix as the Summaries tab's "Waste Stream Contamination" table — also always the
-  // full rollup breakdown, same reasoning as the diversion charts above.
-  const title2d = 'Waste Stream Contamination';
-  const contaminationRows = computeContaminationByStream();
+  // full breakdown, same reasoning as the diversion charts above.
+  const title2d = chartsTenantBreakout ? 'Waste Stream Contamination by Area' : 'Waste Stream Contamination by Tenant';
+  const contaminationRows = computeContaminationByStream(chartsTenantBreakout);
 
   const title3 = 'Waste Stream Characterization (lbs.)';
   const matrix = computeCharacterizationMatrix(chartsScope, charHideZeroRows);
@@ -3395,38 +3685,45 @@ window.toggleCharHideZero = function(checked){
   charHideZeroRows = checked;
   renderChartsTab();
 };
+window.setChartsBreakout = function(v){
+  chartsTenantBreakout = v;
+  renderChartsTab();
+};
 
-// All the Summaries tables for one scope (null = Overall, else an area name) — a plain
+// All the Summaries tables for one scope (null = Overall, else {tenant, areaIds}) — a plain
 // function of scope, not the live summaryScope global, so it can be called repeatedly for
 // each area (see buildAllAreasSummaryHtml) without disturbing what's on screen.
 function buildSummaryTablesHtml(scope){
-  const isOverall = scope === null;
+  const isOverall = scopeIsOverall(scope);
   const fex = computeExtrapolatedRows();
-  const scoped = isOverall ? fex : fex.filter(r => r.area === scope);
-  const unsortedAreas = areas.filter(a => !a.defaultMaterialId && areaPoolOnlyPresortLive(a.name) > 0 && areaTotalSortedLive(a.name) === 0);
-  const scopedUnsorted = isOverall ? unsortedAreas : unsortedAreas.filter(a => a.name === scope);
-  const activeAreaNames = isOverall
-    ? areas.filter(a => !unsortedAreas.includes(a)).map(a => a.name)
-    : (scopedUnsorted.length ? [] : [scope]);
+  const scopeAreaIds = resolveScopeAreaIds(scope);
+  const scoped = isOverall ? fex : fex.filter(r => scopeAreaIds.includes(r.areaId));
+  const unsortedAreas = areas.filter(a => !a.defaultMaterialId && areaPoolOnlyPresortLive(a.id) > 0 && areaTotalSortedLive(a.id) === 0);
+  const scopedUnsorted = isOverall ? unsortedAreas : unsortedAreas.filter(a => scopeAreaIds.includes(a.id));
+  // Areas in scope with a real sorted sample to extrapolate from — everything else in scope
+  // (scopedUnsorted) contributes as its own lump row instead (Table 1 below). For Overall
+  // this is "every area except the unsorted ones", exactly as before Tenant scope existed;
+  // for a single area or a Tenant group it's the same rule applied to a smaller area set.
+  const activeAreaIds = scopeAreaIds.filter(id => !scopedUnsorted.some(u => u.id === id));
 
   // Direct pre-sort total for one area+stream — always correct regardless of whether that
   // specific stream was sorted (mirrors presortTotalFormula() in the Excel export exactly).
-  function presortTotalLive(areaName, stream){
+  function presortTotalLive(areaId, stream){
     if (isCombinedWeighSort(stream)){
-      return sortedEntries.filter(e => e.area === areaName && e.stream === stream).reduce((s,e) => s + e.weight, 0);
+      return sortedEntries.filter(e => e.areaId === areaId && e.stream === stream).reduce((s,e) => s + e.weight, 0);
     }
-    return presortEntries.filter(e => e.area === areaName && e.stream === stream).reduce((s,e) => s + e.weight, 0);
+    return presortEntries.filter(e => e.areaId === areaId && e.stream === stream).reduce((s,e) => s + e.weight, 0);
   }
 
   let html = '';
 
   // ---- Table 1: Total Waste Generation ----
   let streamRows = STREAMS.map(s => {
-    const weight = activeAreaNames.reduce((sum,an) => sum + presortTotalLive(an, s), 0);
+    const weight = activeAreaIds.reduce((sum,id) => sum + presortTotalLive(id, s), 0);
     const diverted = scoped.filter(r => r.stream === s && r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
     return {label: s, weight, diverted};
   });
-  scopedUnsorted.forEach(a => streamRows.push({label: `${a.name} Waste`, weight: areaTotalPresortLive(a.name), diverted: 0}));
+  scopedUnsorted.forEach(a => streamRows.push({label: `${areaLabel(a.id)} Waste`, weight: areaTotalPresortLive(a.id), diverted: 0}));
   const grandTotal = streamRows.reduce((s,r) => s + r.weight, 0);
   const grandDiverted = streamRows.reduce((s,r) => s + r.diverted, 0);
   let rowsHtml = streamRows.map(r => `<tr><td>${r.label}</td><td class="num">${lbs(r.weight)}</td>
@@ -3515,42 +3812,52 @@ function buildSummaryTablesHtml(scope){
   if (isOverall){
     const rollups = [...new Set(areas.map(a => a.rollup))];
 
+    // Row groups for Table 4/5 — either one row per Tenant (its areas combined) or one row
+    // per individual Area (labeled with its tenant, via areaLabel) — summaryTenantBreakout
+    // picks which. `match` is the Fact_Extrapolated row filter for that group's numerator;
+    // `denomIds` is the (activeAreaIds-filtered) area set for its denominator — same two
+    // pieces the rollup-only version used, just generalized to work either way.
+    const rowGroups = summaryTenantBreakout
+      ? areas.map(a => ({label: areaLabel(a.id), match: r => r.areaId === a.id,
+                          denomIds: activeAreaIds.includes(a.id) ? [a.id] : []}))
+      : rollups.map(rg => ({label: rg, match: r => r.rollup === rg,
+                             denomIds: areas.filter(a => a.rollup === rg && activeAreaIds.includes(a.id)).map(a => a.id)}));
+    const groupColLabel = summaryTenantBreakout ? 'Area' : 'Tenant';
+
     // ---- Table 4: Waste Stream Contamination matrix ----
-    let t4Html = rollups.map(rg => {
-      const areaNamesInRollup = areas.filter(a => a.rollup === rg && activeAreaNames.includes(a.name)).map(a => a.name);
+    let t4Html = rowGroups.map(({label, match, denomIds}) => {
       const cells = STREAMS.map(s => {
-        const total = areaNamesInRollup.reduce((sum,an) => sum + presortTotalLive(an, s), 0);
-        const belongs = fex.filter(r => r.rollup === rg && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
+        const total = denomIds.reduce((sum,id) => sum + presortTotalLive(id, s), 0);
+        const belongs = fex.filter(r => match(r) && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
         const contamination = total === 0 ? 0 : 1 - belongs/total;
         return `<td class="num">${pct(contamination)}</td>`;
       }).join('');
-      return `<tr><td>${rg}</td>${cells}</tr>`;
+      return `<tr><td>${label}</td>${cells}</tr>`;
     }).join('');
     const totalCells = STREAMS.map(s => {
-      const total = activeAreaNames.reduce((sum,an) => sum + presortTotalLive(an, s), 0);
+      const total = activeAreaIds.reduce((sum,id) => sum + presortTotalLive(id, s), 0);
       const belongs = fex.filter(r => r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
       const contamination = total === 0 ? 0 : 1 - belongs/total;
       return `<td class="num">${pct(contamination)}</td>`;
     }).join('');
     t4Html += `<tr class="total-row"><td>Total</td>${totalCells}</tr>`;
-    html += renderAnalysisTable('Waste Stream Contamination', ['Generation Area', ...STREAMS], t4Html);
+    html += renderAnalysisTable('Waste Stream Contamination', [groupColLabel, ...STREAMS], t4Html);
 
-    // ---- Table 5: Current v Potential Diversion by rollup ----
+    // ---- Table 5: Current v Potential Diversion, by the same row groups ----
     let t5Html = '';
     let allTotal = 0, allDiverted = 0, allPotential = 0;
-    rollups.forEach(rg => {
-      const areaNames = areas.filter(a => a.rollup === rg).map(a => a.name);
-      const total = areaNames.reduce((s,an) => s + areaTotalPresortLive(an), 0);
-      const rgData = fex.filter(r => r.rollup === rg);
-      const diverted = rgData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-      const potential = rgData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+    rowGroups.forEach(({label, match, denomIds}) => {
+      const total = denomIds.reduce((s,id) => s + areaTotalPresortLive(id), 0);
+      const gData = fex.filter(match);
+      const diverted = gData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
+      const potential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
       allTotal += total; allDiverted += diverted; allPotential += potential;
       const curRate = total ? diverted/total : 0, potRate = total ? potential/total : 0;
-      t5Html += `<tr><td>${rg}</td><td class="num">${pct(curRate)}</td><td class="num">${pct(potRate)}</td><td class="num">${pct(potRate-curRate)}</td></tr>`;
+      t5Html += `<tr><td>${label}</td><td class="num">${pct(curRate)}</td><td class="num">${pct(potRate)}</td><td class="num">${pct(potRate-curRate)}</td></tr>`;
     });
     const curRateTot = allTotal ? allDiverted/allTotal : 0, potRateTot = allTotal ? allPotential/allTotal : 0;
     t5Html += `<tr class="total-row"><td>Total</td><td class="num">${pct(curRateTot)}</td><td class="num">${pct(potRateTot)}</td><td class="num">${pct(potRateTot-curRateTot)}</td></tr>`;
-    html += renderAnalysisTable('Current v Potential Diversion', ['Generation Area','Current Diversion Rate','Potential Diversion Rate','Gap'], t5Html);
+    html += renderAnalysisTable('Current v Potential Diversion', [groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Gap'], t5Html);
   }
 
   return html;
@@ -3559,6 +3866,10 @@ function renderSummaryTab(){
   renderSummaryScopeChips();
   document.getElementById('summaryContent').innerHTML = buildSummaryTablesHtml(summaryScope);
 }
+window.setSummaryBreakout = function(v){
+  summaryTenantBreakout = v;
+  renderSummaryTab();
+};
 
 // ============================================================
 // Excel export — builds a workbook matching the Fact_SortedWeights /
@@ -3658,7 +3969,7 @@ function buildWorkbook(){
   }
 
   // Areas
-  const areaRows = [['area_id','area_name','rollup_group','default_material_id']];
+  const areaRows = [['area_id','area_name','tenant','default_material_id']];
   areas.forEach(a => areaRows.push([a.id, a.name, a.rollup, a.defaultMaterialId || '']));
   XLSX.utils.book_append_sheet(wb, makeSheet(areaRows), 'Areas');
   const AREAS_LAST = areaRows.length;
@@ -3669,34 +3980,43 @@ function buildWorkbook(){
   streamConfig.forEach(s => streamRows.push([s.name, s.combinedWeighSort ? 'Yes' : 'No', s.protected ? 'Yes' : 'No']));
   XLSX.utils.book_append_sheet(wb, makeSheet(streamRows), 'Streams');
 
-  // Fact_SortedWeights
+  // Fact_SortedWeights — 'area' (name, column C) stays human-readable, resolved by formula
+  // like material_name/material_category are; the actual join key is the new trailing
+  // 'area_id' column (appended, not inserted, so every existing lettered column reference
+  // elsewhere stays valid). Areas are matched by id everywhere, never by name, since two
+  // different areas (different tenants) can legitimately share one.
   const fsHeader = ['audit_id','stream','area','material_id','weight_lbs',
                      'material_name','material_category','currently_divertible','accepted_in_program',
-                     'belongs_here','rollup_group','non_representative','notes'];
+                     'belongs_here','tenant','non_representative','notes','area_id'];
   const fsRows = [fsHeader];
-  sortedEntries.forEach(e => fsRows.push([AUDIT_ID, e.stream, e.area, e.materialId, e.weight,
-    null,null,null,null,null,null, e.nonRepresentative ? 'Yes' : 'No', e.note || '']));
+  sortedEntries.forEach(e => fsRows.push([AUDIT_ID, e.stream, null, e.materialId, e.weight,
+    null,null,null,null,null,null, e.nonRepresentative ? 'Yes' : 'No', e.note || '', e.areaId]));
   const FS_LAST = fsRows.length;
   for (let r = 2; r <= FS_LAST; r++){
+    fsRows[r-1][2] = {f:`IFERROR(INDEX(Areas!$B$2:$B$${AREAS_LAST},MATCH(N${r},Areas!$A$2:$A$${AREAS_LAST},0)),"")`};
     fsRows[r-1][5] = {f:`IFERROR(INDEX('Materials Master'!$B$2:$B$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
     fsRows[r-1][6] = {f:`IFERROR(INDEX('Materials Master'!$C$2:$C$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
     fsRows[r-1][7] = {f:`IFERROR(INDEX('Materials Master'!$D$2:$D$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
     fsRows[r-1][8] = {f:`IFERROR(INDEX('Materials Master'!$${acceptedCol}$2:$${acceptedCol}$${MM_LAST},MATCH(D${r},'Materials Master'!$A$2:$A$${MM_LAST},0)),"")`};
     fsRows[r-1][9] = {f:`IFERROR(${mmBelongsExpr(`D${r}`, `B${r}`)},"")`};
-    fsRows[r-1][10] = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(C${r},Areas!$B$2:$B$${AREAS_LAST},0)),"")`};
+    fsRows[r-1][10] = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(N${r},Areas!$A$2:$A$${AREAS_LAST},0)),"")`};
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(fsRows), 'Fact_SortedWeights');
 
-  // Fact_PreSortWeights
-  const psHeader = ['audit_id','stream','area','bag_number','weight_lbs','known_material_id','notes'];
+  // Fact_PreSortWeights — same pattern: 'area' (column C) resolved by formula for
+  // readability, 'area_id' appended at the end as the real join key.
+  const psHeader = ['audit_id','stream','area','bag_number','weight_lbs','known_material_id','notes','area_id'];
   const psRows = [psHeader];
   const bagCounters = {};
   presortEntries.forEach(e => {
-    const key = e.stream + '|' + e.area;
+    const key = e.stream + '|' + e.areaId;
     bagCounters[key] = (bagCounters[key] || 0) + 1;
-    psRows.push([AUDIT_ID, e.stream, e.area, bagCounters[key], e.weight, e.knownMaterialId || '', e.note || '']);
+    psRows.push([AUDIT_ID, e.stream, null, bagCounters[key], e.weight, e.knownMaterialId || '', e.note || '', e.areaId]);
   });
   const PS_LAST = psRows.length;
+  for (let r = 2; r <= PS_LAST; r++){
+    psRows[r-1][2] = {f:`IFERROR(INDEX(Areas!$B$2:$B$${AREAS_LAST},MATCH(H${r},Areas!$A$2:$A$${AREAS_LAST},0)),"")`};
+  }
   XLSX.utils.book_append_sheet(wb, makeSheet(psRows), 'Fact_PreSortWeights');
 
   // ---------------------------------------------------------------
@@ -3711,14 +4031,16 @@ function buildWorkbook(){
   // is just its own sorted total, i.e. 100% sorted by definition.)
   // ---------------------------------------------------------------
   const FSW_STREAM = `Fact_SortedWeights!$B$2:$B$${FS_LAST}`;
-  const FSW_AREA = `Fact_SortedWeights!$C$2:$C$${FS_LAST}`;
   const FSW_MATID = `Fact_SortedWeights!$D$2:$D$${FS_LAST}`;
   const FSW_W = `Fact_SortedWeights!$E$2:$E$${FS_LAST}`;
   const FSW_NONREP = `Fact_SortedWeights!$L$2:$L$${FS_LAST}`;
+  // Join key for "which area" — the appended id column, never the display-name column C
+  // (two areas under different tenants can share a name).
+  const FSW_AREAID = `Fact_SortedWeights!$N$2:$N$${FS_LAST}`;
   const PSW_STREAM = `Fact_PreSortWeights!$B$2:$B$${PS_LAST}`;
-  const PSW_AREA = `Fact_PreSortWeights!$C$2:$C$${PS_LAST}`;
   const PSW_W = `Fact_PreSortWeights!$E$2:$E$${PS_LAST}`;
   const PSW_KNOWN = `Fact_PreSortWeights!$F$2:$F$${PS_LAST}`;
+  const PSW_AREAID = `Fact_PreSortWeights!$H$2:$H$${PS_LAST}`;
 
   const usedSheetNames = new Set();
   function excelSafeSheetName(raw){
@@ -3738,37 +4060,46 @@ function buildWorkbook(){
   // areas with pre-sort weight but zero sorted-material rows anywhere —
   // their full weight is reported as its own "{Area} Waste" line rather
   // than silently folding into (or vanishing from) a normal stream row
-  function areaSortedTotal(areaName){
-    return sortedEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
+  function areaSortedTotal(areaId){
+    return sortedEntries.filter(e => e.areaId === areaId).reduce((s,e) => s + e.weight, 0);
   }
   // Pool-only presort weight — excludes known-composition bags, since those don't need a
   // sorted sample to be understood. This (not the full presort total) is what should decide
   // whether an area counts as "unsorted": a known-only area needs no sorting at all.
-  function areaPoolOnlyPresortTotal(areaName){
-    return presortEntries.filter(e => e.area === areaName && !e.knownMaterialId).reduce((s,e) => s + e.weight, 0);
+  function areaPoolOnlyPresortTotal(areaId){
+    return presortEntries.filter(e => e.areaId === areaId && !e.knownMaterialId).reduce((s,e) => s + e.weight, 0);
   }
-  function areaPresortTotalJS(areaName){
-    const bagged = presortEntries.filter(e => e.area === areaName).reduce((s,e) => s + e.weight, 0);
-    const combined = sortedEntries.filter(e => e.area === areaName && isCombinedWeighSort(e.stream)).reduce((s,e) => s + e.weight, 0);
+  function areaPresortTotalJS(areaId){
+    const bagged = presortEntries.filter(e => e.areaId === areaId).reduce((s,e) => s + e.weight, 0);
+    const combined = sortedEntries.filter(e => e.areaId === areaId && isCombinedWeighSort(e.stream)).reduce((s,e) => s + e.weight, 0);
     return bagged + combined;
   }
-  const unsortedAreas = areas.filter(a => !a.defaultMaterialId && areaPoolOnlyPresortTotal(a.name) > 0 && areaSortedTotal(a.name) === 0);
-  function unsortedAreaWeightFormula(areaName){
+  const unsortedAreas = areas.filter(a => !a.defaultMaterialId && areaPoolOnlyPresortTotal(a.id) > 0 && areaSortedTotal(a.id) === 0);
+  // areaId (not name) is the literal embedded in these SUMIFS — matched against the
+  // Fact_SortedWeights/Fact_PreSortWeights area_id join columns, so a shared area NAME
+  // across two different tenants never gets summed together.
+  function unsortedAreaWeightFormula(areaId){
     const combinedTerms = STREAMS.filter(isCombinedWeighSort)
-      .map(s => `+SUMIFS(${FSW_W},${FSW_AREA},"${areaName}",${FSW_STREAM},"${s}")`).join('');
-    return `SUMIFS(${PSW_W},${PSW_AREA},"${areaName}")${combinedTerms}`;
+      .map(s => `+SUMIFS(${FSW_W},${FSW_AREAID},"${areaId}",${FSW_STREAM},"${s}")`).join('');
+    return `SUMIFS(${PSW_W},${PSW_AREAID},"${areaId}")${combinedTerms}`;
   }
   // Direct pre-sort total for one area+stream — always correct regardless of whether that
   // specific stream was sorted, unlike summing Fact_Extrapolated (which is 0 wherever
   // sortedTotal=0, even if real pre-sort weight exists for that exact area+stream). Already
   // includes known-composition bags along with pool bags — both are real weight in the stream.
-  function presortTotalFormula(areaName, stream){
-    if (isCombinedWeighSort(stream)) return `SUMIFS(${FSW_W},${FSW_AREA},"${areaName}",${FSW_STREAM},"${stream}")`;
-    return `SUMIFS(${PSW_W},${PSW_AREA},"${areaName}",${PSW_STREAM},"${stream}")`;
+  function presortTotalFormula(areaId, stream){
+    if (isCombinedWeighSort(stream)) return `SUMIFS(${FSW_W},${FSW_AREAID},"${areaId}",${FSW_STREAM},"${stream}")`;
+    return `SUMIFS(${PSW_W},${PSW_AREAID},"${areaId}",${PSW_STREAM},"${stream}")`;
   }
 
   // ---- Fact_Extrapolated sheet ----
-  const fexRows = [['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','rollup_group','belongs_here','has_divertible_path']];
+  // Column A ('area') holds the area's id, not its name — it's a join key, referenced by
+  // $A{row} in this row's own SUMIFS below (against the Fact_SortedWeights/PreSortWeights
+  // area_id columns) and by rollupExpr's MATCH against the Areas sheet, both of which would
+  // silently mix two different areas together if two areas ever shared a name. A friendly
+  // 'area_name' column is appended at the end (known already, at generation time, so it's a
+  // literal — not a lookup formula like material_name has to be).
+  const fexRows = [['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','tenant','belongs_here','has_divertible_path','area_name']];
   areas.forEach(a => {
     STREAMS.forEach(s => {
       const combined = isCombinedWeighSort(s);
@@ -3782,14 +4113,14 @@ function buildWorkbook(){
           // Weighed and sorted in one action — every pound is a direct observation, so
           // knownMaterialId/nonRepresentative don't apply here (both are about inferring
           // the UNOBSERVED rest of a bag, which doesn't exist for this stream type).
-          weightExpr = {f:`SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef})`};
+          weightExpr = {f:`SUMIFS(${FSW_W},${FSW_AREAID},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef})`};
         } else {
-          const poolExpr = `SUMIFS(${PSW_W},${PSW_AREA},${areaRef},${PSW_STREAM},${streamRef},${PSW_KNOWN},"")`;
-          const repTotalExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_NONREP},"No")`;
-          const repWeightExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef},${FSW_NONREP},"No")`;
-          const nonRepAllExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_NONREP},"Yes")`;
-          const nonRepWeightExpr = `SUMIFS(${FSW_W},${FSW_AREA},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef},${FSW_NONREP},"Yes")`;
-          const knownWeightExpr = `SUMIFS(${PSW_W},${PSW_AREA},${areaRef},${PSW_STREAM},${streamRef},${PSW_KNOWN},${matRef})`;
+          const poolExpr = `SUMIFS(${PSW_W},${PSW_AREAID},${areaRef},${PSW_STREAM},${streamRef},${PSW_KNOWN},"")`;
+          const repTotalExpr = `SUMIFS(${FSW_W},${FSW_AREAID},${areaRef},${FSW_STREAM},${streamRef},${FSW_NONREP},"No")`;
+          const repWeightExpr = `SUMIFS(${FSW_W},${FSW_AREAID},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef},${FSW_NONREP},"No")`;
+          const nonRepAllExpr = `SUMIFS(${FSW_W},${FSW_AREAID},${areaRef},${FSW_STREAM},${streamRef},${FSW_NONREP},"Yes")`;
+          const nonRepWeightExpr = `SUMIFS(${FSW_W},${FSW_AREAID},${areaRef},${FSW_STREAM},${streamRef},${FSW_MATID},${matRef},${FSW_NONREP},"Yes")`;
+          const knownWeightExpr = `SUMIFS(${PSW_W},${PSW_AREAID},${areaRef},${PSW_STREAM},${streamRef},${PSW_KNOWN},${matRef})`;
           // A non-representative item's weight is physically part of a pool bag already
           // counted in poolExpr — subtract it before scaling, then add it back as itself,
           // or it gets double-counted (once via the ratio, once via its own flat weight).
@@ -3811,7 +4142,7 @@ function buildWorkbook(){
         // material's target streams, it's actually accepted in the program, AND it's not
         // literally Trash — being correctly placed IN Trash isn't "diversion", that's the point).
         const cpExpr = {f:`IF(AND(${belongsExpr},${acceptedExpr}="Yes",${streamRef}<>"${landfillNameEsc}"),1,0)`};
-        const rollupExpr = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$B$2:$B$${AREAS_LAST},0)),"")`};
+        const rollupExpr = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$A$2:$A$${AREAS_LAST},0)),"")`};
         // "belongs_here" — is this row's stream one of the material's target streams at all
         // (Trash included)? For materials whose only target IS Trash, this is true when found
         // in Trash (correctly placed as non-divertible), so 1-belongs_here correctly measures
@@ -3825,7 +4156,7 @@ function buildWorkbook(){
         // marked divertible with no real target still can't become correctly_placed, so both
         // conditions are required.
         const hasPathExpr = {f:`IF(AND(${divertibleExpr}="Yes",${mmHasRealTargetExpr(matRef)}),1,0)`};
-        fexRows.push([a.name, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr]);
+        fexRows.push([a.id, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr, a.name]);
       });
     });
   });
@@ -3833,7 +4164,7 @@ function buildWorkbook(){
   const fexSheet = makeSheet(fexRows);
   XLSX.utils.book_append_sheet(wb, fexSheet, 'Fact_Extrapolated');
 
-  const FEX_AREA = `Fact_Extrapolated!$A$2:$A$${FEX_LAST}`;
+  const FEX_AREAID = `Fact_Extrapolated!$A$2:$A$${FEX_LAST}`;
   const FEX_STREAM = `Fact_Extrapolated!$B$2:$B$${FEX_LAST}`;
   const FEX_MATID = `Fact_Extrapolated!$C$2:$C$${FEX_LAST}`;
   const FEX_CAT = `Fact_Extrapolated!$E$2:$E$${FEX_LAST}`;
@@ -3843,12 +4174,12 @@ function buildWorkbook(){
   const FEX_BELONGS = `Fact_Extrapolated!$J$2:$J$${FEX_LAST}`;
   const FEX_HASPATH = `Fact_Extrapolated!$K$2:$K$${FEX_LAST}`;
 
-  function buildSummarySheetRows(areaName, isOverall){
-    const ac = areaName ? `,${FEX_AREA},"${areaName}"` : '';
-    const scopedUnsorted = areaName ? unsortedAreas.filter(a => a.name === areaName) : unsortedAreas;
-    const activeAreaNames = areaName
-      ? (scopedUnsorted.length ? [] : [areaName])
-      : areas.filter(a => !unsortedAreas.includes(a)).map(a => a.name);
+  function buildSummarySheetRows(areaId, isOverall){
+    const ac = areaId ? `,${FEX_AREAID},"${areaId}"` : '';
+    const scopedUnsorted = areaId ? unsortedAreas.filter(a => a.id === areaId) : unsortedAreas;
+    const activeAreaIds = areaId
+      ? (scopedUnsorted.length ? [] : [areaId])
+      : areas.filter(a => !unsortedAreas.includes(a)).map(a => a.id);
     const rows = [];
 
     // ---- Table 1: Total Waste Generation ----
@@ -3858,8 +4189,8 @@ function buildWorkbook(){
     const streamStart = rows.length + 1;
     STREAMS.forEach(s => {
       const rr = rows.length + 1;
-      const weightExpr = activeAreaNames.length
-        ? activeAreaNames.map(an => presortTotalFormula(an, s)).join('+')
+      const weightExpr = activeAreaIds.length
+        ? activeAreaIds.map(id => presortTotalFormula(id, s)).join('+')
         : '0';
       rows.push([s,
         {f:weightExpr}, null,
@@ -3867,7 +4198,7 @@ function buildWorkbook(){
       ]);
     });
     scopedUnsorted.forEach(a => {
-      rows.push([`${a.name} Waste`, {f:unsortedAreaWeightFormula(a.name)}, null, 0, null]);
+      rows.push([`${a.name} Waste`, {f:unsortedAreaWeightFormula(a.id)}, null, 0, null]);
     });
     const streamEnd = rows.length;
     const totalRow = rows.length + 1;
@@ -3894,7 +4225,7 @@ function buildWorkbook(){
     CATEGORY_ORDER.forEach(cat => {
       materials.filter(m => m.category === cat).forEach(m => {
         STREAMS.forEach(s => {
-          const hasWeight = sortedEntries.some(e => activeAreaNames.includes(e.area) && e.stream === s && e.materialId === m.id && e.weight > 0);
+          const hasWeight = sortedEntries.some(e => activeAreaIds.includes(e.areaId) && e.stream === s && e.materialId === m.id && e.weight > 0);
           if (!hasWeight) return;
           const rr = rows.length + 1;
           if (!catRowRanges[cat]) catRowRanges[cat] = [rr, rr]; else catRowRanges[cat][1] = rr;
@@ -3937,18 +4268,29 @@ function buildWorkbook(){
 
     if (isOverall){
       const rollups = [...new Set(areas.map(a => a.rollup))];
+      // WYSIWYG with the live Summaries tab: the export matches whichever grouping is
+      // currently on screen (summaryTenantBreakout), same as the browser-print PDF export
+      // already does by reusing buildSummaryTablesHtml directly.
+      const groupColLabel = summaryTenantBreakout ? 'Area' : 'Tenant';
+      // matchExpr is the SUMIFS criteria pair identifying this group's rows in
+      // Fact_Extrapolated — by area id (never by area name, which two areas can share
+      // across tenants) or by tenant, matching the two group shapes throughout this file.
+      const groupsFor = (filterActive) => summaryTenantBreakout
+        ? areas.map(a => ({label: areaLabel(a.id), matchExpr: `${FEX_AREAID},"${a.id}"`,
+                            areaIds: (!filterActive || activeAreaIds.includes(a.id)) ? [a.id] : []}))
+        : rollups.map(rg => ({label: rg, matchExpr: `${FEX_ROLLUP},"${rg}"`,
+                               areaIds: areas.filter(a => a.rollup === rg && (!filterActive || activeAreaIds.includes(a.id))).map(a => a.id)}));
 
-      // ---- Table 4: Waste Stream Contamination (rollup x stream matrix) ----
+      // ---- Table 4: Waste Stream Contamination (group x stream matrix) ----
       rows.push([]);
       rows.push(['Waste Stream Contamination']);
-      rows.push(['Generation Area', ...STREAMS]);
+      rows.push([groupColLabel, ...STREAMS]);
       const contStart = rows.length + 1;
-      rollups.forEach(rg => {
-        const row = [rg];
-        const areaNamesInRollup = areas.filter(a => a.rollup === rg && activeAreaNames.includes(a.name)).map(a => a.name);
+      groupsFor(true).forEach(({label, matchExpr, areaIds}) => {
+        const row = [label];
         STREAMS.forEach(s => {
-          const totalExpr = areaNamesInRollup.length ? areaNamesInRollup.map(an => presortTotalFormula(an, s)).join('+') : '0';
-          row.push({f:`IF((${totalExpr})=0,0,1-SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_STREAM},"${s}",${FEX_BELONGS},1)/(${totalExpr}))`});
+          const totalExpr = areaIds.length ? areaIds.map(id => presortTotalFormula(id, s)).join('+') : '0';
+          row.push({f:`IF((${totalExpr})=0,0,1-SUMIFS(${FEX_W},${matchExpr},${FEX_STREAM},"${s}",${FEX_BELONGS},1)/(${totalExpr}))`});
         });
         rows.push(row);
       });
@@ -3956,42 +4298,43 @@ function buildWorkbook(){
       const contTotRow = ['Total'];
       STREAMS.forEach((s, i) => {
         const col = String.fromCharCode(66 + i); // B, C, D...
-        const totalExpr = activeAreaNames.length ? activeAreaNames.map(an => presortTotalFormula(an, s)).join('+') : '0';
+        const totalExpr = activeAreaIds.length ? activeAreaIds.map(id => presortTotalFormula(id, s)).join('+') : '0';
         contTotRow.push({f:`IF((${totalExpr})=0,0,1-SUMIFS(${FEX_W},${FEX_STREAM},"${s}",${FEX_BELONGS},1)/(${totalExpr}))`});
       });
       rows.push(contTotRow);
 
-      // ---- Table 5: Current vs. Potential Diversion (by rollup group) ----
+      // ---- Table 5: Current vs. Potential Diversion, by the same groups ----
       rows.push([]);
       rows.push(['Current v Potential Diversion']);
-      rows.push(['Generation Area','Current Diversion Rate','Potential Diversion Rate','Current v Potential (Percentage Point) Gap']);
+      rows.push([groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Current v Potential (Percentage Point) Gap']);
       const divStart = rows.length + 1;
-      rollups.forEach(rg => {
+      // Denominator here is every area of the group (not activeAreaIds-filtered, unlike
+      // Table 4 above) — same as before this table supported more than one grouping.
+      groupsFor(false).forEach(({label, matchExpr, areaIds}) => {
         const rr = rows.length + 1;
-        const areaNamesInRollup = areas.filter(a => a.rollup === rg).map(a => a.name);
         // Sum presortTotalFormula across every stream (not just one hardcoded name) — it
         // already picks PSW vs FSW per stream based on that stream's own combined-weigh-sort
         // flag, so this stays correct regardless of which streams are combined or renamed.
-        const totalExpr = areaNamesInRollup.map(an =>
-          STREAMS.map(s => presortTotalFormula(an, s)).join('+')
+        const totalExpr = areaIds.map(id =>
+          STREAMS.map(s => presortTotalFormula(id, s)).join('+')
         ).join('+');
-        rows.push([rg,
-          {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_CP},1)/(${totalExpr}))`},
-          {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${FEX_ROLLUP},"${rg}",${FEX_HASPATH},1)/(${totalExpr}))`},
+        rows.push([label,
+          {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchExpr},${FEX_CP},1)/(${totalExpr}))`},
+          {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchExpr},${FEX_HASPATH},1)/(${totalExpr}))`},
           {f:`C${rr}-B${rr}`}
         ]);
       });
       const divEnd = rows.length;
       const divTot = rows.length + 1;
       const allAreaTotalExpr = areas.map(a =>
-        STREAMS.map(s => presortTotalFormula(a.name, s)).join('+')
+        STREAMS.map(s => presortTotalFormula(a.id, s)).join('+')
       ).join('+');
       rows.push(['Total',
         {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_CP},1)/(${allAreaTotalExpr}))`},
         {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_HASPATH},1)/(${allAreaTotalExpr}))`},
         {f:`C${divTot}-B${divTot}`}
       ]);
-      // fix sign convention on the per-rollup rows to match: gap = potential - current (positive)
+      // fix sign convention on the per-group rows to match: gap = potential - current (positive)
     }
 
     return rows;
@@ -3999,7 +4342,10 @@ function buildWorkbook(){
 
   XLSX.utils.book_append_sheet(wb, makeSheet(buildSummarySheetRows(null, true)), excelSafeSheetName('Overall Summary'));
   areas.forEach(a => {
-    XLSX.utils.book_append_sheet(wb, makeSheet(buildSummarySheetRows(a.name, false)), excelSafeSheetName(`${a.name} Summary`));
+    // Tenant first in the sheet name — with duplicate area names now allowed across tenants
+    // (e.g. two "Office" areas), leading with the area name alone could produce sheets that
+    // all read "Office Summary", "Office Summary (2)"... with no clue which tenant is which.
+    XLSX.utils.book_append_sheet(wb, makeSheet(buildSummarySheetRows(a.id, false)), excelSafeSheetName(`${a.rollup} — ${a.name} Summary`));
   });
 
   // Notes & Assumptions
@@ -4018,27 +4364,30 @@ function buildWorkbook(){
   // each other's side of the ledger, so comparing raw totals would flag them as false
   // mismatches). Known-composition and non-representative totals are shown separately so
   // an auditor can see at a glance how much weight each mechanism is accounting for.
+  // Column A ('area') stays the human name — this sheet is meant to be read directly — with
+  // the real join key (area_id) appended at the end instead, since two areas can share a name.
   const qaRows = [['QA — Pre-sort pool weight vs. representative sorted sample'], [],
-    ['area','stream','presort_pool_lbs','known_composition_lbs','sorted_representative_lbs','non_representative_lbs','variance_lbs','variance_pct','flag']];
+    ['area','stream','presort_pool_lbs','known_composition_lbs','sorted_representative_lbs','non_representative_lbs','variance_lbs','variance_pct','flag','area_id']];
   areas.forEach(a => {
     STREAMS.forEach(s => {
       const rr = qaRows.length + 1;
       if (isCombinedWeighSort(s)){
         qaRows.push([a.name, s, 'n/a', 'n/a',
-          {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr})`},
-          {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"Yes")`},
-          'n/a', 'n/a', 'combined weigh-and-sort — no separate pre-sort step to compare'
+          {f:`SUMIFS(${FSW_W},${FSW_AREAID},J${rr},${FSW_STREAM},B${rr})`},
+          {f:`SUMIFS(${FSW_W},${FSW_AREAID},J${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"Yes")`},
+          'n/a', 'n/a', 'combined weigh-and-sort — no separate pre-sort step to compare', a.id
         ]);
         return;
       }
       qaRows.push([a.name, s,
-        {f:`SUMIFS(${PSW_W},${PSW_AREA},A${rr},${PSW_STREAM},B${rr},${PSW_KNOWN},"")`},
-        {f:`SUMIFS(${PSW_W},${PSW_AREA},A${rr},${PSW_STREAM},B${rr},${PSW_KNOWN},"<>")`},
-        {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"No")`},
-        {f:`SUMIFS(${FSW_W},${FSW_AREA},A${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"Yes")`},
+        {f:`SUMIFS(${PSW_W},${PSW_AREAID},J${rr},${PSW_STREAM},B${rr},${PSW_KNOWN},"")`},
+        {f:`SUMIFS(${PSW_W},${PSW_AREAID},J${rr},${PSW_STREAM},B${rr},${PSW_KNOWN},"<>")`},
+        {f:`SUMIFS(${FSW_W},${FSW_AREAID},J${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"No")`},
+        {f:`SUMIFS(${FSW_W},${FSW_AREAID},J${rr},${FSW_STREAM},B${rr},${FSW_NONREP},"Yes")`},
         {f:`E${rr}-C${rr}`},
         {f:`IF(C${rr}=0,"n/a",G${rr}/C${rr})`},
-        {f:`IF(AND(C${rr}=0,E${rr}=0),"no data yet",IF(C${rr}=0,"no presort pool data",IF(E${rr}=0,"NOT YET SORTED",IF(ABS(H${rr})>0.15,"CHECK >15% variance","OK"))))`}
+        {f:`IF(AND(C${rr}=0,E${rr}=0),"no data yet",IF(C${rr}=0,"no presort pool data",IF(E${rr}=0,"NOT YET SORTED",IF(ABS(H${rr})>0.15,"CHECK >15% variance","OK"))))`},
+        a.id
       ]);
     });
   });
@@ -4143,6 +4492,24 @@ function parseImportedWorkbook(wb){
   }
 
   const materialsForLookup = result.materials || materials;
+  const areasForLookup = result.areas || areas;
+
+  // Resolves one Fact_SortedWeights/PreSortWeights row's area to an id — areas are matched
+  // by id everywhere else in the app (never by name, since two areas under different tenants
+  // can share one), so import has to land on the same id an equivalent live-logged entry
+  // would use. Prefers the row's own area_id column (every export from this version onward
+  // carries one, and it's unambiguous regardless of duplicate names); for older files without
+  // it, falls back to matching name+tenant (if the row has a tenant column) or name alone
+  // (oldest files, from before duplicate area names were even possible).
+  function resolveImportedAreaId(row, nameIdx, tenantIdx, areaIdIdx){
+    if (areaIdIdx >= 0 && row[areaIdIdx]) return row[areaIdIdx];
+    const name = row[nameIdx];
+    const tenant = tenantIdx >= 0 ? row[tenantIdx] : null;
+    const match = tenant
+      ? areasForLookup.find(a => a.name === name && a.rollup === tenant)
+      : areasForLookup.find(a => a.name === name);
+    return match ? match.id : null;
+  }
 
   // Fact tables — also read by header name for the handful of fields actually consumed
   // on import (the rest are recalculated formulas/annotations, not source data).
@@ -4150,13 +4517,16 @@ function parseImportedWorkbook(wb){
   if (fsRows && fsRows.length > 1){
     const fsHeader = fsRows[0].map(h => (h == null ? '' : String(h)));
     const streamIdx = fsHeader.indexOf('stream'), areaIdx = fsHeader.indexOf('area'),
+          areaIdIdx = fsHeader.indexOf('area_id'), tenantIdx = fsHeader.indexOf('tenant'),
           matIdx = fsHeader.indexOf('material_id'), wIdx = fsHeader.indexOf('weight_lbs'),
           nonRepIdx = fsHeader.indexOf('non_representative'), noteIdx = fsHeader.indexOf('notes');
     fsRows.slice(1).forEach(r => {
-      if (!r || !r[streamIdx] || !r[areaIdx] || !r[matIdx]) return;
+      if (!r || !r[streamIdx] || !r[matIdx]) return;
+      const aid = resolveImportedAreaId(r, areaIdx, tenantIdx, areaIdIdx);
+      if (!aid) return;
       const mat = materialsForLookup.find(m => m.id === r[matIdx]);
       result.sortedEntries.push({
-        area: r[areaIdx], stream: r[streamIdx], materialId: r[matIdx],
+        areaId: aid, stream: r[streamIdx], materialId: r[matIdx],
         materialName: mat ? mat.name : r[matIdx],
         weight: parseFloat(r[wIdx]) || 0,
         nonRepresentative: nonRepIdx >= 0 ? r[nonRepIdx] === 'Yes' : false,
@@ -4169,12 +4539,15 @@ function parseImportedWorkbook(wb){
   if (psRows && psRows.length > 1){
     const psHeader = psRows[0].map(h => (h == null ? '' : String(h)));
     const streamIdx = psHeader.indexOf('stream'), areaIdx = psHeader.indexOf('area'),
+          areaIdIdx = psHeader.indexOf('area_id'), tenantIdx = psHeader.indexOf('tenant'),
           wIdx = psHeader.indexOf('weight_lbs'), knownIdx = psHeader.indexOf('known_material_id'),
           noteIdx = psHeader.indexOf('notes');
     psRows.slice(1).forEach(r => {
-      if (!r || !r[streamIdx] || !r[areaIdx]) return;
+      if (!r || !r[streamIdx]) return;
+      const aid = resolveImportedAreaId(r, areaIdx, tenantIdx, areaIdIdx);
+      if (!aid) return;
       result.presortEntries.push({
-        area: r[areaIdx], stream: r[streamIdx], weight: parseFloat(r[wIdx]) || 0,
+        areaId: aid, stream: r[streamIdx], weight: parseFloat(r[wIdx]) || 0,
         knownMaterialId: (knownIdx >= 0 && r[knownIdx]) ? r[knownIdx] : null,
         note: (noteIdx >= 0 ? r[noteIdx] : '') || '', ts: Date.now() + Math.random()
       });
@@ -4253,14 +4626,14 @@ document.getElementById('mergeImportBtn').onclick = async () => {
     if (!auditMeta[k]) auditMeta[k] = pendingImport.auditMeta[k];
   });
 
-  const sortedKey = e => [e.area, e.stream, e.materialId, e.weight, e.note].join('|');
+  const sortedKey = e => [e.areaId, e.stream, e.materialId, e.weight, e.note].join('|');
   const existingSortedKeys = new Set(sortedEntries.map(sortedKey));
   let addedSorted = 0;
   pendingImport.sortedEntries.forEach(e => {
     if (!existingSortedKeys.has(sortedKey(e))){ sortedEntries.push(e); existingSortedKeys.add(sortedKey(e)); addedSorted++; }
   });
 
-  const presortKey = e => [e.area, e.stream, e.weight, e.note].join('|');
+  const presortKey = e => [e.areaId, e.stream, e.weight, e.note].join('|');
   const existingPresortKeys = new Set(presortEntries.map(presortKey));
   let addedPresort = 0;
   pendingImport.presortEntries.forEach(e => {
@@ -4288,7 +4661,11 @@ document.getElementById('exportBtn').onclick = () => {
 // buildSummaryTablesHtml exactly as the live Summaries tab does, so this can never drift
 // from what's shown on screen.
 function buildAllAreasSummaryHtml(){
-  const scopes = [{name: 'Overall', scope: null}, ...areas.map(a => ({name: a.name, scope: a.name}))];
+  // Page title is the qualified "Name — Tenant" label, not the bare area name — two areas
+  // under different tenants can share a name, and these pages are laid out one after another
+  // with no other context to tell them apart.
+  const scopes = [{name: 'Overall', scope: {tenantIds: null, areaIds: null}},
+    ...areas.map(a => ({name: areaLabel(a.id), scope: {tenantIds: [a.rollup], areaIds: [a.id]}}))];
   const metaLine = [auditMeta.clientName, auditMeta.siteName, auditMeta.hauler].filter(Boolean).join(' · ') || 'Client · Site · Hauler';
   return scopes.map(({name, scope}) => `
     <section class="print-page">
@@ -4298,7 +4675,7 @@ function buildAllAreasSummaryHtml(){
     </section>
   `).join('');
 }
-document.getElementById('exportAllAreasPdfBtn').onclick = () => {
+document.getElementById('exportAllSummariesBtn').onclick = () => {
   if (sortedEntries.length === 0 && presortEntries.length === 0){
     showToast('Nothing logged yet');
     return;
@@ -4312,18 +4689,22 @@ document.getElementById('exportAllAreasPdfBtn').onclick = () => {
   window.print();
 };
 
-// nav.tabs' own height varies with font rendering/zoom, so this measures it rather than
-// hardcoding a pixel guess — .scope-sticky should start sticking exactly where nav.tabs
-// (itself sticky at its own --nav-top) stops.
-function updateScopeStickyTop(){
+// header's rendered height varies with font rendering/zoom/content (its status line can wrap
+// to a second line), so both nav.tabs' and .scope-sidebar's sticky `top` are measured off the
+// real DOM rather than a hardcoded guess — otherwise, once header is taller than nav's CSS
+// `top` assumed, nav locks at a `top` still underneath header (hidden behind it, higher
+// z-index) once scrolled, and .scope-sidebar — chained off nav's position — inherits the same
+// error, hiding its first row (the "Filter by Tenant" label) the same way.
+function updateStickyOffsets(){
+  const header = document.querySelector('header');
   const nav = document.querySelector('nav.tabs');
-  const els = document.querySelectorAll('.scope-sticky');
-  if (!nav || !els.length) return;
-  const navTop = parseFloat(getComputedStyle(nav).top) || 0;
-  const top = navTop + nav.offsetHeight;
-  els.forEach(el => { el.style.top = top + 'px'; });
+  if (!header || !nav) return;
+  const navTop = header.offsetHeight;
+  nav.style.top = navTop + 'px';
+  const sidebarTop = navTop + nav.offsetHeight;
+  document.querySelectorAll('.scope-sidebar').forEach(el => { el.style.top = sidebarTop + 'px'; });
 }
-window.addEventListener('resize', updateScopeStickyTop);
+window.addEventListener('resize', updateStickyOffsets);
 
 // ============================================================
 // Init
@@ -4331,7 +4712,7 @@ window.addEventListener('resize', updateScopeStickyTop);
 (function init(){
   loadState();
   renderAll();
-  updateScopeStickyTop();
+  updateStickyOffsets();
 })();
 </script>
 </body>
