@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Great forest audit tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --ink:#16241f; --paper:#f4f2ec; --panel:#ffffff;
@@ -12,13 +15,14 @@
     --danger:#a1372c; --danger-light:#f6dedb;
     --ok:#2f7a4f;
     --line:#d8d3c6;
-    --cat-fibers:#3d6b52; --cat-glass:#2f6f8f; --cat-metals:#6b6558;
-    --cat-plastics:#3a5a91; --cat-organics:#8a5a2b; --cat-unacceptable:#a1372c; --cat-other:#6a4a8a;
+    /* Same palette the charts use (CATEGORY_COLORS in the script below) — keep the two in sync. */
+    --cat-fibers:#c5b9ab; --cat-glass:#73b3a2; --cat-metals:#f3d64e;
+    --cat-plastics:#017455; --cat-organics:#3e441e; --cat-unacceptable:#6d6023; --cat-other:#5c5f66;
   }
   *{box-sizing:border-box;}
   body{
     margin:0; background:var(--paper); color:var(--ink);
-    font-family:Arial,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-family:'Poppins',Arial,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     -webkit-tap-highlight-color:transparent;
   }
   header{
@@ -95,7 +99,7 @@
   .btn-danger{background:var(--danger-light); color:var(--danger);}
   .btn-outline{background:#fff; border:1.5px solid var(--line); color:var(--ink);}
   table.log{width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;}
-  .summary-table-title{font-size:17px; font-weight:800; color:var(--brand-dark); margin:36px 0 10px; padding-top:20px; border-top:2px solid var(--brand-light); display:flex; align-items:baseline; justify-content:space-between; gap:12px;}
+  .summary-table-title{font-size:17px; font-weight:600; color:var(--brand-dark); margin:36px 0 10px; padding-top:20px; border-top:2px solid var(--brand-light); display:flex; align-items:baseline; justify-content:space-between; gap:12px;}
   .summary-table-title:first-child{margin-top:24px; padding-top:0; border-top:none;}
   .table-actions{display:flex; align-items:center; gap:8px; flex-shrink:0;}
   /* Each Summaries table gets its own white card (Figma "summaries" frame) instead of the
@@ -110,11 +114,15 @@
      sidebar's top edge instead of sitting 18px lower than it. */
   #chartsContent .chart-card:first-child{margin-top:0;}
   .chart-card-header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;}
-  .chart-card-title{font-size:15px; font-weight:800; color:var(--brand-dark);}
+  .chart-card-title{font-size:16px; font-weight:600; color:var(--brand-dark);}
   .chart-download-btn{font-size:12px; font-weight:600; padding:5px 12px; border-radius:6px; border:1.5px solid var(--brand); background:#fff; color:var(--brand-dark); cursor:pointer; white-space:nowrap;}
   .chart-download-btn:hover{background:var(--brand-light);}
   .chart-svg-wrap{width:100%; overflow:hidden;}
-  .chart-svg-wrap svg{width:100%; height:auto; display:block;}
+  /* Charts render at their own natural size (now that every build*Svg emits real width/height
+     attributes alongside viewBox, not just viewBox alone) — max-width instead of a flat 100%
+     keeps a chart from being stretched up past its designed size just because its card happens
+     to sit in a wide layout, while still shrinking it down responsively on a narrow one. */
+  .chart-svg-wrap svg{width:auto; max-width:100%; height:auto; display:block;}
   .copy-table-btn{font-size:12px; font-weight:600; padding:5px 12px; border-radius:6px; border:1.5px solid var(--brand); background:#fff; color:var(--brand-dark); cursor:pointer; white-space:nowrap; flex-shrink:0;}
   .copy-table-btn:hover{background:var(--brand-light);}
   .copy-table-btn:active{background:var(--brand); color:#fff;}
@@ -190,6 +198,14 @@
   .filter-content-grid{display:grid; grid-template-columns:1fr; gap:20px; align-items:start;}
   @media(min-width:760px){ .filter-content-grid{grid-template-columns:260px 1fr;} }
   .filter-sidebar{background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px 20px; position:sticky; top:var(--sticky-offset, 106px);}
+  /* On mobile the sidebar stacks above the chart/summary content instead of sitting beside
+     it (see .filter-content-grid's single-column default above), so an uncapped tenant/area
+     checklist can push everything else off the bottom of the first screenful. Capping just
+     the two checklists to a scrollable box keeps Grouping/Download reachable immediately
+     below them without needing to scroll past every tenant and area first. */
+  @media(max-width:759px){
+    .filter-sidebar-scroll{max-height:220px; overflow-y:auto; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:12px;}
+  }
   .filter-checkbox-row{display:flex; align-items:center; gap:8px; padding:5px 0; cursor:pointer; font-size:14px; color:var(--intro-dark);}
   .filter-checkbox-row input[type="checkbox"]{width:16px; height:16px; accent-color:var(--brand); flex:none;}
   .filter-checkbox-master{font-weight:700;}
@@ -246,7 +262,7 @@
   }
   .mm-cat-header-title{font-size:16px; font-weight:700; color:var(--brand-dark);}
   .mm-category-divider{
-    background:#f6f6f6; font-weight:600; font-size:14px; color:var(--ink); padding:12px 14px; margin-top:14px;
+    background:#f6f6f6; font-weight:600; font-size:17px; color:var(--ink); padding:12px 14px; margin-top:14px;
     border-radius:6px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;
   }
   /* Open category: header's bottom corners square off so it reads as one continuous grey
@@ -677,10 +693,12 @@
   <div class="panel" id="panel-summaries">
     <div class="filter-content-grid">
       <div class="filter-sidebar">
-        <div class="section-label">Filter by tenant</div>
-        <div id="summaryTenantFilters"></div>
-        <div class="section-label" style="margin-top:20px;">Filter by area</div>
-        <div id="summaryAreaFilters"></div>
+        <div class="filter-sidebar-scroll">
+          <div class="section-label">Filter by tenant</div>
+          <div id="summaryTenantFilters"></div>
+          <div class="section-label" style="margin-top:20px;">Filter by area</div>
+          <div id="summaryAreaFilters"></div>
+        </div>
         <div class="section-label" style="margin-top:20px;">Grouping</div>
         <div class="grouping-toggle" id="summaryGroupingToggle"></div>
         <div class="section-label" style="margin-top:20px;">Download</div>
@@ -694,14 +712,17 @@
   <div class="panel" id="panel-charts">
     <div class="filter-content-grid">
       <div class="filter-sidebar">
-        <div class="section-label">Filter by tenant</div>
-        <div id="chartsTenantFilters"></div>
-        <div class="section-label" style="margin-top:20px;">Filter by area</div>
-        <div id="chartsAreaFilters"></div>
+        <div class="filter-sidebar-scroll">
+          <div class="section-label">Filter by tenant</div>
+          <div id="chartsTenantFilters"></div>
+          <div class="section-label" style="margin-top:20px;">Filter by area</div>
+          <div id="chartsAreaFilters"></div>
+        </div>
         <div class="section-label" style="margin-top:20px;">Grouping</div>
         <div class="grouping-toggle" id="chartsGroupingToggle"></div>
         <div class="section-label" style="margin-top:20px;">Download</div>
-        <button type="button" class="sidebar-download-btn" id="exportAllChartsZipBtn">⬇ Export all charts (ZIP)</button>
+        <button type="button" class="sidebar-download-btn" id="exportAllChartsZipBtn">⬇ Export all charts (PNG, ZIP)</button>
+        <button type="button" class="sidebar-download-btn" id="exportAllChartsSvgBtn" style="margin-top:8px;">⬇ Export all charts (SVG, ZIP)</button>
       </div>
       <div id="chartsContent"></div>
     </div>
@@ -841,14 +862,24 @@ function materialBelongsIn(m, stream){ return m.targets.includes(stream); }
 // The disposal / landfill stream — the one flagged `protected` in the stream config. Weight
 // sent here is, by definition, NOT diverted, so it's the baseline the whole tool measures
 // diversion against. The math must resolve it by the protected flag, never by a hardcoded
-// name, so the stream stays renameable. If nothing is flagged (a partial/legacy import, or
-// a config built from the "Empty" scenario before a baseline was picked) it falls back to
-// the first stream, then to the string 'Trash' when there are no streams at all.
+// name, so the stream stays renameable. A genuinely unset baseline (no stream flagged) is a
+// real, intentional state — a site where every stream is commingled/mixed and sorted
+// downstream, so diversion should be judged purely by each material's own Divertible flag
+// with no stream-level override — so this returns null rather than silently guessing at a
+// stream to treat as the baseline.
 function landfillStreamName(){
   const flagged = streamConfig.find(s => s.protected);
-  return (flagged || streamConfig[0] || {}).name || 'Trash';
+  return flagged ? flagged.name : null;
 }
-function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && stream !== landfillStreamName(); }
+// A material still needs *some* target to fall back to when it has none (e.g. a
+// newly-added material, or one whose only target stream just got deleted) — that's a UI
+// convenience, unrelated to whether a baseline is actually set for diversion math, so it
+// keeps the old "first configured stream" fallback rather than propagating null into a
+// material's targets list.
+function defaultFallbackStream(){
+  return landfillStreamName() || (streamConfig[0] || {}).name || 'Trash';
+}
+function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && m.divertible === 'Yes' && stream !== landfillStreamName(); }
 // Potential Diversion Rate is the ceiling: everything that *could* be diverted in this
 // program if it were placed perfectly. That's driven by "currently divertible" (actually
 // recyclable/compostable here), NOT "accepted in program" — a material can be accepted (e.g.
@@ -1371,9 +1402,9 @@ function makeTargetChips(m){
           // collection streams this tool tracks, so finding them anywhere (including Trash)
           // is itself worth flagging. Every other material still needs at least one target,
           // or it'd be uncategorizable in every report.
-          if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = [landfillStreamName()];
+          if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = [defaultFallbackStream()];
         } else {
-          m.targets = m.targets.filter(t => t !== landfillStreamName()).concat([s]);
+          m.targets = m.targets.filter(t => t !== defaultFallbackStream()).concat([s]);
         }
         saveMaterials();
         renderMaterialsMasterForm();
@@ -1519,7 +1550,7 @@ function renderMaterialsMasterForm(){
       togglesRow.className = 'mm-card-toggles-row';
       togglesRow.appendChild(makeStatusField('Accepted?', ['Yes','No'], m.accepted, 'accepted', v => {
         m.accepted = v;
-        if (v !== 'Yes') m.targets = (m.divertible === 'Unacceptable') ? [] : [landfillStreamName()];
+        if (v !== 'Yes') m.targets = (m.divertible === 'Unacceptable') ? [] : [defaultFallbackStream()];
         saveMaterials();
         renderMaterialsMasterForm();
       }));
@@ -1580,7 +1611,7 @@ function renderAddMaterialForm(){
   statusRow.className = 'add-material-status-row';
   statusRow.appendChild(makeStatusField('Accepted?', ['Yes','No'], mmNewMaterial.accepted, 'accepted', v => {
     mmNewMaterial.accepted = v;
-    if (v !== 'Yes') mmNewMaterial.targets = (mmNewMaterial.divertible === 'Unacceptable') ? [] : [landfillStreamName()];
+    if (v !== 'Yes') mmNewMaterial.targets = (mmNewMaterial.divertible === 'Unacceptable') ? [] : [defaultFallbackStream()];
     renderAddMaterialForm();
   }));
   statusRow.appendChild(makeStatusField('Divertible?', DIVERTIBLE_OPTIONS, mmNewMaterial.divertible, 'divertible', v => { mmNewMaterial.divertible = v; }));
@@ -1813,6 +1844,49 @@ function moveMaterialWithinCategory(m, dir){
 function renderStreamsForm(){
   const box = document.getElementById('streamsForm');
   box.innerHTML = '';
+  const hasBaseline = streamConfig.some(s => s.protected);
+
+  // Whether this site has a landfill/disposal baseline at all is a site-level switch, not
+  // something to infer from whichever stream's radio happens to be checked — a radio group
+  // alone can't express "none of these" once any one of them has been picked (native radios
+  // don't uncheck themselves on a second click), so this is the only way to reach or leave a
+  // genuinely baseline-less, fully-commingled configuration.
+  const baselineToggleWrap = document.createElement('label');
+  baselineToggleWrap.className = 'toggle-field';
+  baselineToggleWrap.style.marginBottom = '14px';
+  const baselineToggleCb = document.createElement('input');
+  baselineToggleCb.type = 'checkbox';
+  baselineToggleCb.checked = hasBaseline;
+  baselineToggleCb.addEventListener('change', () => {
+    if (baselineToggleCb.checked){
+      // Turning it back on needs some stream selected right away, since the per-row radios
+      // are about to become active again — default to the first, reassignable with any row's
+      // radio afterward, same convention "+ Add stream" already uses for a from-scratch config.
+      if (streamConfig.length) streamConfig[0].protected = true;
+      showToast(streamConfig[0].name + ' is now the landfill baseline');
+    } else {
+      streamConfig.forEach(s => { s.protected = false; });
+      showToast('No landfill baseline set — diversion now follows each material’s own Divertible flag');
+    }
+    applyStreamConfig(streamConfig);
+    saveStreamConfig();
+    renderAll();
+  });
+  const baselineToggleLabel = document.createElement('span');
+  baselineToggleLabel.textContent = 'This site has a landfill baseline stream';
+  baselineToggleWrap.appendChild(baselineToggleCb);
+  baselineToggleWrap.appendChild(baselineToggleLabel);
+  box.appendChild(baselineToggleWrap);
+
+  // A genuinely unset baseline (every stream commingled/mixed, sorted downstream rather than
+  // collected separately) is an intentional configuration, not an accident — call it out
+  // explicitly rather than leaving it looking like nobody's picked one yet.
+  if (!hasBaseline){
+    const note = document.createElement('p');
+    note.className = 'note';
+    note.textContent = 'No baseline stream set — every material’s own Divertible flag determines diversion, with no stream-level override. Use this when every stream gets sorted downstream rather than collected separately.';
+    box.appendChild(note);
+  }
   streamConfig.forEach((s, idx) => {
     const row = document.createElement('div');
     row.className = 'stream-row';
@@ -1874,6 +1948,10 @@ function renderStreamsForm(){
     baseRadio.type = 'radio';
     baseRadio.name = 'streamBaseline';
     baseRadio.checked = !!s.protected;
+    // Disabled, not hidden, while the site-level toggle above is off — the row still shows
+    // which stream would become the baseline if it were switched back on, it just can't be
+    // interacted with until then.
+    baseRadio.disabled = !hasBaseline;
     baseRadio.title = 'Weight in this stream counts as sent to landfill — the baseline diversion is measured against.';
     baseRadio.addEventListener('change', () => {
       streamConfig.forEach(x => { x.protected = (x === s); });
@@ -1885,6 +1963,7 @@ function renderStreamsForm(){
     const baseLabelText = document.createElement('span');
     baseLabelText.textContent = 'Landfill baseline';
     baseWrap.appendChild(baseRadio); baseWrap.appendChild(baseLabelText);
+    if (!hasBaseline) baseWrap.style.opacity = '0.5';
 
     const delBtn = document.createElement('button');
     delBtn.className = 'del-btn area-del-btn';
@@ -1908,7 +1987,7 @@ function renderStreamsForm(){
           // have no target at all.
           materials.forEach(m => {
             m.targets = m.targets.filter(t => t !== removedName);
-            if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = [landfillStreamName()];
+            if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = [defaultFallbackStream()];
           });
           sortedEntries = sortedEntries.filter(e => e.stream !== removedName);
           presortEntries = presortEntries.filter(e => e.stream !== removedName);
@@ -1965,9 +2044,12 @@ function renderStreamsForm(){
   addBtn.onclick = () => {
     let n = 1, name = 'NEW STREAM';
     while (streamConfig.some(s => s.name === name)) { n++; name = 'NEW STREAM ' + n; }
-    // First stream in a from-scratch config becomes the landfill baseline automatically —
-    // it can be reassigned with "Set as baseline" on any other row.
-    const firstBaseline = !streamConfig.some(s => s.protected);
+    // First stream in a truly from-scratch config (nothing configured yet at all) becomes the
+    // landfill baseline automatically — reassignable via any row's radio afterward. Checked
+    // against streamConfig actually being empty, not just "nothing currently protected", so
+    // adding a stream after the site-level baseline toggle above has been explicitly switched
+    // off doesn't silently turn it back on.
+    const firstBaseline = streamConfig.length === 0;
     streamConfig.push({name, combinedWeighSort:false, excludeSoiled:false, protected: firstBaseline});
     applyStreamConfig(streamConfig);
     saveStreamConfig();
@@ -2741,7 +2823,7 @@ function renderTableToCanvas(table, title){
   const colWidths = new Array(colCount).fill(30);
   rows.forEach(r => {
     r.cells.forEach((c, i) => {
-      measure.font = (c.isHeader || r.isTotal) ? `700 ${fontSize}px Arial` : `${fontSize}px Arial`;
+      measure.font = (c.isHeader || r.isTotal) ? `700 ${fontSize}px Poppins, Arial` : `${fontSize}px Poppins, Arial`;
       const w = measure.measureText(c.text).width + pad*2;
       if (w > colWidths[i]) colWidths[i] = w;
     });
@@ -2757,7 +2839,7 @@ function renderTableToCanvas(table, title){
   let y = 0;
   if (title){
     ctx.fillStyle = '#123a30';
-    ctx.font = '800 15px Arial';
+    ctx.font = '600 16px Poppins, Arial';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText(title, pad, titleH/2);
     y = titleH;
@@ -2775,7 +2857,7 @@ function renderTableToCanvas(table, title){
     r.cells.forEach((c, i) => {
       const w = colWidths[i];
       ctx.fillStyle = isHeaderRow ? '#ffffff' : '#16241f';
-      ctx.font = (isHeaderRow || r.isTotal || (r.isCat && i === 0)) ? `700 ${fontSize}px Arial` : `${fontSize}px Arial`;
+      ctx.font = (isHeaderRow || r.isTotal || (r.isCat && i === 0)) ? `700 ${fontSize}px Poppins, Arial` : `${fontSize}px Poppins, Arial`;
       ctx.textBaseline = 'middle';
       ctx.textAlign = c.isNum ? 'right' : 'left';
       ctx.fillText(c.text, c.isNum ? x+w-pad : x+pad, y+rowH/2);
@@ -2800,11 +2882,16 @@ function downloadCanvasAsPng(canvas, filename){
     setTimeout(() => URL.revokeObjectURL(link.href), 30000);
   }, 'image/png');
 }
-window.downloadAnalysisTableImage = function(btn){
+window.downloadAnalysisTableImage = async function(btn){
   const wrap = btn.closest('.summary-table-title');
   const table = wrap.nextElementSibling;
   const title = wrap.querySelector('span').textContent;
   if (!table){ showToast('Nothing to download'); return; }
+  // Canvas text uses whatever font is actually loaded at draw time, not the page's CSS — if
+  // this fires before the Poppins webfont has finished loading (e.g. someone exports within
+  // the first moment on a slow connection), it would silently measure/draw with a fallback
+  // font instead, mismatching every other export. document.fonts.ready guards against that.
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
   const canvas = renderTableToCanvas(table, title);
   if (!canvas){ showToast('Nothing to download'); return; }
   downloadCanvasAsPng(canvas, title.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'') + '.png');
@@ -2991,14 +3078,17 @@ function renderScopeFilterSidebar(tenantBoxId, areaBoxId, excludedSet, onChange)
 // Client's official brand palette (5 colors: Black, Dark Green, Light Green, Sand, Yellow).
 // Only 5 colors for 7 categories, so Glass and Unacceptable use a tint/shade derived from
 // Light Green and Yellow respectively, rather than a color outside the brand family.
+// Each color needs to carry its own weight as a solid fill (donut slices, material-table
+// category bands with white text on top) — distinct hues spread around the wheel, each dark
+// enough for white text to stay readable, rather than a tints-of-one-hue family.
 const CATEGORY_COLORS = {
   Fibers: '#c5b9ab', // Sand
   Glass: '#73b3a2', // Light Green, lightened
-  Metals: '#000000', // Black
+  Metals: '#f3d64e', // Yellow
   Plastics: '#017455', // Light Green
   Organics: '#3e441e', // Dark Green
   Unacceptable: '#6d6023', // Yellow, darkened
-  Other: '#f3d64e', // Yellow
+  Other: '#5c5f66', // Slate grey
 };
 let charSharedScale = false; // false = each stream column scaled to its own max; true = one scale for all columns
 let charHideZeroRows = false; // true = hide materials with 0 weight across every stream
@@ -3099,7 +3189,7 @@ function buildAlluvialSvg(title, flow, groupColLabel){
 
   const hasData = flow.areaNodes.length && flow.streamNodes.length;
   if (!hasData){
-    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
       <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
       <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
     </svg>`;
@@ -3205,12 +3295,12 @@ function buildAlluvialSvg(title, flow, groupColLabel){
       const labelX = anchor === 'end' ? x - 8 : x + nodeW + 8;
       const midY = (p.y0+p.y1)/2;
       if (p.h < 26){
-        svg += `<text x="${labelX}" y="${midY+4}" text-anchor="${anchor}" font-size="10.5" font-weight="700" fill="#1a1a1a" ${halo}>${escapeHtml(name)} — ${lbs(totals[name])} lbs.</text>`;
+        svg += `<text x="${labelX}" y="${midY+4}" text-anchor="${anchor}" font-size="10.5" font-weight="600" fill="#1a1a1a" ${halo}>${escapeHtml(name)} — ${lbs(totals[name])} lbs.</text>`;
       } else if (p.h < 40){
-        svg += `<text x="${labelX}" y="${midY-2}" text-anchor="${anchor}" font-size="11" font-weight="700" fill="#1a1a1a" ${halo}>${escapeHtml(name)}</text>
+        svg += `<text x="${labelX}" y="${midY-2}" text-anchor="${anchor}" font-size="11" font-weight="600" fill="#1a1a1a" ${halo}>${escapeHtml(name)}</text>
           <text x="${labelX}" y="${midY+12}" text-anchor="${anchor}" font-size="10" fill="#5c584d" ${halo}>${lbs(totals[name])} lbs.</text>`;
       } else {
-        svg += `<text x="${labelX}" y="${midY-10}" text-anchor="${anchor}" font-size="11" font-weight="700" fill="#1a1a1a" ${halo}>${escapeHtml(name)}</text>
+        svg += `<text x="${labelX}" y="${midY-10}" text-anchor="${anchor}" font-size="11" font-weight="600" fill="#1a1a1a" ${halo}>${escapeHtml(name)}</text>
           <text x="${labelX}" y="${midY+4}" text-anchor="${anchor}" font-size="10" fill="#5c584d" ${halo}>${lbs(totals[name])} lbs.</text>
           <text x="${labelX}" y="${midY+18}" text-anchor="${anchor}" font-size="10" fill="#5c584d" ${halo}>${pct(totals[name]/grandTotal)}</text>`;
       }
@@ -3229,7 +3319,7 @@ function buildAlluvialSvg(title, flow, groupColLabel){
     if (p.h <= 0.5) return;
     const labelX = col3X+nodeW+8, midY = (p.y0+p.y1)/2;
     outcomeNodesColored += `<rect x="${col3X}" y="${p.y0}" width="${nodeW}" height="${p.h}" fill="${OUTCOME_COLORS[name]}" rx="2" />
-      <text x="${labelX}" y="${p.h < 40 ? midY-2 : midY-10}" text-anchor="start" font-size="11" font-weight="700" fill="${OUTCOME_COLORS[name]}">${escapeHtml(name)}</text>
+      <text x="${labelX}" y="${p.h < 40 ? midY-2 : midY-10}" text-anchor="start" font-size="11" font-weight="600" fill="${OUTCOME_COLORS[name]}">${escapeHtml(name)}</text>
       <text x="${labelX}" y="${p.h < 40 ? midY+12 : midY+4}" text-anchor="start" font-size="10" fill="#5c584d">${lbs(flow.outcomeTotals[name])} lbs.</text>`;
     if (p.h >= 40){
       outcomeNodesColored += `<text x="${labelX}" y="${midY+18}" text-anchor="start" font-size="10" fill="#5c584d">${pct(flow.outcomeTotals[name]/grandTotal)}</text>`;
@@ -3240,12 +3330,12 @@ function buildAlluvialSvg(title, flow, groupColLabel){
   // next to their bar, so a separate Diverted/Landfilled swatch legend here would just repeat
   // the same thing while eating into the margin those node labels need.
   const legend = `
-    <text x="${col1X}" y="18" font-size="11" font-weight="700" fill="#5c584d">${escapeHtml(groupColLabel || 'Area')}</text>
-    <text x="${col2X}" y="18" font-size="11" font-weight="700" fill="#5c584d">Stream</text>
-    <text x="${col3X}" y="18" font-size="11" font-weight="700" fill="#5c584d">Outcome</text>
+    <text x="${col1X}" y="18" font-size="11" font-weight="600" fill="#5c584d">${escapeHtml(groupColLabel || 'Area')}</text>
+    <text x="${col2X}" y="18" font-size="11" font-weight="600" fill="#5c584d">Stream</text>
+    <text x="${col3X}" y="18" font-size="11" font-weight="600" fill="#5c584d">Outcome</text>
   `;
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
     <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
     ${legend}${areaStreamRibbons}${streamOutcomeRibbons}${areaNodesSvg}${streamNodesSvg}${outcomeNodesColored}
   </svg>`;
@@ -3310,41 +3400,58 @@ function wrapText(text, maxWidth, font, maxLines, measureCtx){
 
 function buildContaminationSvg(title, rows, groupColLabel){
   const streamsList = STREAMS;
-  const ML = 14, MR = 14, nameColW = 150, colW = Math.max(90, (760 - nameColW) / Math.max(1, streamsList.length));
+  const ML = 24, MR = 14, nameColW = 147, colW = Math.max(90, (760 - nameColW) / Math.max(1, streamsList.length));
   const W = ML + nameColW + streamsList.length * colW + MR;
-  const headerLine1Y = 34, headerLine2Y = 47, bodyStartY = 58;
-  const rowH = 54, barH = 6, MB = 14;
+  const headerY = 25, bodyStartY = 38;
+  const rowH = 54, barH = 6, MB = 14, totalExtraGap = 21;
 
   if (!rows.length){
     const H = 160;
-    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
       <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
       <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
     </svg>`;
   }
 
-  const H = bodyStartY + rows.length * rowH + MB;
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  // A stream name is drawn on one line, left-aligned to its column, wherever it fits —
+  // that only breaks down once there are enough columns that colW gets tight, so a stream
+  // name too wide for its own column falls back to two lines rather than overlapping the
+  // next one. headerRows/effHeaderY/effBodyStartY only grow past the single-line defaults
+  // when at least one column actually needs the second line.
+  measureCtx.font = '600 12px Arial';
+  const headerLineW = colW - 8;
+  const needsWrap = streamsList.some(s => measureCtx.measureText(s).width > headerLineW);
+  const effHeaderY = needsWrap ? headerY - 6 : headerY;
+  const effBodyStartY = needsWrap ? bodyStartY + 13 : bodyStartY;
+
+  const hasTotal = rows.some(r => r.isTotal);
+  const H = effBodyStartY + rows.length * rowH + (hasTotal ? totalExtraGap : 0) + MB;
   let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
-  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="700" fill="#5c584d">${escapeHtml(groupColLabel || 'Tenant')}</text>`;
+  svg += `<text x="${ML}" y="${effHeaderY}" font-size="11" fill="#5c584d">${escapeHtml(groupColLabel || 'Tenant')}</text>`;
 
   streamsList.forEach((s, i) => {
-    const cx = ML + nameColW + i*colW + colW/2;
-    const words = s.split(' ');
-    const lines = words.length > 1
-      ? [words.slice(0, Math.ceil(words.length/2)).join(' '), words.slice(Math.ceil(words.length/2)).join(' ')]
-      : [s];
-    svg += `<text x="${cx}" y="${headerLine1Y}" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1a1a">${escapeHtml(lines[0])}</text>`;
-    if (lines[1]) svg += `<text x="${cx}" y="${headerLine2Y}" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1a1a">${escapeHtml(lines[1])}</text>`;
-  });
-  svg += `<line x1="${ML}" y1="${bodyStartY-4}" x2="${W-MR}" y2="${bodyStartY-4}" stroke="#1a1a1a" stroke-width="1.5" />`;
-
-  const measureCtx = document.createElement('canvas').getContext('2d');
-  const labelMaxW = nameColW - 10; // small buffer before the first stream column starts
-  rows.forEach((r, ri) => {
-    const rowTop = bodyStartY + ri*rowH;
-    if (r.isTotal){
-      svg += `<line x1="${ML}" y1="${rowTop}" x2="${W-MR}" y2="${rowTop}" stroke="#c7c2b4" stroke-width="1" stroke-dasharray="3 3" />`;
+    const x = ML + nameColW + i*colW;
+    if (needsWrap){
+      const lines = wrapText(s, headerLineW, '600 12px Arial', 2, measureCtx);
+      lines.forEach((line, li) => {
+        svg += `<text x="${x}" y="${effHeaderY + li*13}" font-size="12" font-weight="600" fill="#1a1a1a">${escapeHtml(line)}</text>`;
+      });
+    } else {
+      svg += `<text x="${x}" y="${effHeaderY}" font-size="12" font-weight="600" fill="#1a1a1a">${escapeHtml(s)}</text>`;
     }
+  });
+  svg += `<line x1="${ML}" y1="${effBodyStartY-4}" x2="${W-MR}" y2="${effBodyStartY-4}" stroke="#1a1a1a" stroke-width="1.5" />`;
+
+  const labelMaxW = nameColW - 10; // small buffer before the first stream column starts
+  let cursor = effBodyStartY;
+  rows.forEach((r, ri) => {
+    if (r.isTotal){
+      svg += `<line x1="${ML}" y1="${cursor}" x2="${W-MR}" y2="${cursor}" stroke="#c7c2b4" stroke-width="1" stroke-dasharray="3 3" />`;
+      cursor += totalExtraGap;
+    }
+    const rowTop = cursor;
+    cursor += rowH;
     const labelWeight = r.isTotal ? 700 : 600;
     const labelLines = wrapText(r.label, labelMaxW, `${labelWeight} 12px Arial`, 3, measureCtx);
     const lineH = 13;
@@ -3355,20 +3462,20 @@ function buildContaminationSvg(title, rows, groupColLabel){
     r.cells.forEach((c, i) => {
       const colX = ML + nameColW + i*colW;
       const barW = colW - 24;
-      const barX = colX + 12;
+      const barX = colX;
       const pctY = rowTop + 20, barY = rowTop + 26;
       if (!c.hasData){
         svg += `<text x="${barX}" y="${pctY}" font-size="11" fill="#b4b2a9">—</text>`;
         return;
       }
       const fillW = Math.max(2, c.pct * barW);
-      svg += `<text x="${barX}" y="${pctY}" font-size="13" font-weight="700" fill="${CONTAMINATION_COLOR}">${pct(c.pct)}</text>`;
+      svg += `<text x="${barX}" y="${pctY}" font-size="13" fill="${CONTAMINATION_COLOR}">${pct(c.pct)}</text>`;
       svg += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="3" fill="#e9e7e0" />`;
       svg += `<rect x="${barX}" y="${barY}" width="${fillW}" height="${barH}" rx="3" fill="${CONTAMINATION_COLOR}" />`;
     });
   });
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">${svg}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">${svg}</svg>`;
 }
 
 function computeCategoryBreakdown(scope){
@@ -3389,7 +3496,13 @@ function computeCategoryBreakdown(scope){
     // Biggest first — this also groups the small slices together at the tail end of the
     // circle (which wraps back to meet the start), instead of scattering them wherever
     // their category happened to fall in CATEGORY_ORDER, so their callouts stack cleanly.
-    .sort((a,b) => b.value - a.value);
+    // "Other" is a catch-all, not a real material family, so it always sits last regardless
+    // of its size instead of competing for a size-ranked position among the real categories.
+    .sort((a,b) => {
+      if (a.label === 'Other') return 1;
+      if (b.label === 'Other') return -1;
+      return b.value - a.value;
+    });
 }
 
 // Per-material companion to computeCategoryBreakdown — same scope, same grand total (so its
@@ -3399,24 +3512,36 @@ function computeMaterialBreakdown(scope){
   const rows = computeExtrapolatedRows();
   const areaIds = resolveScopeAreaIds(scope);
   const totals = {};
-  materials.forEach(m => totals[m.id] = 0);
+  const captured = {};
+  materials.forEach(m => { totals[m.id] = 0; captured[m.id] = 0; });
   rows.forEach(r => {
-    if (areaIds.includes(r.areaId) && totals[r.materialId] !== undefined) totals[r.materialId] += r.weight;
+    if (areaIds.includes(r.areaId) && totals[r.materialId] !== undefined){
+      totals[r.materialId] += r.weight;
+      if (r.correctlyPlaced) captured[r.materialId] += r.weight;
+    }
   });
   const grandTotal = Object.values(totals).reduce((s,v) => s+v, 0);
   const materialRows = materials
     .map(m => ({id: m.id, name: m.name, category: m.category, divertible: m.divertible, weight: totals[m.id]}))
     .filter(m => m.weight > 0.005)
-    .map(m => ({...m, pct: grandTotal ? m.weight/grandTotal : 0}));
+    // pct is this material's share of the grand total (lines up with the donut); capturedPct
+    // is a different denominator — this material's OWN weight — the share of just this
+    // material that was correctly diverted rather than landfilled or misplaced.
+    .map(m => ({...m, pct: grandTotal ? m.weight/grandTotal : 0, capturedPct: m.weight ? captured[m.id]/m.weight : 0}));
 
   // Grouped by category (biggest category first, same ordering the donut uses), and within
   // each category biggest material first — rather than one flat weight-sorted list, so
   // materials of the same type land next to each other instead of scattered by size alone.
   const categoryTotals = {};
   materialRows.forEach(m => { categoryTotals[m.category] = (categoryTotals[m.category]||0) + m.weight; });
-  return materialRows.sort((a,b) =>
-    a.category === b.category ? b.weight - a.weight : categoryTotals[b.category] - categoryTotals[a.category]
-  );
+  // "Other" is a catch-all, not a real material family, so its group always sits last
+  // regardless of size — same rule computeCategoryBreakdown's donut ordering uses.
+  return materialRows.sort((a,b) => {
+    if (a.category === b.category) return b.weight - a.weight;
+    if (a.category === 'Other') return 1;
+    if (b.category === 'Other') return -1;
+    return categoryTotals[b.category] - categoryTotals[a.category];
+  });
 }
 
 // Built as SVG (like the Characterization/Contamination charts) rather than an HTML table —
@@ -3424,12 +3549,12 @@ function computeMaterialBreakdown(scope){
 // (downloadChartCard just grabs the card's <svg>), instead of needing a separate export path.
 function buildMaterialTableSvg(title, materialRows){
   const ML = 14, MR = 14, nameColW = 300, numColW = 100, divColW = 110;
-  const W = ML + nameColW + numColW*2 + divColW + MR;
+  const W = ML + nameColW + numColW*3 + divColW + MR;
   const headerY = 20, bodyStartY = 32, catHeaderH = 22, rowH = 20, MB = 12;
 
   if (!materialRows.length){
     const H = 120;
-    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
       <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
       <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
     </svg>`;
@@ -3448,33 +3573,40 @@ function buildMaterialTableSvg(title, materialRows){
   groups.forEach(g => { bodyH += catHeaderH + g.materials.length * rowH; });
   const H = bodyStartY + bodyH + MB;
 
-  const col2R = ML + nameColW + numColW, col3R = col2R + numColW, col4X = col3R + 12;
+  // Column order matches the Figma spec: Material | Divertible? | Weight (lbs.) | % of Total
+  // | % Captured — all four right-hand columns right-aligned, not just the numeric ones.
+  const col1R = ML + nameColW + divColW, col2R = col1R + numColW, col3R = col2R + numColW, col4R = col3R + numColW;
 
   let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
-  svg += `<text x="${ML}" y="${headerY}" font-size="11" font-weight="700" fill="#5c584d">Material</text>`;
-  svg += `<text x="${col2R-8}" y="${headerY}" text-anchor="end" font-size="11" font-weight="700" fill="#1a1a1a">Weight (lbs.)</text>`;
-  svg += `<text x="${col3R-8}" y="${headerY}" text-anchor="end" font-size="11" font-weight="700" fill="#1a1a1a">% of Total</text>`;
-  svg += `<text x="${col4X}" y="${headerY}" font-size="11" font-weight="700" fill="#1a1a1a">Divertible?</text>`;
+  svg += `<text x="${ML}" y="${headerY}" font-size="11" fill="#5c584d">Material</text>`;
+  svg += `<text x="${col1R-8}" y="${headerY}" text-anchor="end" font-size="12" font-weight="600" fill="#1a1a1a">Divertible?</text>`;
+  svg += `<text x="${col2R-8}" y="${headerY}" text-anchor="end" font-size="12" font-weight="600" fill="#1a1a1a">Weight (lbs.)</text>`;
+  svg += `<text x="${col3R-8}" y="${headerY}" text-anchor="end" font-size="12" font-weight="600" fill="#1a1a1a">% of Total</text>`;
+  svg += `<text x="${col4R-8}" y="${headerY}" text-anchor="end" font-size="12" font-weight="600" fill="#1a1a1a">% Captured</text>`;
   svg += `<line x1="${ML}" y1="${bodyStartY-10}" x2="${W-MR}" y2="${bodyStartY-10}" stroke="#1a1a1a" stroke-width="1.5" />`;
 
   let y = bodyStartY;
   groups.forEach(g => {
-    svg += `<rect x="${ML}" y="${y}" width="${W-ML-MR}" height="${catHeaderH-6}" fill="#e9e7e0" rx="3" />
-      <text x="${ML+8}" y="${y+(catHeaderH-6)/2+4}" font-size="10.5" font-weight="700" fill="#5c584d">${escapeHtml(g.category.toUpperCase())}</text>`;
+    // Category band uses the same per-category color as the donut/dots elsewhere in the app
+    // (CATEGORY_COLORS), white label — not a flat grey band — per the Figma spec.
+    const bandColor = CATEGORY_COLORS[g.category] || '#999';
+    svg += `<rect x="${ML}" y="${y}" width="${W-ML-MR}" height="${catHeaderH-6}" fill="${bandColor}" rx="3" />
+      <text x="${ML+8}" y="${y+(catHeaderH-6)/2+4}" font-size="12" font-weight="600" fill="#ffffff">${escapeHtml(g.category.toUpperCase())}</text>`;
     y += catHeaderH;
     g.materials.forEach(m => {
       const dotColor = CATEGORY_COLORS[m.category] || '#999';
       const textY = y + rowH/2 + 3;
       svg += `<circle cx="${ML+4}" cy="${y+rowH/2}" r="3.5" fill="${dotColor}" />`;
       svg += `<text x="${ML+14}" y="${textY}" font-size="11" fill="#1a1a1a">${escapeHtml(truncateLabel(m.name, 42))}</text>`;
+      svg += `<text x="${col1R-8}" y="${textY}" text-anchor="end" font-size="11" fill="#1a1a1a">${escapeHtml(m.divertible)}</text>`;
       svg += `<text x="${col2R-8}" y="${textY}" text-anchor="end" font-size="11" fill="#1a1a1a">${lbs(m.weight)}</text>`;
       svg += `<text x="${col3R-8}" y="${textY}" text-anchor="end" font-size="11" fill="#1a1a1a">${pct(m.pct)}</text>`;
-      svg += `<text x="${col4X}" y="${textY}" font-size="11" fill="#1a1a1a">${escapeHtml(m.divertible)}</text>`;
+      svg += `<text x="${col4R-8}" y="${textY}" text-anchor="end" font-size="11" font-weight="700" fill="${PLACEMENT_COLORS.correct}">${pct(m.capturedPct)}</text>`;
       y += rowH;
     });
   });
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">${svg}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">${svg}</svg>`;
 }
 
 // Builds a donut chart as a self-contained SVG string, title included, so
@@ -3521,8 +3653,8 @@ function buildDonutSvg(title, data){
   const LABEL_HALO = 'stroke="#ffffff" stroke-width="2" paint-order="stroke" stroke-linejoin="round"';
   const bigLabels = big.map(d => {
     const [x, y] = pt(d.midDeg, r);
-    return `<text x="${x}" y="${y-4}" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a" ${LABEL_HALO}>${escapeHtml(d.label)}</text>
-      <text x="${x}" y="${y+12}" text-anchor="middle" font-size="11" font-weight="700" fill="#3a3a38" ${LABEL_HALO}>${(d.pct*100).toFixed(1)}%</text>`;
+    return `<text x="${x}" y="${y-4}" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a" ${LABEL_HALO}>${escapeHtml(d.label)}</text>
+      <text x="${x}" y="${y+12}" text-anchor="middle" font-size="11" fill="#3a3a38" ${LABEL_HALO}>${(d.pct*100).toFixed(1)}%</text>`;
   }).join('');
 
   // Small slices: split left/right by position, stacked with fixed spacing
@@ -3549,7 +3681,7 @@ function buildDonutSvg(title, data){
       const [ox, oy] = pt(d.midDeg, outerR);
       const labelY = topMargin + i * rowGap;
       return `<polyline points="${ox},${oy} ${bendX},${oy} ${labelX},${labelY}" fill="none" stroke="#b4b2a9" stroke-width="1" />
-        <text x="${textX}" y="${labelY-2}" text-anchor="${anchor}" font-size="12" font-weight="700" fill="#1a1a1a">${escapeHtml(d.label)}</text>
+        <text x="${textX}" y="${labelY-2}" text-anchor="${anchor}" font-size="12" font-weight="600" fill="#1a1a1a">${escapeHtml(d.label)}</text>
         <text x="${textX}" y="${labelY+13}" text-anchor="${anchor}" font-size="11" fill="#5c584d">${(d.pct*100).toFixed(1)}%</text>`;
     }).join('');
   }
@@ -3560,7 +3692,7 @@ function buildDonutSvg(title, data){
   const rightLabels = buildSide(rightSmall, rightTopMargin, W - 70, 'start');
   const leftLabels = buildSide(leftSmall, leftTopMargin, 100, 'end');
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
     <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
     ${data.length ? arcs + bigLabels + rightLabels + leftLabels : `<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>`}
   </svg>`;
@@ -3650,62 +3782,154 @@ const DIVERSION_POTENTIAL_COLOR = '#1f5c4c'; // --brand
 // to the current rate, with the potential rate marked as a threshold line further along the
 // same track, plus the gap between the two spelled out in points at the right of the group's
 // own label line (potential minus current — the improvement still on the table).
-function buildDiversionTrackSvg(title, groups){
+// A group can optionally carry a second, alternately-scoped Potential rate alongside the
+// primary one — e.g. "Excluding Unacceptable" vs. "Including Unacceptable" — for comparing
+// two same-moment scenarios, not a before/after over time (a "previous/ghost marker" framing
+// was tried and tested as confusing, since it reads as timeline language for something that
+// isn't one). All three of altPotential/potentialLabel/altPotentialLabel must be present
+// together for a group to render this way; a group with none of them renders exactly as
+// before — same output, byte for byte.
+function buildDiversionTrackSvg(title, groups, explanationNote){
   const W = 560;
-  const ML = 16, MR = 16;
+  const ML = 13, MR = 19;
   const plotW = W - ML - MR;
-  const MT = 34, MB = 12, rowH = 80, barH = 30, markerExtend = 6;
+  const MT = 52, rowStep = 54, barH = 23, MB = 16;
+  const totalBarH = 46, totalGapAfterDivider = 25, totalBarTopOffset = 17, totalCaptionGap = 15, dividerPad = 4;
+  // Alt-scenario rows need extra headroom above the track for the second label — barTop moves
+  // from rowTop+20 to rowTop+altTopPad, and the row grows by the same amount so the bottom
+  // label (which is anchored off barBottom) doesn't creep into the next row.
+  const altTopPad = 64, altExtraH = altTopPad - 20;
   const CUR = DIVERSION_CURRENT_COLOR, POT = DIVERSION_POTENTIAL_COLOR;
   const TRACK_BG = '#e9e7e0';
 
+  // Legend: a small amber swatch + "Current diversion rate", a vertical divider, then
+  // "Potential diversion rate" — drawn once above the tracks instead of repeating per row.
+  function legendSvg(){
+    const swatchY = 11, dividerX = ML + 152, text2X = ML + 157.8;
+    return `<rect x="${ML}" y="${swatchY}" width="10" height="10" rx="2" fill="${CUR}" />
+      <text x="${ML+14.5}" y="${swatchY+8.5}" font-size="12" fill="#1a1a1a">Current diversion rate</text>
+      <line x1="${dividerX}" y1="${swatchY}" x2="${dividerX}" y2="${swatchY+10}" stroke="#1a1a1a" stroke-width="1" />
+      <text x="${text2X}" y="${swatchY+8.5}" font-size="12" fill="#1a1a1a">Potential diversion rate</text>`;
+  }
+
   if (!groups.length){
     const H = 160;
-    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
       <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
+      ${legendSvg()}
       <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
     </svg>`;
   }
 
-  const H = MT + groups.length*rowH + MB;
-
-  const legend = `
-    <rect x="${ML}" y="10" width="10" height="10" fill="${CUR}" rx="2" />
-    <text x="${ML+14}" y="19" font-size="11" fill="#3a3a38">Current (fill)</text>
-    <line x1="${ML+120}" y1="9" x2="${ML+120}" y2="19" stroke="#1a1a1a" stroke-width="1.5" />
-    <text x="${ML+128}" y="19" font-size="11" fill="#3a3a38">Potential (marker)</text>
-  `;
+  const hasAlt = g => g.altPotential !== undefined && g.potentialLabel !== undefined && g.altPotentialLabel !== undefined;
+  const noteLines = explanationNote ? explanationNote.split('\n') : [];
+  const noteH = noteLines.length ? (14 + noteLines.length * 13) : 0;
 
   let rows = '';
-  groups.forEach((g, i) => {
-    const rowTop = MT + i*rowH;
+  let cursor = MT;
+  groups.forEach((g) => {
+    const alt = hasAlt(g);
     if (g.isTotal){
-      rows += `<line x1="${ML}" y1="${rowTop-6}" x2="${W-MR}" y2="${rowTop-6}" stroke="#c7c2b4" stroke-width="1" stroke-dasharray="3 3" />`;
+      const dividerY = cursor + dividerPad;
+      rows += `<line x1="${ML}" y1="${dividerY}" x2="${W-MR}" y2="${dividerY}" stroke="#c7c2b4" stroke-width="1" stroke-dasharray="3 3" />`;
+      cursor = dividerY + totalGapAfterDivider;
     }
-    rows += `<text x="${ML}" y="${rowTop+12}" font-size="12" font-weight="${g.isTotal ? 700 : 600}" fill="#1a1a1a">${escapeHtml(g.label)}</text>`;
+    const rowBase = cursor;
+    const thisBarH = g.isTotal ? totalBarH : barH;
+    const labelY = rowBase + 9;
+    const barTop = g.isTotal ? rowBase + totalBarTopOffset : rowBase + (alt ? altTopPad - 6 : 15);
+    const barBottom = barTop + thisBarH;
+
     const gapPts = (g.potential - g.current) * 100;
-    rows += `<text x="${W-MR}" y="${rowTop+12}" text-anchor="end" font-size="11" font-weight="700" fill="#5c584d">${gapPts >= 0 ? '+' : ''}${gapPts.toFixed(1)} pts potential gap</text>`;
-
-    const barTop = rowTop + 20, barBottom = barTop + barH;
-    rows += `<rect x="${ML}" y="${barTop}" width="${plotW}" height="${barH}" rx="4" fill="${TRACK_BG}" />`;
-    const fillW = Math.max(0, Math.min(1, g.current)) * plotW;
-    if (fillW > 0.5) rows += `<rect x="${ML}" y="${barTop}" width="${fillW}" height="${barH}" rx="4" fill="${CUR}" />`;
-
-    const curLabel = `${(g.current*100).toFixed(1)}%`;
-    rows += fillW > 46
-      ? `<text x="${ML+10}" y="${(barTop+barBottom)/2+4}" font-size="13" font-weight="700" fill="#ffffff">${curLabel}</text>`
-      : `<text x="${ML+fillW+8}" y="${(barTop+barBottom)/2+4}" font-size="13" font-weight="700" fill="${CUR}">${curLabel}</text>`;
+    const gapLabel = `${gapPts >= 0 ? '+' : ''}${gapPts.toFixed(1)} pts potential gap`;
+    if (alt){
+      // Two named potentials means "the gap" is ambiguous on its own, so the title takes the
+      // top-right spot instead, freeing top-left for the (still useful) gap-vs-primary label.
+      rows += `<text x="${W-MR}" y="${labelY}" text-anchor="end" font-size="${g.isTotal ? 13 : 12}" font-weight="${g.isTotal ? 700 : 600}" fill="#1a1a1a">${escapeHtml(g.label)}</text>`;
+      rows += `<text x="${ML}" y="${labelY}" font-size="11" font-weight="700" fill="#5c584d">${gapLabel}</text>`;
+    } else {
+      rows += `<text x="${ML}" y="${labelY}" font-size="${g.isTotal ? 13 : 12}" font-weight="${g.isTotal ? 700 : 600}" fill="#1a1a1a">${escapeHtml(g.label)}</text>`;
+      rows += `<text x="${W-MR}" y="${labelY}" text-anchor="end" font-size="11" fill="#6c675a">${gapLabel}</text>`;
+    }
 
     const markerX = ML + Math.max(0, Math.min(1, g.potential)) * plotW;
-    rows += `<line x1="${markerX}" y1="${barTop-markerExtend}" x2="${markerX}" y2="${barBottom+markerExtend}" stroke="#1a1a1a" stroke-width="1.5" />`;
-    const nearRightEdge = (W - MR) - markerX < 90;
-    const potAnchor = nearRightEdge ? 'end' : 'start';
-    const potX = markerX + (nearRightEdge ? -6 : 6);
-    rows += `<text x="${potX}" y="${barBottom+markerExtend+14}" text-anchor="${potAnchor}" font-size="11" font-weight="700" fill="${POT}">${(g.potential*100).toFixed(1)}% potential</text>`;
+    const fillW = Math.max(0, Math.min(1, g.current)) * plotW;
+
+    if (alt){
+      // Shaded band between the two potential markers, drawn before the Current fill so the
+      // fill stays fully opaque on top of it.
+      const altMarkerXForBand = ML + Math.max(0, Math.min(1, g.altPotential)) * plotW;
+      const bandX0 = Math.min(markerX, altMarkerXForBand), bandX1 = Math.max(markerX, altMarkerXForBand);
+      rows += `<rect x="${ML}" y="${barTop}" width="${plotW}" height="${thisBarH}" rx="4" fill="${TRACK_BG}" />`;
+      rows += `<rect x="${bandX0}" y="${barTop}" width="${bandX1-bandX0}" height="${thisBarH}" fill="#1a1a1a" fill-opacity="0.14" />`;
+    } else {
+      rows += `<rect x="${ML}" y="${barTop}" width="${plotW}" height="${thisBarH}" rx="4" fill="${TRACK_BG}" />`;
+      // The stretch between the current fill and the potential marker is filled solid dark —
+      // it's the achievable-but-not-yet-captured gap, distinct from the plain grey track
+      // beyond the potential marker.
+      if (markerX > ML + fillW + 0.5) rows += `<rect x="${ML+fillW}" y="${barTop}" width="${markerX-ML-fillW}" height="${thisBarH}" fill="#cac9c2" />`;
+    }
+    if (fillW > 0.5) rows += `<rect x="${ML}" y="${barTop}" width="${fillW}" height="${thisBarH}" rx="4" fill="${CUR}" />`;
+
+    const curLabel = `${(g.current*100).toFixed(1)}%`;
+    const curFontSize = g.isTotal ? 16 : 13;
+    const valueY = barTop + thisBarH/2 + (g.isTotal ? 5 : 4.5);
+    rows += fillW > 46
+      ? `<text x="${ML+10}" y="${valueY}" font-size="${curFontSize}" fill="#ffffff">${curLabel}</text>`
+      : `<text x="${ML+fillW+8}" y="${valueY}" font-size="${curFontSize}" fill="${CUR}">${curLabel}</text>`;
+
+    if (alt){
+      // Primary scenario — same marker position as always, just relabeled with its explicit
+      // scenario name and recolored to neutral ink (POT's amber/green no longer applies once
+      // there are two named potentials rather than one implicit "the" potential).
+      rows += `<line x1="${markerX}" y1="${barTop}" x2="${markerX}" y2="${barBottom}" stroke="#1a1a1a" stroke-width="2" />`;
+      const nearRightEdge = (W - MR) - markerX < 90;
+      const potAnchor = nearRightEdge ? 'end' : 'start';
+      const potX = markerX + (nearRightEdge ? -8 : 8);
+      rows += `<text x="${potX}" y="${barBottom+14}" text-anchor="${potAnchor}" font-size="11" font-weight="700" fill="#1a1a1a">${escapeHtml(g.potentialLabel)}: ${(g.potential*100).toFixed(1)}%</text>`;
+
+      // Alternate scenario — dashed marker, label above the track, centered on its own marker.
+      const altMarkerX = ML + Math.max(0, Math.min(1, g.altPotential)) * plotW;
+      rows += `<line x1="${altMarkerX}" y1="${barTop}" x2="${altMarkerX}" y2="${barBottom}" stroke="#6c675a" stroke-width="1.5" stroke-dasharray="3 2" />`;
+      rows += `<text x="${altMarkerX}" y="${barTop-34}" text-anchor="middle" font-size="11" font-weight="700" fill="#6c675a">${escapeHtml(g.altPotentialLabel)}: ${Math.round(g.altPotential*100)}%</text>`;
+    } else {
+      rows += `<line x1="${markerX}" y1="${barTop}" x2="${markerX}" y2="${barBottom}" stroke="#1a1a1a" stroke-width="1.5" />`;
+      if (g.isTotal){
+        // The Total row's potential rate is called out separately below the bar, rather than
+        // squeezed in next to the marker — it's the one number on the chart that deserves its
+        // own line.
+        rows += `<text x="${W/2}" y="${barBottom+totalCaptionGap}" text-anchor="middle" font-size="12" fill="#1a1a1a">Potential rate: ${(g.potential*100).toFixed(1)}%</text>`;
+      } else {
+        const nearRightEdge = (W - MR) - markerX < 90;
+        const potAnchor = nearRightEdge ? 'end' : 'start';
+        const potX = markerX + (nearRightEdge ? -8 : 8);
+        // Flipped to the left of the marker (near the right edge), this label can land on
+        // top of the dark current-to-potential gap segment instead of the plain track — a
+        // white halo behind the dark fill keeps it legible either way without needing to
+        // know which background it landed on.
+        const potHalo = nearRightEdge ? 'stroke="#ffffff" stroke-width="2" paint-order="stroke" stroke-linejoin="round"' : '';
+        rows += `<text x="${potX}" y="${valueY}" text-anchor="${potAnchor}" font-size="11" fill="#1a1a1a" ${potHalo}>${(g.potential*100).toFixed(1)}%</text>`;
+      }
+    }
+
+    cursor = rowBase + rowStep + (alt ? altExtraH : 0) + (g.isTotal ? (totalBarTopOffset + totalBarH - rowStep + totalCaptionGap + 14) : 0);
   });
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+  let noteSvg = '';
+  if (noteLines.length){
+    let ny = cursor + 14;
+    noteLines.forEach(line => {
+      noteSvg += `<text x="${ML}" y="${ny}" font-size="9.5" font-style="italic" fill="#8a8578">${escapeHtml(line)}</text>`;
+      ny += 13;
+    });
+    cursor = ny;
+  }
+
+  const H = cursor + MB;
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
     <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
-    ${legend}${rows}
+    ${legendSvg()}${rows}${noteSvg}
   </svg>`;
 }
 
@@ -3760,7 +3984,19 @@ function computeCharacterizationMatrix(scope, hideZeroRows){
   // (one shared scale) — buildCharacterizationSvg picks whichever the scale toggle wants.
   const colMax = STREAMS.map((s, i) => Math.max(0, ...rows.flatMap(g => g.materials.map(m => m.values[i].weight))));
   const sharedMax = Math.max(0, ...colMax);
-  return { rows, colMax, sharedMax };
+
+  // Capture rate per stream — same formula as the Waste Stream Contamination table/chart
+  // (belongs-here weight / that stream's total weight), just framed positively and scoped to
+  // the same areaIds this matrix itself is scoped to (Contamination's own version is always
+  // the full unscoped breakdown, so it can't be reused directly here without disagreeing with
+  // the matrix's own numbers when a Filter selection is active).
+  const streamCapture = STREAMS.map(s => {
+    const total = areaIds.reduce((sum,id) => sum + streamWeightForArea(id, s), 0);
+    const belongs = fex.filter(r => areaIds.includes(r.areaId) && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
+    return { stream: s, rate: total === 0 ? 0 : belongs/total, hasData: total > 0.005 };
+  });
+
+  return { rows, colMax, sharedMax, streamCapture };
 }
 
 function truncateLabel(s, maxLen){
@@ -3778,12 +4014,14 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
   const streamsList = STREAMS;
   const ML = 14, MR = 14, nameColW = 190, streamColW = 116;
   const W = ML + nameColW + streamsList.length * streamColW + MR;
-  const legendY = 12, headerLine1Y = 34, headerLine2Y = 47, bodyStartY = 56;
+  const legendY = 12, legendY2 = 26, headerLine1Y = 48, headerLine2Y = 61, bodyStartY = 70;
   const catHeaderH = 24, rowH = 20, catGap = 6, MB = 12;
   const trackW = streamColW - 24, trackH = 12;
 
+  const captureRowH = catHeaderH + 6;
   let bodyH = 0;
   matrix.rows.forEach(g => { bodyH += catHeaderH + g.materials.length * rowH + catGap; });
+  bodyH += captureRowH;
   const H = bodyStartY + bodyH + MB;
 
   let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
@@ -3795,14 +4033,18 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
     ['Contamination — wrong stream', PLACEMENT_COLORS.contamination],
     ['Unacceptable material', PLACEMENT_COLORS.unacceptable],
   ];
+  // Two per line rather than one long strip — four items squeezed onto one row ran together
+  // and was hard to scan at this font size.
   let lx = ML;
-  legendItems.forEach(([label, color]) => {
-    svg += `<rect x="${lx}" y="${legendY-9}" width="10" height="10" fill="${color}" rx="2" />
-      <text x="${lx+14}" y="${legendY}" font-size="10.5" fill="#3a3a38">${escapeHtml(label)}</text>`;
+  legendItems.forEach(([label, color], i) => {
+    if (i === 2) lx = ML;
+    const y = i < 2 ? legendY : legendY2;
+    svg += `<rect x="${lx}" y="${y-9}" width="10" height="10" fill="${color}" rx="2" />
+      <text x="${lx+14}" y="${y}" font-size="10.5" fill="#3a3a38">${escapeHtml(label)}</text>`;
     lx += 26 + label.length * 5.6;
   });
 
-  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="700" fill="#5c584d">Material</text>`;
+  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="700" fill="#5c584d">Material (lbs.)</text>`;
 
   // Column headers (wrapped to two lines on the middle space, if any)
   streamsList.forEach((s, i) => {
@@ -3852,7 +4094,19 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
     y += catGap;
   });
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">${svg}</svg>`;
+  // Capture rate — one % per stream (belongs-here weight / that stream's total), the same
+  // metric the Waste Stream Contamination table/chart reports, just framed as the positive
+  // complement and placed here so it reads directly under the material detail it summarizes.
+  svg += `<line x1="${ML}" y1="${y}" x2="${W-MR}" y2="${y}" stroke="#1a1a1a" stroke-width="1.5" />`;
+  svg += `<rect x="${ML}" y="${y+4}" width="${W-ML-MR}" height="${captureRowH-8}" fill="#dcebe6" rx="4" />
+    <text x="${ML+8}" y="${y+captureRowH/2+4}" font-size="11" font-weight="700" fill="#123a30">CAPTURE RATE</text>`;
+  matrix.streamCapture.forEach((c, i) => {
+    const cx = ML + nameColW + i*streamColW + streamColW/2;
+    const label = c.hasData ? pct(c.rate) : '—';
+    svg += `<text x="${cx}" y="${y+captureRowH/2+4}" text-anchor="middle" font-size="12" font-weight="700" fill="#123a30">${label}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">${svg}</svg>`;
 }
 
 function chartCardHtml(title, svg, footerHtml){
@@ -4154,8 +4408,11 @@ function buildWorkbook(){
   // The disposal/landfill stream, resolved by the `protected` flag (not a hardcoded name),
   // baked into the formulas below as a literal so a renamed protected stream still stays
   // excluded from diversion credit. Doubled quotes keep it a valid Excel string literal.
+  // null when no stream is flagged (a genuinely baseline-less, fully-commingled site) — every
+  // formula below that excludes the landfill stream omits that clause entirely in that case,
+  // rather than comparing against an empty/invalid string.
   const landfillName = landfillStreamName();
-  const landfillNameEsc = landfillName.replace(/"/g, '""');
+  const landfillNameEsc = landfillName ? landfillName.replace(/"/g, '""') : null;
   const mmHeader = ['material_id','material_name','material_category','currently_divertible','accepted_in_program',
                      ...STREAMS.map(s => `target: ${s}`)];
   const mmRows = [mmHeader];
@@ -4361,8 +4618,14 @@ function buildWorkbook(){
         const divertibleExpr = `INDEX('Materials Master'!$${divertibleCol}$2:$${divertibleCol}$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
         // "diverted" — properly recycled/composted elsewhere (this row's stream is one of the
         // material's target streams, it's actually accepted in the program, AND it's not
-        // literally Trash — being correctly placed IN Trash isn't "diversion", that's the point).
-        const cpExpr = {f:`IF(AND(${belongsExpr},${acceptedExpr}="Yes",${streamRef}<>"${landfillNameEsc}"),1,0)`};
+        // literally Trash — being correctly placed IN Trash isn't "diversion", that's the
+        // point). No baseline stream configured (landfillNameEsc null) means there's nothing
+        // to exclude on that basis — the clause is omitted entirely rather than comparing
+        // against an empty string, which would incorrectly exclude every row whose stream
+        // happens to be blank/unset instead of excluding none.
+        const cpConds = [belongsExpr, `${acceptedExpr}="Yes"`, `${divertibleExpr}="Yes"`];
+        if (landfillNameEsc !== null) cpConds.push(`${streamRef}<>"${landfillNameEsc}"`);
+        const cpExpr = {f:`IF(AND(${cpConds.join(',')}),1,0)`};
         const rollupExpr = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$A$2:$A$${AREAS_LAST},0)),"")`};
         // "belongs_here" — is this row's stream one of the material's target streams at all
         // (Trash included)? For materials whose only target IS Trash, this is true when found
@@ -4719,7 +4982,7 @@ function parseImportedWorkbook(wb){
       // runs before the imported Streams sheet is parsed below, so it uses the current
       // session's landfill stream name — fine, this only fires for a material with no
       // targets at all in the file.)
-      if (targets.length === 0) targets = [landfillStreamName()];
+      if (targets.length === 0) targets = [defaultFallbackStream()];
       return {
         id: r[0], name: r[1],
         category: catIdx >= 0 ? r[catIdx] : r[2],
@@ -5059,6 +5322,38 @@ document.getElementById('exportAllChartsZipBtn').onclick = async () => {
       files.push({name, data: new Uint8Array(await blob.arrayBuffer())});
     }
     downloadBlob(buildZip(files), 'charts.zip');
+  } catch (e){
+    showToast('Chart export failed');
+  }
+};
+
+// "Export all charts (SVG, ZIP)" — every chart is already built as a self-contained SVG
+// string (see the various build*Svg functions), so this just serializes each card's live
+// <svg> element as-is and bundles the raw XML into a .zip — no rasterization step, so the
+// files stay fully vector and editable in Illustrator/Figma/Inkscape etc.
+document.getElementById('exportAllChartsSvgBtn').onclick = () => {
+  if (sortedEntries.length === 0 && presortEntries.length === 0){
+    showToast('Nothing logged yet');
+    return;
+  }
+  const cards = [...document.querySelectorAll('#chartsContent .chart-card')];
+  if (!cards.length){ showToast('Nothing to export'); return; }
+  try {
+    const used = new Set();
+    const files = [];
+    const encoder = new TextEncoder();
+    cards.forEach(card => {
+      const svgEl = card.querySelector('svg');
+      if (!svgEl) return;
+      const title = card.querySelector('.chart-card-title').textContent;
+      const base = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'chart';
+      let name = base + '.svg', n = 2;
+      while (used.has(name)) name = `${base}_${n++}.svg`;
+      used.add(name);
+      const svgText = new XMLSerializer().serializeToString(svgEl);
+      files.push({name, data: encoder.encode(svgText)});
+    });
+    downloadBlob(buildZip(files), 'charts_svg.zip');
   } catch (e){
     showToast('Chart export failed');
   }
