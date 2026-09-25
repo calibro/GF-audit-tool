@@ -127,12 +127,12 @@
   .copy-table-btn:hover{background:var(--brand-light);}
   .copy-table-btn:active{background:var(--brand); color:#fff;}
   table.analysis{width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:6px;}
-  table.analysis th{background:var(--brand); color:#fff; text-align:left; padding:6px 8px; font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none; white-space:nowrap;}
+  table.analysis th{background:var(--brand); color:#fff; text-align:left; padding:6px 8px; font-size:11px; font-weight:600; text-transform:uppercase; cursor:pointer; user-select:none; white-space:nowrap;}
   table.analysis th:hover{background:var(--brand-dark);}
   table.analysis th .sort-arrow{display:inline-block; width:0.9em; opacity:0.6; font-size:10px;}
   table.analysis td{padding:6px 8px; border-bottom:1px solid var(--line);}
   table.analysis td.num{text-align:right; font-variant-numeric:tabular-nums;}
-  table.analysis tr.total-row td{font-weight:700; border-top:1.5px solid var(--brand); border-bottom:none;}
+  table.analysis tr.total-row td{font-weight:600; border-top:1.5px solid var(--brand); border-bottom:none;}
   table.analysis tr.cat-row td:first-child{font-weight:600;}
   table.log th{text-align:left; font-size:11px; text-transform:uppercase; color:#6c675a; padding:6px 4px; border-bottom:1.5px solid var(--line);}
   table.log td{padding:8px 4px; border-bottom:1px solid var(--line); vertical-align:middle;}
@@ -821,39 +821,6 @@ var o=((a=s[17])==null?void 0:a[0])?Ob(e,e[_b(s[17][0].data)][0]):[];var l=vb(s[
 var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.s.r;c<=n.e.r;++c){i=Ta(c);for(f=n.s.c;f<=n.e.c;++f){r=s[f]+i;t=l?(e[c]||[])[f]:e[r];a="";if(t===undefined)continue;else if(t.F!=null){r=t.F;if(!t.f)continue;a=t.f;if(r.indexOf(":")==-1)r=r+":"+r}if(t.f!=null)a=t.f;else if(t.t=="z")continue;else if(t.t=="n"&&t.v!=null)a=""+t.v;else if(t.t=="b")a=t.v?"TRUE":"FALSE";else if(t.w!==undefined)a="'"+t.w;else if(t.v===undefined)continue;else if(t.t=="s")a="'"+t.v;else a=""+t.v;o[o.length]=r+"="+a}}return o}function xw(e,r,t){var a=t||{};var n=+!a.skipHeader;var i=e||{};var s=0,f=0;if(i&&a.origin!=null){if(typeof a.origin=="number")s=a.origin;else{var o=typeof a.origin=="string"?Oa(a.origin):a.origin;s=o.r;f=o.c}}var l;var c={s:{c:0,r:0},e:{c:f,r:s+r.length-1+n}};if(i["!ref"]){var h=Da(i["!ref"]);c.e.c=Math.max(c.e.c,h.e.c);c.e.r=Math.max(c.e.r,h.e.r);if(s==-1){s=h.e.r+1;c.e.r=s+r.length-1+n}}else{if(s==-1){s=0;c.e.r=r.length-1+n}}var u=a.header||[],d=0;r.forEach(function(e,r){rr(e).forEach(function(t){if((d=u.indexOf(t))==-1)u[d=u.length]=t;var o=e[t];var c="z";var h="";var v=Ra({c:f+d,r:s+r+n});l=Rw(i,v);if(o&&typeof o==="object"&&!(o instanceof Date)){i[v]=o}else{if(typeof o=="number")c="n";else if(typeof o=="boolean")c="b";else if(typeof o=="string")c="s";else if(o instanceof Date){c="d";if(!a.cellDates){c="n";o=fr(o)}h=a.dateNF||X[14]}else if(o===null&&a.nullError){c="e";o=0}if(!l)i[v]=l={t:c,v:o};else{l.t=c;l.v=o;delete l.w;delete l.R;if(h)l.z=h}if(h)l.z=h}})});c.e.c=Math.max(c.e.c,f+u.length-1);var v=Ta(s);if(n)for(d=0;d<u.length;++d)i[ya(d+f)+v]={t:"s",v:u[d]};i["!ref"]=Na(c);return i}function Ow(e,r){return xw(null,e,r)}function Rw(e,r,t){if(typeof r=="string"){if(Array.isArray(e)){var a=Oa(r);if(!e[a.r])e[a.r]=[];return e[a.r][a.c]||(e[a.r][a.c]={t:"z"})}return e[r]||(e[r]={t:"z"})}if(typeof r!="number")return Rw(e,Ra(r));return Rw(e,Ra({r:r,c:t||0}))}function Iw(e,r){if(typeof r=="number"){if(r>=0&&e.SheetNames.length>r)return r;throw new Error("Cannot find sheet # "+r)}else if(typeof r=="string"){var t=e.SheetNames.indexOf(r);if(t>-1)return t;throw new Error("Cannot find sheet name |"+r+"|")}else throw new Error("Cannot find sheet |"+r+"|")}function Nw(){return{SheetNames:[],Sheets:{}}}function Dw(e,r,t,a){var n=1;if(!t)for(;n<=65535;++n,t=undefined)if(e.SheetNames.indexOf(t="Sheet"+n)==-1)break;if(!t||e.SheetNames.length>=65535)throw new Error("Too many worksheets");if(a&&e.SheetNames.indexOf(t)>=0){var i=t.match(/(^.*?)(\d+)$/);n=i&&+i[2]||0;var s=i&&i[1]||t;for(++n;n<=65535;++n)if(e.SheetNames.indexOf(t=s+n)==-1)break}Jp(t);if(e.SheetNames.indexOf(t)>=0)throw new Error("Worksheet with name |"+t+"| already exists!");e.SheetNames.push(t);e.Sheets[t]=r;return t}function Fw(e,r,t){if(!e.Workbook)e.Workbook={};if(!e.Workbook.Sheets)e.Workbook.Sheets=[];var a=Iw(e,r);if(!e.Workbook.Sheets[a])e.Workbook.Sheets[a]={};switch(t){case 0:;case 1:;case 2:break;default:throw new Error("Bad sheet visibility setting "+t);}e.Workbook.Sheets[a].Hidden=t}function Pw(e,r){e.z=r;return e}function Lw(e,r,t){if(!r){delete e.l}else{e.l={Target:r};if(t)e.l.Tooltip=t}return e}function Mw(e,r,t){return Lw(e,"#"+r,t)}function Uw(e,r,t){if(!e.c)e.c=[];e.c.push({t:r,a:t||"SheetJS"})}function Bw(e,r,t,a){var n=typeof r!="string"?r:Da(r);var i=typeof r=="string"?r:Na(r);for(var s=n.s.r;s<=n.e.r;++s)for(var f=n.s.c;f<=n.e.c;++f){var o=Rw(e,s,f);o.t="n";o.F=i;delete o.v;if(s==n.s.r&&f==n.s.c){o.f=t;if(a)o.D=true}}return e}var Ww={encode_col:ya,encode_row:Ta,encode_cell:Ra,encode_range:Na,decode_col:Ca,decode_row:ka,split_cell:xa,decode_cell:Oa,decode_range:Ia,format_cell:Pa,sheet_add_aoa:Ma,sheet_add_json:xw,sheet_add_dom:Gm,aoa_to_sheet:Ua,json_to_sheet:Ow,table_to_sheet:jm,table_to_book:Xm,sheet_to_csv:yw,sheet_to_txt:Sw,sheet_to_json:Aw,sheet_to_html:Vm,sheet_to_formulae:_w,sheet_to_row_object_array:Aw,sheet_get_cell:Rw,book_new:Nw,book_append_sheet:Dw,book_set_sheet_visibility:Fw,cell_set_number_format:Pw,cell_set_hyperlink:Lw,cell_set_internal_link:Mw,cell_add_comment:Uw,sheet_set_array_formula:Bw,consts:{SHEET_VISIBLE:0,SHEET_HIDDEN:1,SHEET_VERY_HIDDEN:2}};var Hw;function zw(e){Hw=e}function Vw(e,r){var t=Hw();var a=r==null?{}:r;if(e==null||e["!ref"]==null){t.push(null);return t}var n=Da(e["!ref"]);var i=a.FS!==undefined?a.FS:",",s=i.charCodeAt(0);var f=a.RS!==undefined?a.RS:"\n",o=f.charCodeAt(0);var l=new RegExp((i=="|"?"\\|":i)+"+$");var c="",h=[];a.dense=Array.isArray(e);var u=a.skipHidden&&e["!cols"]||[];var d=a.skipHidden&&e["!rows"]||[];for(var v=n.s.c;v<=n.e.c;++v)if(!(u[v]||{}).hidden)h[v]=ya(v);var p=n.s.r;var g=false,m=0;t._read=function(){if(!g){g=true;return t.push("\ufeff")}while(p<=n.e.r){++p;if((d[p-1]||{}).hidden)continue;c=Cw(e,n,p-1,h,s,o,i,a);if(c!=null){if(a.strip)c=c.replace(l,"");if(c||a.blankrows!==false)return t.push((m++?f:"")+c)}}return t.push(null)};return t}function Gw(e,r){var t=Hw();var a=r||{};var n=a.header!=null?a.header:Bm;var i=a.footer!=null?a.footer:Wm;t.push(n);var s=Ia(e["!ref"]);a.dense=Array.isArray(e);t.push(zm(e,s,a));var f=s.s.r;var o=false;t._read=function(){if(f>s.e.r){if(!o){o=true;t.push("</table>"+i)}return t.push(null)}while(f<=s.e.r){t.push(Um(e,s,f,a));++f;break}};return t}function jw(e,r){var t=Hw({objectMode:true});if(e==null||e["!ref"]==null){t.push(null);return t}var a={t:"n",v:0},n=0,i=1,s=[],f=0,o="";var l={s:{r:0,c:0},e:{r:0,c:0}};var c=r||{};var h=c.range!=null?c.range:e["!ref"];if(c.header===1)n=1;else if(c.header==="A")n=2;else if(Array.isArray(c.header))n=3;switch(typeof h){case"string":l=Da(h);break;case"number":l=Da(e["!ref"]);l.s.r=h;break;default:l=h;}if(n>0)i=0;var u=Ta(l.s.r);var d=[];var v=0;var p=Array.isArray(e);var g=l.s.r,m=0;var b={};if(p&&!e[g])e[g]=[];var w=c.skipHidden&&e["!cols"]||[];var k=c.skipHidden&&e["!rows"]||[];for(m=l.s.c;m<=l.e.c;++m){if((w[m]||{}).hidden)continue;d[m]=ya(m);a=p?e[g][m]:e[d[m]+u];switch(n){case 1:s[m]=m-l.s.c;break;case 2:s[m]=d[m];break;case 3:s[m]=c.header[m-l.s.c];break;default:if(a==null)a={w:"__EMPTY",t:"s"};o=f=Pa(a,null,c);v=b[f]||0;if(!v)b[f]=1;else{do{o=f+"_"+v++}while(b[o]);b[f]=v;b[o]=1}s[m]=o;}}g=l.s.r+i;t._read=function(){while(g<=l.e.r){if((k[g-1]||{}).hidden)continue;var r=Tw(e,l,g,d,n,s,p,c);++g;if(r.isempty===false||(n===1?c.blankrows!==false:!!c.blankrows)){t.push(r.row);return}}return t.push(null)};return t}var Xw={to_json:jw,to_html:Gw,to_csv:Vw,set_readable:zw};if(typeof vm!=="undefined")e.parse_xlscfb=vm;e.parse_zip=Xb;e.read=iw;e.readFile=sw;e.readFileSync=sw;e.write=gw;e.writeFile=bw;e.writeFileSync=bw;e.writeFileAsync=kw;e.utils=Ww;e.writeXLSX=pw;e.writeFileXLSX=ww;e.SSF=Ve;if(typeof Xw!=="undefined")e.stream=Xw;if(typeof Ke!=="undefined")e.CFB=Ke;if(typeof require!=="undefined"){var $w=undefined;if(($w||{}).Readable)zw($w.Readable)}}if(typeof exports!=="undefined")make_xlsx_lib(exports);else if(typeof module!=="undefined"&&module.exports)make_xlsx_lib(module.exports);else if(typeof define==="function"&&define.amd)define("xlsx",function(){if(!XLSX.version)make_xlsx_lib(XLSX);return XLSX});else make_xlsx_lib(XLSX);if(typeof window!=="undefined"&&!window.XLSX)try{window.XLSX=XLSX}catch(e){}
 </script>
 <script>
-// ============================================================
-// Default config — mirrors Materials Master / Areas / Streams from the workbook
-// (Materials are editable at runtime via the Audit Info tab; these are just the starting defaults)
-// ============================================================
-const DEFAULT_MATERIALS = [
-  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling','GMPC Recycling','Paper Recycling'],'Yes'],
-  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB04','Mixed Paper','Fibers','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
-  ['FIB06','Beverage Cartons','Fibers','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
-  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
-  ['GLA01','Glass Bottles & Jars','Glass','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
-  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
-  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['GMPC Recycling','Cardboard Recycling','Paper Recycling'],'Yes'],
-  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
-  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
-  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
-  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['OTH01','Snack Wrappers (Composites)','Other','Yes',['Terracycle'],'No'],
-  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
-].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
-
 // "Accepted in program" is its own independently-editable field — a material's target
 // stream(s) say where it's *supposed* to go, but acceptance is a separate real-world fact
 // (e.g. a hauler may not actually take something even though a stream exists for it).
@@ -889,148 +856,179 @@ function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, strea
 // target — a material marked divertible with nowhere to divert it to shouldn't count either.
 function materialHasDivertiblePath(m){ return m.divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName()); }
 
-const DEFAULT_AREAS = [
+// ============================================================
+// Configuration scenarios — presets that swap Areas/Streams/Materials Master together as a
+// unit, for clients who run the same handful of program setups across sites. These three are
+// Great Forest's real client configuration templates (delivered as xlsx files in the app's
+// own export schema — generated by replaying parseImportedWorkbook()'s Materials
+// Master/Areas/Streams parsing against them in a standalone script, not hand-transcribed, so
+// this is byte-for-byte what "Import session file" would produce from the same files; see
+// technique-scenario-from-client-xlsx). The client's own templates are the only presets;
+// SCENARIOS[0] doubles as the app's built-in starting point (first load, "Start a new
+// session") so there's one source of truth for "default" rather than a separate hardcoded
+// copy that could drift from what the dropdown actually offers. Picking one seeds all three
+// sections; Great Forest can still rename/edit anything afterward, same as always.
+// ============================================================
+const SCENARIO_NATIONWIDE_NO_ORGANICS_MATERIALS = [
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB03','Waxed Cardboard','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB06','Gable Top & Aseptic Cartons','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB07','Soiled Cartons','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB08','Coated Paper Cups & Foodware','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','Yes',['Landfill / Incineration'],'Yes'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLA01','Rigid Plastic Containers 1-6 (Accepted)','Plastics','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLA02','Soiled Plastic Containers','Plastics','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLAC1','Rigid Plastic Containers 1-6 (Non-Accepted)','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG01','Food & Plant Waste','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG02','Paper Fibers & Food-Soiled Paper (FSP)','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG03','Fiber-based & PLA Compostable Serviceware','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['UNAC1','Reusable Materials','Unacceptable','Yes',[],'Unacceptable'],
+  ['UNA03','Other Unacceptable','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['GLAC1','Other Glass','Glass','Yes',['Landfill / Incineration'],'No'],
+  ['METC1','Other Metals','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLAC3','Other Rigid Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['PLA03','Film Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['OTHC2','Textiles','Other','Yes',['Landfill / Incineration'],'Unacceptable'],
+  ['PLAC2','Waste Disposal Bags','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORGC2','Other Organics','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['OTHC1','Other Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['OTH02','Other/Residual Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['UNA04','Liquids','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['PLA04','Foams','Plastics','Yes',['Landfill / Incineration'],'No'],
+].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
+
+const SCENARIO_NATIONWIDE_NO_ORGANICS_AREAS = [
   {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'CAFE_BOH', name:'CAFÉ BOH', rollup:'BOH', defaultMaterialId:null},
-  // Bathroom waste is routinely never sorted (sanitary reasons) but is reliably almost all
-  // paper towels/toilet paper — rather than showing as an unlabeled "Area Waste" lump, this
-  // default assumption lets it flow into the normal material breakdown like everything else.
+  {id:'CAFE_BOH', name:'KITCHEN / BACK-OF-HOUSE', rollup:'BOH', defaultMaterialId:null},
   {id:'BATHROOM', name:'BATHROOM', rollup:'Rest of Building', defaultMaterialId:'ORG02'},
 ];
 
-const DEFAULT_STREAM_CONFIG = [
-  // protected: Trash is hardcoded as the "not a real diversion" baseline in several places
-  // (materialCorrectlyPlacedIn, the Materials Master target-locking logic, the Excel export
-  // formulas) — renaming or deleting it would silently break those, so it's the one stream
-  // whose name/deletion is locked in the UI. Every other property (including
-  // combinedWeighSort) still applies to it normally.
-  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
-  {name:'GMPC Recycling', combinedWeighSort:false, excludeSoiled:false},
-  // excludeSoiled: soiled/contaminated variants of recyclables (Soiled Cardboard, Soiled
-  // Glass, etc.) aren't offered as sortable options for these streams — see
-  // materialsForStream(). Carried on the stream object itself (not matched by name) so it
-  // survives a rename.
-  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
-  // Combined weigh-and-sort: loose/bulky material that's weighed and categorized in one
-  // action rather than bagged-then-sampled. For these streams the Pre-Sort Bags tab is
-  // suppressed entirely, and the stream's total is just the sum of Sorted Weights — there's
-  // no separate "pool" to extrapolate against, since everything is directly observed.
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
-  {name:'Paper Recycling', combinedWeighSort:false, excludeSoiled:false},
-  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false},
+const SCENARIO_NATIONWIDE_NO_ORGANICS_STREAM_CONFIG = [
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
 ];
 
-// ============================================================
-// Configuration scenarios — presets that swap Areas/Streams/Materials Master together as a
-// unit, for clients who run the same handful of program setups across sites. Scenario 1 is
-// exactly today's defaults (unchanged). Scenario 2/3 are starting points, not final client
-// data — Great Forest can rename/edit anything after picking one, same as always; picking a
-// different scenario just seeds the three sections instead of leaving them blank.
-// ============================================================
-const SCENARIO_2_MATERIALS = [
-  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling'],'Yes'],
-  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB04','Mixed Paper','Fibers','Yes',['Single-Stream Recycling'],'Yes'],
-  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
-  ['FIB06','Beverage Cartons','Fibers','Yes',['Single-Stream Recycling'],'Yes'],
-  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
-  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
-  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Single-Stream Recycling'],'Yes'],
-  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
-  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Single-Stream Recycling'],'Yes'],
-  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
-  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['Single-Stream Recycling'],'Yes'],
-  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
-  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
-  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
-  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['OTH01','Snack Wrappers (Composites)','Other','No',['Trash'],'No'],
-  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
+const SCENARIO_NATIONWIDE_WITH_ORGANICS_MATERIALS = [
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Mixed Recycling','Cardboard Recycling','Compost / Organics Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['FIB03','Waxed Cardboard','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['Mixed Recycling','Cardboard Recycling','Compost / Organics Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['FIB06','Gable Top & Aseptic Cartons','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB07','Soiled Cartons','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB08','Coated Paper Cups & Foodware','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','Yes',['Landfill / Incineration'],'Yes'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLA01','Rigid Plastic Containers 1-6 (Accepted)','Plastics','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLA02','Soiled Plastic Containers','Plastics','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLAC1','Rigid Plastic Containers 1-6 (Non-Accepted)','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG01','Food & Plant Waste','Organics','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['ORG02','Paper Fibers & Food-Soiled Paper (FSP)','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG03','Fiber-based & PLA Compostable Serviceware','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['UNAC1','Reusable Materials','Unacceptable','Yes',[],'Unacceptable'],
+  ['UNA03','Other Unacceptable','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['GLAC1','Other Glass','Glass','Yes',['Landfill / Incineration'],'No'],
+  ['METC1','Other Metals','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLAC3','Other Rigid Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['PLA03','Film Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['OTHC2','Textiles','Other','Yes',['Landfill / Incineration'],'Unacceptable'],
+  ['PLAC2','Waste Disposal Bags','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORGC2','Other Organics','Organics','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['OTHC1','Other Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['OTH02','Other/Residual Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['UNA04','Liquids','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['PLA04','Foams','Plastics','Yes',['Landfill / Incineration'],'No'],
 ].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
-const SCENARIO_2_AREAS = [
-  {id:'SALES', name:'SALES FLOOR', rollup:'Front of House', defaultMaterialId:null},
-  {id:'STOCK', name:'STOCKROOM', rollup:'Back of House', defaultMaterialId:null},
-  {id:'BREAK', name:'BREAK ROOM', rollup:'Back of House', defaultMaterialId:null},
-  {id:'OFFICE2', name:'OFFICE', rollup:'Back of House', defaultMaterialId:null},
-  {id:'DOCK2', name:'LOADING DOCK', rollup:'Back of House', defaultMaterialId:null},
-];
-const SCENARIO_2_STREAM_CONFIG = [
-  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
-  {name:'Single-Stream Recycling', combinedWeighSort:false, excludeSoiled:false},
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
-  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
+
+const SCENARIO_NATIONWIDE_WITH_ORGANICS_AREAS = [
+  {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
+  {id:'CAFE_BOH', name:'KITCHEN / BACK-OF-HOUSE', rollup:'BOH', defaultMaterialId:null},
+  {id:'BATHROOM', name:'BATHROOM', rollup:'Rest of Building', defaultMaterialId:'ORG02'},
 ];
 
-const SCENARIO_3_MATERIALS = [
-  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Cardboard Recycling'],'Yes'],
-  ['FIB02','Soiled Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB03','Waxed Cardboard','Fibers','No',['Trash'],'No'],
-  ['FIB04','Mixed Paper','Fibers','Yes',['Paper Recycling'],'Yes'],
-  ['FIB05','Soiled Paper','Fibers','No',['Trash'],'No'],
-  ['FIB06','Beverage Cartons','Fibers','Yes',['Paper Recycling'],'Yes'],
-  ['FIB07','Soiled Beverage Cartons','Fibers','No',['Trash'],'No'],
-  ['FIB08','Paper Cups / Other Coated Paper Containers','Fibers','No',['Trash'],'No'],
-  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Glass Recycling'],'Yes'],
-  ['GLA02','Soiled Glass','Glass','No',['Trash'],'No'],
-  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Metal & Plastic Recycling'],'Yes'],
-  ['MET02','Soiled Metals','Metals','No',['Trash'],'No'],
-  ['PLA01','Rigid Plastics (1-6)','Plastics','Yes',['Metal & Plastic Recycling'],'Yes'],
-  ['PLA02','Soiled Rigid Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA03','Film Plastics','Plastics','No',['Trash'],'No'],
-  ['PLA04','Foams','Plastics','No',['Trash'],'No'],
-  ['ORG01','Food Waste','Organics','Yes',['Organics Recycling'],'Yes'],
-  ['ORG02','Paper Fibers and Food-Soiled Paper (FSP)','Organics','No',['Trash'],'No'],
-  ['ORG03','Fiber-based Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['ORG04','PLA Compostable Serviceware','Organics','No',['Trash'],'No'],
-  ['UNA01','E/U Waste','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA02','Textiles','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA03','Other Unacceptable (specify)','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['UNA04','Liquids','Unacceptable','No',['Trash'],'Unacceptable'],
-  ['OTH01','Snack Wrappers (Composites)','Other','Yes',['Terracycle'],'No'],
-  ['OTH02','Other/Residual Materials','Other','No',['Trash'],'No'],
-  ['OTH03','Electronics / E-Waste','Other','Yes',['Electronics Recycling'],'Yes'],
-].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
-const SCENARIO_3_AREAS = [
-  {id:'LOBBY3', name:'LOBBY', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'SUITES3', name:'TENANT SUITES', rollup:'Rest of Building', defaultMaterialId:null},
-  {id:'CAFE3', name:'CAFETERIA', rollup:'BOH', defaultMaterialId:null},
-  {id:'DOCK3', name:'LOADING DOCK', rollup:'BOH', defaultMaterialId:null},
-  {id:'MAIL3', name:'MAIL ROOM', rollup:'Rest of Building', defaultMaterialId:null},
+const SCENARIO_NATIONWIDE_WITH_ORGANICS_STREAM_CONFIG = [
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
+  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
 ];
-const SCENARIO_3_STREAM_CONFIG = [
-  {name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true},
-  {name:'Paper Recycling', combinedWeighSort:false, excludeSoiled:false},
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false},
-  {name:'Glass Recycling', combinedWeighSort:false, excludeSoiled:true},
-  {name:'Metal & Plastic Recycling', combinedWeighSort:false, excludeSoiled:false},
-  {name:'Organics Recycling', combinedWeighSort:false, excludeSoiled:true},
-  {name:'Electronics Recycling', combinedWeighSort:true, excludeSoiled:false},
-  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false},
+
+const SCENARIO_CBRE_BLOOMBERG_MATERIALS = [
+  ['FIB01','Corrugated Cardboard','Fibers','Yes',['Mixed Recycling','Cardboard Recycling','Compost / Organics Recycling'],'Yes'],
+  ['FIB02','Soiled Cardboard','Fibers','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['FIB03','Waxed Cardboard','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['FIB04','Mixed Paper','Fibers','Yes',['Mixed Recycling','Cardboard Recycling','Compost / Organics Recycling'],'Yes'],
+  ['FIB05','Soiled Paper','Fibers','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['FIB06','Gable Top & Aseptic Cartons','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['FIB07','Soiled Cartons','Fibers','Yes',['Landfill / Incineration'],'Yes'],
+  ['FIB08','Coated Paper Cups & Foodware (Non-Compostable)','Fibers','Yes',['Landfill / Incineration'],'No'],
+  ['GLA01','Glass Bottles & Jars','Glass','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['GLA02','Soiled Glass','Glass','Yes',['Landfill / Incineration'],'Yes'],
+  ['MET01','Aluminum & Bi-Metal Containers','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['MET02','Soiled Metals','Metals','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLA01','Rigid Plastic Containers','Plastics','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLA02','Soiled Plastic Containers','Plastics','Yes',['Landfill / Incineration'],'Yes'],
+  ['PLAC3','Other Rigid Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG01','Food & Plant Waste','Organics','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['ORG02','Paper Fibers & Food-Soiled Paper (FSP)','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG03','Fiber-based Compostable Serviceware','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['ORG04','PLA Compostable Serviceware','Organics','Yes',['Landfill / Incineration'],'No'],
+  ['UNA01','E/U Waste','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['UNAC1','Reusable Materials','Unacceptable','Yes',[],'Unacceptable'],
+  ['UNA03','Other Unacceptable','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+  ['OTHC3','Snack Wrappers (Composites)','Other','Yes',['Terracycle'],'Yes'],
+  ['GLAC1','Other Glass','Glass','Yes',['Landfill / Incineration'],'No'],
+  ['METC1','Other Metals','Metals','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
+  ['PLA03','Film Plastics','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['PLAC2','Waste Disposal Bags','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['OTHC2','Textiles','Other','Yes',['Landfill / Incineration'],'Unacceptable'],
+  ['PLA04','Foams','Plastics','Yes',['Landfill / Incineration'],'No'],
+  ['ORGC2','Other Organics','Organics','Yes',['Compost / Organics Recycling'],'Yes'],
+  ['OTHC1','Other Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['OTH02','Other/Residual Materials','Other','Yes',['Landfill / Incineration'],'No'],
+  ['UNA04','Liquids','Unacceptable','No',['Landfill / Incineration'],'Unacceptable'],
+].map(([id,name,category,accepted,targets,divertible]) => ({id,name,category,accepted,targets,divertible}));
+
+const SCENARIO_CBRE_BLOOMBERG_AREAS = [
+  {id:'OFFICES', name:'OFFICES', rollup:'Rest of Building', defaultMaterialId:null},
+  {id:'CAFE_BOH', name:'KITCHEN / BACK-OF-HOUSE', rollup:'BOH', defaultMaterialId:null},
+  {id:'BATHROOM', name:'BATHROOM', rollup:'Rest of Building', defaultMaterialId:'ORG02'},
+];
+
+const SCENARIO_CBRE_BLOOMBERG_STREAM_CONFIG = [
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
+  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
+  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false, protected:false},
 ];
 
 const SCENARIOS = [
   {
-    id:'scenario1', label:'Scenario 1',
-    description:'Standard office/retail program — GMPC, Cardboard, Paper, Organics Recycling and TerraCycle.',
-    materials:DEFAULT_MATERIALS, areas:DEFAULT_AREAS, streamConfig:DEFAULT_STREAM_CONFIG,
+    id:'nationwide-no-organics', label:'Nationwide Default no Organics — 2026-09-11',
+    description:'Landfill/Incineration, Mixed Recycling and Cardboard Recycling — no separate organics stream.',
+    materials:SCENARIO_NATIONWIDE_NO_ORGANICS_MATERIALS, areas:SCENARIO_NATIONWIDE_NO_ORGANICS_AREAS, streamConfig:SCENARIO_NATIONWIDE_NO_ORGANICS_STREAM_CONFIG,
   },
   {
-    id:'scenario2', label:'Scenario 2',
-    description:'Simplified single-stream program — Single-Stream Recycling, Cardboard Recycling and Organics Recycling only.',
-    materials:SCENARIO_2_MATERIALS, areas:SCENARIO_2_AREAS, streamConfig:SCENARIO_2_STREAM_CONFIG,
+    id:'nationwide-with-organics', label:'Nationwide Default w Organics — 2026-09-11',
+    description:'Landfill/Incineration, Mixed Recycling and Cardboard Recycling, plus Compost / Organics Recycling.',
+    materials:SCENARIO_NATIONWIDE_WITH_ORGANICS_MATERIALS, areas:SCENARIO_NATIONWIDE_WITH_ORGANICS_AREAS, streamConfig:SCENARIO_NATIONWIDE_WITH_ORGANICS_STREAM_CONFIG,
   },
   {
-    id:'scenario3', label:'Scenario 3',
-    description:'Expanded multi-stream program — separate Paper, Glass and Metal & Plastic recycling, plus Electronics Recycling and TerraCycle.',
-    materials:SCENARIO_3_MATERIALS, areas:SCENARIO_3_AREAS, streamConfig:SCENARIO_3_STREAM_CONFIG,
+    id:'cbre-bloomberg', label:'CBRE Bloomberg — 2026-09-11',
+    description:'Landfill/Incineration, Mixed Recycling, Cardboard Recycling and Compost / Organics Recycling, plus TerraCycle.',
+    materials:SCENARIO_CBRE_BLOOMBERG_MATERIALS, areas:SCENARIO_CBRE_BLOOMBERG_AREAS, streamConfig:SCENARIO_CBRE_BLOOMBERG_STREAM_CONFIG,
   },
   {
     id:'empty', label:'Empty',
@@ -1043,7 +1041,7 @@ const SCENARIOS = [
 // STREAMS stays a flat array of names — nearly all existing code (STREAMS.forEach,
 // STREAMS.includes, Materials Master's per-stream target columns) only ever needed the
 // name, not the config, so this keeps that code working unchanged.
-let streamConfig = DEFAULT_STREAM_CONFIG.map(s => ({...s}));
+let streamConfig = SCENARIOS[0].streamConfig.map(s => ({...s}));
 let STREAMS = streamConfig.map(s => s.name);
 function isCombinedWeighSort(streamName){
   const cfg = streamConfig.find(s => s.name === streamName);
@@ -1127,13 +1125,13 @@ const AUDIT_FIELDS = [
 // ============================================================
 // State
 // ============================================================
-let materials = DEFAULT_MATERIALS.map(m => ({...m}));
-let areas = DEFAULT_AREAS.map(a => ({...a}));
+let materials = SCENARIOS[0].materials.map(m => ({...m}));
+let areas = SCENARIOS[0].areas.map(a => ({...a}));
 // Which scenario preset Areas/Streams/Materials Master currently reflect, and whether the
 // user has since hand-edited any of those three sections — set by markScenarioEdited() via
 // saveMaterials/saveAreas/saveStreamConfig, cleared by applyScenario(). `applyingScenario`
 // suppresses that tracking while a scenario itself is being applied (that's not a user edit).
-let activeScenarioId = 'scenario1';
+let activeScenarioId = SCENARIOS[0].id;
 let scenarioEdited = false;
 let applyingScenario = false;
 let auditMeta = {};
@@ -2601,9 +2599,9 @@ document.getElementById('presortWeight').addEventListener('input', renderPresort
 async function performNewSessionReset(){
   sortedEntries = []; presortEntries = [];
   applyingScenario = true;
-  materials = DEFAULT_MATERIALS.map(m => ({...m}));
-  areas = DEFAULT_AREAS.map(a => ({...a}));
-  applyStreamConfig(DEFAULT_STREAM_CONFIG.map(s => ({...s})));
+  materials = SCENARIOS[0].materials.map(m => ({...m}));
+  areas = SCENARIOS[0].areas.map(a => ({...a}));
+  applyStreamConfig(SCENARIOS[0].streamConfig.map(s => ({...s})));
   activeScenarioId = SCENARIOS[0].id;
   scenarioEdited = false;
   AUDIT_FIELDS.forEach(f => auditMeta[f.key] = f.default);
@@ -2823,7 +2821,7 @@ function renderTableToCanvas(table, title){
   const colWidths = new Array(colCount).fill(30);
   rows.forEach(r => {
     r.cells.forEach((c, i) => {
-      measure.font = (c.isHeader || r.isTotal) ? `700 ${fontSize}px Poppins, Arial` : `${fontSize}px Poppins, Arial`;
+      measure.font = (c.isHeader || r.isTotal) ? `600 ${fontSize}px Poppins, Arial` : `${fontSize}px Poppins, Arial`;
       const w = measure.measureText(c.text).width + pad*2;
       if (w > colWidths[i]) colWidths[i] = w;
     });
@@ -2857,7 +2855,7 @@ function renderTableToCanvas(table, title){
     r.cells.forEach((c, i) => {
       const w = colWidths[i];
       ctx.fillStyle = isHeaderRow ? '#ffffff' : '#16241f';
-      ctx.font = (isHeaderRow || r.isTotal || (r.isCat && i === 0)) ? `700 ${fontSize}px Poppins, Arial` : `${fontSize}px Poppins, Arial`;
+      ctx.font = (isHeaderRow || r.isTotal || (r.isCat && i === 0)) ? `600 ${fontSize}px Poppins, Arial` : `${fontSize}px Poppins, Arial`;
       ctx.textBaseline = 'middle';
       ctx.textAlign = c.isNum ? 'right' : 'left';
       ctx.fillText(c.text, c.isNum ? x+w-pad : x+pad, y+rowH/2);
@@ -3226,8 +3224,8 @@ function buildAlluvialSvg(title, flow, groupColLabel){
     const p = areaCol.positions[name];
     if (p.h <= 0.5) return;
     const w = p.h < 26
-      ? textWidth(`${name} — ${lbs(flow.areaTotals[name])} lbs.`, '700 10.5px Arial')
-      : textWidth(name, '700 11px Arial');
+      ? textWidth(`${name} — ${lbs(flow.areaTotals[name])} lbs.`, '600 10.5px Arial')
+      : textWidth(name, '600 11px Arial');
     if (w > maxAreaLabelW) maxAreaLabelW = w;
   });
   // Wide margins on both ends — area names sit to the LEFT of col1 (anchor "end") and
@@ -3403,7 +3401,7 @@ function buildContaminationSvg(title, rows, groupColLabel){
   const ML = 24, MR = 14, nameColW = 147, colW = Math.max(90, (760 - nameColW) / Math.max(1, streamsList.length));
   const W = ML + nameColW + streamsList.length * colW + MR;
   const headerY = 25, bodyStartY = 38;
-  const rowH = 54, barH = 6, MB = 14, totalExtraGap = 21;
+  const rowH = 54, barH = 12, totalBarH = barH * 2, MB = 14, totalExtraGap = 21;
 
   if (!rows.length){
     const H = 160;
@@ -3452,8 +3450,9 @@ function buildContaminationSvg(title, rows, groupColLabel){
     }
     const rowTop = cursor;
     cursor += rowH;
-    const labelWeight = r.isTotal ? 700 : 600;
-    const labelLines = wrapText(r.label, labelMaxW, `${labelWeight} 12px Arial`, 3, measureCtx);
+    const labelWeight = 600;
+    const labelText = r.isTotal ? r.label.toUpperCase() : r.label;
+    const labelLines = wrapText(labelText, labelMaxW, `${labelWeight} 12px Arial`, 3, measureCtx);
     const lineH = 13;
     const labelStartY = rowTop + rowH/2 + 4 - (labelLines.length-1)*lineH/2;
     labelLines.forEach((line, li) => {
@@ -3469,9 +3468,10 @@ function buildContaminationSvg(title, rows, groupColLabel){
         return;
       }
       const fillW = Math.max(2, c.pct * barW);
+      const thisBarH = r.isTotal ? totalBarH : barH;
       svg += `<text x="${barX}" y="${pctY}" font-size="13" fill="${CONTAMINATION_COLOR}">${pct(c.pct)}</text>`;
-      svg += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="3" fill="#e9e7e0" />`;
-      svg += `<rect x="${barX}" y="${barY}" width="${fillW}" height="${barH}" rx="3" fill="${CONTAMINATION_COLOR}" />`;
+      svg += `<rect x="${barX}" y="${barY}" width="${barW}" height="${thisBarH}" rx="3" fill="#e9e7e0" />`;
+      svg += `<rect x="${barX}" y="${barY}" width="${fillW}" height="${thisBarH}" rx="3" fill="${CONTAMINATION_COLOR}" />`;
     });
   });
 
@@ -3550,7 +3550,12 @@ function computeMaterialBreakdown(scope){
 function buildMaterialTableSvg(title, materialRows){
   const ML = 14, MR = 14, nameColW = 300, numColW = 100, divColW = 110;
   const W = ML + nameColW + numColW*3 + divColW + MR;
-  const headerY = 20, bodyStartY = 32, catHeaderH = 22, rowH = 20, MB = 12;
+  const headerY = 20, bodyStartY = 32, rowH = 20, MB = 12;
+  // catGapAbove/catBandH/catGapBelow (rather than one flat catHeaderH) so each band sits
+  // close to the materials it groups (small gap below) but clearly separated from the
+  // previous group above it (bigger gap above) — makes the category boundary read as "this
+  // band starts a new group" instead of floating between two unrelated gaps.
+  const catGapAbove = 10, catBandH = 16, catGapBelow = 2;
 
   if (!materialRows.length){
     const H = 120;
@@ -3568,9 +3573,19 @@ function buildMaterialTableSvg(title, materialRows){
     if (!g || g.category !== m.category) groups.push({category: m.category, materials: [m]});
     else g.materials.push(m);
   });
+  // Category-level rollups shown on the band itself, right alongside the per-material rows
+  // below it — weight and % of total just sum directly; % captured is a weighted average
+  // (captured weight / category weight), reconstructing each material's captured weight from
+  // its own capturedPct * weight since computeMaterialBreakdown doesn't carry the raw figure.
+  groups.forEach(g => {
+    g.weight = g.materials.reduce((s,m) => s + m.weight, 0);
+    g.pct = g.materials.reduce((s,m) => s + m.pct, 0);
+    const capturedWeight = g.materials.reduce((s,m) => s + m.capturedPct * m.weight, 0);
+    g.capturedPct = g.weight ? capturedWeight / g.weight : 0;
+  });
 
   let bodyH = 0;
-  groups.forEach(g => { bodyH += catHeaderH + g.materials.length * rowH; });
+  groups.forEach((g, gi) => { bodyH += (gi > 0 ? catGapAbove : 0) + catBandH + catGapBelow + g.materials.length * rowH; });
   const H = bodyStartY + bodyH + MB;
 
   // Column order matches the Figma spec: Material | Divertible? | Weight (lbs.) | % of Total
@@ -3586,13 +3601,18 @@ function buildMaterialTableSvg(title, materialRows){
   svg += `<line x1="${ML}" y1="${bodyStartY-10}" x2="${W-MR}" y2="${bodyStartY-10}" stroke="#1a1a1a" stroke-width="1.5" />`;
 
   let y = bodyStartY;
-  groups.forEach(g => {
+  groups.forEach((g, gi) => {
+    if (gi > 0) y += catGapAbove;
     // Category band uses the same per-category color as the donut/dots elsewhere in the app
     // (CATEGORY_COLORS), white label — not a flat grey band — per the Figma spec.
     const bandColor = CATEGORY_COLORS[g.category] || '#999';
-    svg += `<rect x="${ML}" y="${y}" width="${W-ML-MR}" height="${catHeaderH-6}" fill="${bandColor}" rx="3" />
-      <text x="${ML+8}" y="${y+(catHeaderH-6)/2+4}" font-size="12" font-weight="600" fill="#ffffff">${escapeHtml(g.category.toUpperCase())}</text>`;
-    y += catHeaderH;
+    const bandTextY = y + catBandH/2 + 4;
+    svg += `<rect x="${ML}" y="${y}" width="${W-ML-MR}" height="${catBandH}" fill="${bandColor}" rx="3" />
+      <text x="${ML+8}" y="${bandTextY}" font-size="12" font-weight="600" fill="#ffffff">${escapeHtml(g.category.toUpperCase())}</text>
+      <text x="${col2R-8}" y="${bandTextY}" text-anchor="end" font-size="12" font-weight="600" fill="#ffffff">${lbs(g.weight)}</text>
+      <text x="${col3R-8}" y="${bandTextY}" text-anchor="end" font-size="12" font-weight="600" fill="#ffffff">${pct(g.pct)}</text>
+      <text x="${col4R-8}" y="${bandTextY}" text-anchor="end" font-size="12" font-weight="600" fill="#ffffff">${pct(g.capturedPct)}</text>`;
+    y += catBandH + catGapBelow;
     g.materials.forEach(m => {
       const dotColor = CATEGORY_COLORS[m.category] || '#999';
       const textY = y + rowH/2 + 3;
@@ -3601,7 +3621,7 @@ function buildMaterialTableSvg(title, materialRows){
       svg += `<text x="${col1R-8}" y="${textY}" text-anchor="end" font-size="11" fill="#1a1a1a">${escapeHtml(m.divertible)}</text>`;
       svg += `<text x="${col2R-8}" y="${textY}" text-anchor="end" font-size="11" fill="#1a1a1a">${lbs(m.weight)}</text>`;
       svg += `<text x="${col3R-8}" y="${textY}" text-anchor="end" font-size="11" fill="#1a1a1a">${pct(m.pct)}</text>`;
-      svg += `<text x="${col4R-8}" y="${textY}" text-anchor="end" font-size="11" font-weight="700" fill="${PLACEMENT_COLORS.correct}">${pct(m.capturedPct)}</text>`;
+      svg += `<text x="${col4R-8}" y="${textY}" text-anchor="end" font-size="11" font-weight="600" fill="${PLACEMENT_COLORS.correct}">${pct(m.capturedPct)}</text>`;
       y += rowH;
     });
   });
@@ -3650,7 +3670,7 @@ function buildDonutSvg(title, data){
   // A white stroke halo behind the dark fill keeps it readable whether the slice underneath
   // is light or dark, without needing to pick text color per-slice — paint-order draws the
   // stroke first so it sits behind the fill instead of eating into the glyph strokes.
-  const LABEL_HALO = 'stroke="#ffffff" stroke-width="2" paint-order="stroke" stroke-linejoin="round"';
+  const LABEL_HALO = 'stroke="#ffffff" stroke-width="3" paint-order="stroke" stroke-linejoin="round"';
   const bigLabels = big.map(d => {
     const [x, y] = pt(d.midDeg, r);
     return `<text x="${x}" y="${y-4}" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a" ${LABEL_HALO}>${escapeHtml(d.label)}</text>
@@ -3842,13 +3862,14 @@ function buildDiversionTrackSvg(title, groups, explanationNote){
 
     const gapPts = (g.potential - g.current) * 100;
     const gapLabel = `${gapPts >= 0 ? '+' : ''}${gapPts.toFixed(1)} pts potential gap`;
+    const groupLabelText = g.isTotal ? g.label.toUpperCase() : g.label;
     if (alt){
       // Two named potentials means "the gap" is ambiguous on its own, so the title takes the
       // top-right spot instead, freeing top-left for the (still useful) gap-vs-primary label.
-      rows += `<text x="${W-MR}" y="${labelY}" text-anchor="end" font-size="${g.isTotal ? 13 : 12}" font-weight="${g.isTotal ? 700 : 600}" fill="#1a1a1a">${escapeHtml(g.label)}</text>`;
-      rows += `<text x="${ML}" y="${labelY}" font-size="11" font-weight="700" fill="#5c584d">${gapLabel}</text>`;
+      rows += `<text x="${W-MR}" y="${labelY}" text-anchor="end" font-size="${g.isTotal ? 13 : 12}" font-weight="600" fill="#1a1a1a">${escapeHtml(groupLabelText)}</text>`;
+      rows += `<text x="${ML}" y="${labelY}" font-size="11" font-weight="600" fill="#5c584d">${gapLabel}</text>`;
     } else {
-      rows += `<text x="${ML}" y="${labelY}" font-size="${g.isTotal ? 13 : 12}" font-weight="${g.isTotal ? 700 : 600}" fill="#1a1a1a">${escapeHtml(g.label)}</text>`;
+      rows += `<text x="${ML}" y="${labelY}" font-size="${g.isTotal ? 13 : 12}" font-weight="600" fill="#1a1a1a">${escapeHtml(groupLabelText)}</text>`;
       rows += `<text x="${W-MR}" y="${labelY}" text-anchor="end" font-size="11" fill="#6c675a">${gapLabel}</text>`;
     }
 
@@ -3886,12 +3907,12 @@ function buildDiversionTrackSvg(title, groups, explanationNote){
       const nearRightEdge = (W - MR) - markerX < 90;
       const potAnchor = nearRightEdge ? 'end' : 'start';
       const potX = markerX + (nearRightEdge ? -8 : 8);
-      rows += `<text x="${potX}" y="${barBottom+14}" text-anchor="${potAnchor}" font-size="11" font-weight="700" fill="#1a1a1a">${escapeHtml(g.potentialLabel)}: ${(g.potential*100).toFixed(1)}%</text>`;
+      rows += `<text x="${potX}" y="${barBottom+14}" text-anchor="${potAnchor}" font-size="11" font-weight="600" fill="#1a1a1a">${escapeHtml(g.potentialLabel)}: ${(g.potential*100).toFixed(1)}%</text>`;
 
       // Alternate scenario — dashed marker, label above the track, centered on its own marker.
       const altMarkerX = ML + Math.max(0, Math.min(1, g.altPotential)) * plotW;
       rows += `<line x1="${altMarkerX}" y1="${barTop}" x2="${altMarkerX}" y2="${barBottom}" stroke="#6c675a" stroke-width="1.5" stroke-dasharray="3 2" />`;
-      rows += `<text x="${altMarkerX}" y="${barTop-34}" text-anchor="middle" font-size="11" font-weight="700" fill="#6c675a">${escapeHtml(g.altPotentialLabel)}: ${Math.round(g.altPotential*100)}%</text>`;
+      rows += `<text x="${altMarkerX}" y="${barTop-34}" text-anchor="middle" font-size="11" font-weight="600" fill="#6c675a">${escapeHtml(g.altPotentialLabel)}: ${Math.round(g.altPotential*100)}%</text>`;
     } else {
       rows += `<line x1="${markerX}" y1="${barTop}" x2="${markerX}" y2="${barBottom}" stroke="#1a1a1a" stroke-width="1.5" />`;
       if (g.isTotal){
@@ -4044,7 +4065,7 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
     lx += 26 + label.length * 5.6;
   });
 
-  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="700" fill="#5c584d">Material (lbs.)</text>`;
+  svg += `<text x="${ML}" y="${headerLine1Y}" font-size="11" font-weight="600" fill="#5c584d">Material (lbs.)</text>`;
 
   // Column headers (wrapped to two lines on the middle space, if any)
   streamsList.forEach((s, i) => {
@@ -4053,15 +4074,15 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
     const lines = words.length > 1
       ? [words.slice(0, Math.ceil(words.length/2)).join(' '), words.slice(Math.ceil(words.length/2)).join(' ')]
       : [s];
-    svg += `<text x="${cx}" y="${headerLine1Y}" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1a1a">${escapeHtml(lines[0])}</text>`;
-    if (lines[1]) svg += `<text x="${cx}" y="${headerLine2Y}" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1a1a">${escapeHtml(lines[1])}</text>`;
+    svg += `<text x="${cx}" y="${headerLine1Y}" text-anchor="middle" font-size="11" font-weight="600" fill="#1a1a1a">${escapeHtml(lines[0])}</text>`;
+    if (lines[1]) svg += `<text x="${cx}" y="${headerLine2Y}" text-anchor="middle" font-size="11" font-weight="600" fill="#1a1a1a">${escapeHtml(lines[1])}</text>`;
   });
   svg += `<line x1="${ML}" y1="${bodyStartY-2}" x2="${W-MR}" y2="${bodyStartY-2}" stroke="#1a1a1a" stroke-width="1.5" />`;
 
   let y = bodyStartY;
   matrix.rows.forEach(g => {
     svg += `<rect x="${ML}" y="${y+4}" width="${W-ML-MR}" height="${catHeaderH-8}" fill="#e9e7e0" rx="4" />
-      <text x="${ML+8}" y="${y+catHeaderH/2+4}" font-size="11" font-weight="700" fill="#5c584d">${escapeHtml(g.category.toUpperCase())}</text>`;
+      <text x="${ML+8}" y="${y+catHeaderH/2+4}" font-size="11" font-weight="600" fill="#5c584d">${escapeHtml(g.category.toUpperCase())}</text>`;
     y += catHeaderH;
     g.materials.forEach(m => {
       const rowY = y;
@@ -4083,8 +4104,8 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
           const label = Math.round(value.weight);
           svg += `<rect x="${trackX}" y="${trackY}" width="${fillW}" height="${trackH}" rx="3" fill="${color}" />`;
           svg += fillW > 20
-            ? `<text x="${trackX+fillW-5}" y="${trackY+trackH-3}" text-anchor="end" font-size="9.5" font-weight="700" fill="#ffffff">${label}</text>`
-            : `<text x="${trackX+fillW+4}" y="${trackY+trackH-3}" text-anchor="start" font-size="9.5" font-weight="700" fill="#3a3a38">${label}</text>`;
+            ? `<text x="${trackX+fillW-5}" y="${trackY+trackH-3}" text-anchor="end" font-size="9.5" font-weight="600" fill="#ffffff">${label}</text>`
+            : `<text x="${trackX+fillW+4}" y="${trackY+trackH-3}" text-anchor="start" font-size="9.5" font-weight="600" fill="#3a3a38">${label}</text>`;
         } else {
           svg += `<text x="${trackX+5}" y="${trackY+trackH-3}" text-anchor="start" font-size="9.5" fill="#8a8578">0</text>`;
         }
@@ -4099,11 +4120,11 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
   // complement and placed here so it reads directly under the material detail it summarizes.
   svg += `<line x1="${ML}" y1="${y}" x2="${W-MR}" y2="${y}" stroke="#1a1a1a" stroke-width="1.5" />`;
   svg += `<rect x="${ML}" y="${y+4}" width="${W-ML-MR}" height="${captureRowH-8}" fill="#dcebe6" rx="4" />
-    <text x="${ML+8}" y="${y+captureRowH/2+4}" font-size="11" font-weight="700" fill="#123a30">CAPTURE RATE</text>`;
+    <text x="${ML+8}" y="${y+captureRowH/2+4}" font-size="13" font-weight="600" fill="#123a30">CAPTURE RATE</text>`;
   matrix.streamCapture.forEach((c, i) => {
     const cx = ML + nameColW + i*streamColW + streamColW/2;
     const label = c.hasData ? pct(c.rate) : '—';
-    svg += `<text x="${cx}" y="${y+captureRowH/2+4}" text-anchor="middle" font-size="12" font-weight="700" fill="#123a30">${label}</text>`;
+    svg += `<text x="${cx}" y="${y+captureRowH/2+4}" text-anchor="middle" font-size="14" font-weight="600" fill="#123a30">${label}</text>`;
   });
 
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">${svg}</svg>`;
