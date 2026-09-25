@@ -87,6 +87,13 @@
     background:#fff; font-family:inherit;
   }
   .field-row input[type=number]{font-size:22px;}
+  /* Weight-entry fields only (Pre-Sort Bags/Sorted Weights, via .field-row) — no spinner
+     arrows, so an accidental scroll-wheel or misclick over the field can't bump the value.
+     Typed input still works exactly as before; this only hides the clickable increment
+     controls, both engines need their own property. */
+  .field-row input[type=number]::-webkit-outer-spin-button,
+  .field-row input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  .field-row input[type=number]{-moz-appearance:textfield;}
   .note-row{margin-top:10px;}
   #presortKnownSection, #sortedNonRepSection{margin-top:14px;}
   .note-row input{width:100%; font-size:14px; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line);}
@@ -1379,7 +1386,7 @@ function makeTargetChips(m){
   wrap.className = 'mm-targets';
   const lab = document.createElement('span');
   lab.className = 'mm-label';
-  lab.textContent = 'Target stream(s) — where this material is correctly diverted';
+  lab.textContent = 'Target stream(s) — where this material is correctly placed';
   const chipRow = document.createElement('div');
   chipRow.className = 'mm-target-chips';
   // If a material isn't accepted, it has no correct recycling-stream home — picking one
@@ -1783,8 +1790,14 @@ function renderAreasForm(){
       }
     };
 
+    defaultMatRow.appendChild(makeReorderControl(
+      () => moveArea(idx, -1),
+      () => moveArea(idx, +1),
+      idx > 0,
+      idx < areas.length - 1
+    ));
     defaultMatRow.appendChild(delBtn);
-    row.appendChild(nameWrap); row.appendChild(rollupWrap); row.appendChild(defaultMatWrap);
+    row.appendChild(rollupWrap); row.appendChild(nameWrap); row.appendChild(defaultMatWrap);
     box.appendChild(row);
   });
 
@@ -1822,6 +1835,15 @@ function moveStream(idx, dir){
   [streamConfig[idx], streamConfig[j]] = [streamConfig[j], streamConfig[idx]];
   applyStreamConfig(streamConfig);
   saveStreamConfig();
+  renderAll();
+}
+// Areas have no category-grouping constraint to respect (unlike materials, which must stay
+// within their own category) — a plain adjacent swap in the flat array is enough.
+function moveArea(idx, dir){
+  const j = idx + dir;
+  if (j < 0 || j >= areas.length) return;
+  [areas[idx], areas[j]] = [areas[j], areas[idx]];
+  saveAreas();
   renderAll();
 }
 // Reorders a material within its category only. The materials array is flat and categories
@@ -2191,7 +2213,12 @@ function renderSortedRollups(){
   box.innerHTML = '';
   distinctRollups().forEach(r => {
     box.appendChild(chip(r, sortedSel.rollup === r, () => {
-      sortedSel.rollup = r; sortedSel.areaId = null; renderAll();
+      sortedSel.rollup = r;
+      // Only clear the area pick for a brand-new entry — during an edit, the area was already
+      // valid for the loaded entry's tenant, and re-picking it on every unrelated correction
+      // (e.g. fixing a typo'd stream) is unnecessary rework the client explicitly flagged.
+      if (editingSortedTs === null) sortedSel.areaId = null;
+      renderAll();
     }));
   });
 }
@@ -2208,7 +2235,11 @@ function renderSortedStreams(){
   box.innerHTML = '';
   STREAMS.forEach(s => {
     box.appendChild(chip(s, sortedSel.stream === s, () => {
-      sortedSel.stream = s; sortedSel.category = null; sortedSel.materialId = null;
+      sortedSel.stream = s;
+      // Same edit-mode carve-out as the rollup chip above: area/stream are the error-prone
+      // fields when transcribing from a spreadsheet, material rarely is, so don't force a
+      // re-pick of an already-correct material just because the stream got corrected.
+      if (editingSortedTs === null){ sortedSel.category = null; sortedSel.materialId = null; }
       renderAll();
     }));
   });
@@ -2256,7 +2287,7 @@ function renderSortedNonRepToggle(){
   cb.checked = !!sortedSel.nonRepresentative;
   cb.addEventListener('change', () => { sortedSel.nonRepresentative = cb.checked; renderAll(); });
   const lab = document.createElement('span');
-  lab.textContent = 'Non-representative — a one-off find, not typical of this bag';
+  lab.textContent = 'Non-representative — a one-off find, not typical of this tenant/area/stream';
   wrap.appendChild(cb); wrap.appendChild(lab);
   box.appendChild(wrap);
   if (sortedSel.nonRepresentative){
@@ -2351,7 +2382,16 @@ let presortReviewFilters = {areaId: 'All', stream: 'All'};
 let sortedReviewFilters = {areaId: 'All', stream: 'All', category: 'All', material: 'All'};
 
 function buildFilterOptions(selectEl, kind){
-  if (selectEl.dataset.built === '1') return;
+  // Signature of the source array's identity+labels, not just its length — so a rename
+  // (area/material) or a reorder (STREAMS/CATEGORY_ORDER) triggers a rebuild too, not just
+  // an add/remove. Rebuilding only when this actually differs (rather than on every render,
+  // or never past the first render) keeps the dropdown in sync without wasted DOM churn.
+  let sig;
+  if (kind === 'area') sig = areas.map(a => a.id + ':' + a.name + ':' + a.rollup).join(',');
+  else if (kind === 'stream') sig = STREAMS.join(',');
+  else if (kind === 'category') sig = CATEGORY_ORDER.join(',');
+  else if (kind === 'material') sig = materials.map(m => m.id + ':' + m.name).join(',');
+  if (selectEl.dataset.builtSig === sig) return;
   if (kind === 'area'){
     // Qualified areaLabel() (not the bare name) — this list is never scoped to one tenant,
     // so two areas sharing a name must still read as distinguishable options here.
@@ -2363,7 +2403,7 @@ function buildFilterOptions(selectEl, kind){
   } else if (kind === 'material'){
     selectEl.innerHTML = '<option value="All">All materials</option>' + materials.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('');
   }
-  selectEl.dataset.built = '1';
+  selectEl.dataset.builtSig = sig;
 }
 
 function renderPresortReview(){
@@ -2593,6 +2633,16 @@ document.getElementById('sortedWeight').addEventListener('input', renderSortedAd
 document.getElementById('sortedUnit').addEventListener('change', renderSortedAddButton);
 document.getElementById('presortUnit').addEventListener('change', renderPresortAddButton);
 document.getElementById('presortWeight').addEventListener('input', renderPresortAddButton);
+
+// Hiding the spinner arrows (CSS, above) doesn't stop Chrome/Safari's other built-in
+// behavior for a focused number input: the scroll wheel still bumps the value up/down,
+// which is exactly the accidental-edit risk that motivated removing the arrows in the first
+// place — scrolling the page while the cursor happens to be over the field silently changes
+// a logged weight. Blurring on wheel is the standard fix: once the field isn't focused, the
+// same scroll just scrolls the page instead of the browser treating it as an increment.
+['sortedWeight', 'presortWeight'].forEach(id => {
+  document.getElementById(id).addEventListener('wheel', function(){ this.blur(); }, {passive: true});
+});
 
 // Shared by the header's "Start a new session" button and the intro page's — the reset
 // itself doesn't care which one triggered it.
@@ -3184,6 +3234,10 @@ function buildAlluvialSvg(title, flow, groupColLabel){
   const ALLUVIAL_AREA_COLOR = '#6c675a';
   const ALLUVIAL_STREAM_COLOR = '#123a30'; // --brand-dark
   const OUTCOME_COLORS = {Diverted: '#2f7a4f', Landfilled: '#a1372c'}; // --ok / --danger
+  // Display-only rename — 'Landfilled' stays the key everywhere (OUTCOME_COLORS,
+  // outcomeTotals, streamOutcomeLinks) since it's really "everything not diverted", disposal
+  // method unknown/unspecified — the on-chart label just says so more precisely.
+  const OUTCOME_LABELS = {Diverted: 'Diverted', Landfilled: 'Landfilled / Incinerated'};
 
   const hasData = flow.areaNodes.length && flow.streamNodes.length;
   if (!hasData){
@@ -3232,9 +3286,10 @@ function buildAlluvialSvg(title, flow, groupColLabel){
   // outcome names sit to the RIGHT of col3 (anchor "start"), so both need real room or their
   // text runs off the edge of the canvas instead of just getting tight. ML grows with the
   // widest label (capped so one extreme name can't crush the plot area down to nothing); MR
-  // stays fixed since the outcome column's own labels ("Diverted"/"Landfilled" + a short
-  // weight/percent) are short and don't vary with the data the way area names do.
-  const ML = Math.min(260, Math.max(100, maxAreaLabelW + 8 + 6)), MR = 100;
+  // stays fixed since the outcome column's own labels ("Diverted"/"Landfilled / Incinerated"
+  // + a short weight/percent) don't vary with the data the way area names do — sized for the
+  // longer of the two fixed labels, not just "Diverted".
+  const ML = Math.min(260, Math.max(100, maxAreaLabelW + 8 + 6)), MR = 145;
   const col1X = ML, col3X = W - MR - nodeW, col2X = (col1X + col3X) / 2;
 
   // Stacks each link into a sub-span of its source node's band and its target node's band —
@@ -3317,7 +3372,7 @@ function buildAlluvialSvg(title, flow, groupColLabel){
     if (p.h <= 0.5) return;
     const labelX = col3X+nodeW+8, midY = (p.y0+p.y1)/2;
     outcomeNodesColored += `<rect x="${col3X}" y="${p.y0}" width="${nodeW}" height="${p.h}" fill="${OUTCOME_COLORS[name]}" rx="2" />
-      <text x="${labelX}" y="${p.h < 40 ? midY-2 : midY-10}" text-anchor="start" font-size="11" font-weight="600" fill="${OUTCOME_COLORS[name]}">${escapeHtml(name)}</text>
+      <text x="${labelX}" y="${p.h < 40 ? midY-2 : midY-10}" text-anchor="start" font-size="11" font-weight="600" fill="${OUTCOME_COLORS[name]}">${escapeHtml(OUTCOME_LABELS[name] || name)}</text>
       <text x="${labelX}" y="${p.h < 40 ? midY+12 : midY+4}" text-anchor="start" font-size="10" fill="#5c584d">${lbs(flow.outcomeTotals[name])} lbs.</text>`;
     if (p.h >= 40){
       outcomeNodesColored += `<text x="${labelX}" y="${midY+18}" text-anchor="start" font-size="10" fill="#5c584d">${pct(flow.outcomeTotals[name]/grandTotal)}</text>`;
