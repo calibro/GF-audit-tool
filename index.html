@@ -185,6 +185,10 @@
   @media(min-width:520px){.info-form{grid-template-columns:1fr 1fr;}}
   .info-field label{display:block; font-size:14px; color:var(--intro-dark); font-weight:400; margin-bottom:4px;}
   .info-field input{width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid var(--line); font-size:14px;}
+  /* Square Footage/Occupancy and Start/Stop time each read as one logical unit — always keep
+     them side by side as a sub-row, even where .info-form itself is forced to one column
+     (e.g. inside .audit-details-card, see below). */
+  .info-field-pair{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .scenario-picker{margin:10px 0 20px; max-width:420px;}
   .scenario-picker label{display:block; font-size:14px; color:var(--intro-dark); font-weight:400; margin-bottom:4px;}
   .scenario-picker select{width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid var(--line); font-size:14px; background:#fff; color:var(--ink); font-family:inherit;}
@@ -257,10 +261,17 @@
   .btn-add-bag svg{width:20px; height:20px; flex:none;}
   .config-tabs{display:flex; border-radius:8px; overflow:hidden; margin:18px 0 14px;}
   .config-tab-btn{
-    flex:1; background:var(--intro-dark); opacity:0.5; color:#fdfdfd; border:none;
+    flex:1; background:#f6f6f6; color:var(--ink); border:1px solid var(--line);
     padding:8px 12px; font-size:16px; font-weight:400; cursor:pointer;
+    height:49px; display:flex; align-items:center; justify-content:center;
   }
-  .config-tab-btn.active{opacity:1;}
+  .config-tab-btn.active{background:var(--brand); border-color:var(--brand); color:#fdfdfd;}
+  /* The container's own border-radius + overflow:hidden clips to a rounded mask, but each
+     button is still a sharp rectangle underneath — without matching corner radii here, that
+     mask cuts straight through the outer two buttons' border pixels at all four corners,
+     making the grey border look like it disappears right where it should be most visible. */
+  .config-tab-btn:first-child{border-radius:8px 0 0 8px;}
+  .config-tab-btn:last-child{border-radius:0 8px 8px 0;}
   .config-subpanel{display:none;}
   .config-subpanel.active{display:block;}
   .mm-cat-header{
@@ -1109,24 +1120,41 @@ const MATERIAL_INFO = {
 
 const SOILED_IDS = new Set(['FIB02','FIB05','FIB07','GLA02','MET02','PLA02']);
 
-const AUDIT_ID = '120PARK-2025';
+// Evaluated at export time (not a constant) — every exported row used to be stamped with a
+// single hardcoded '120PARK-2025' regardless of which site was actually being audited. Falls
+// back through Project ID then Site ID before giving up, since either one uniquely identifies
+// the audit in the client's own systems and Project ID is the more specific of the two.
+function auditId(){
+  return auditMeta.projectId || auditMeta.siteId || 'UNSPECIFIED';
+}
 
 const AUDIT_FIELDS = [
-  // Labels match the Figma "Redesign" file's Audit Details card text exactly (including its
-  // capitalization, which is inconsistent — "Client name" but "Tenants/Area Breakouts").
-  // The import matcher below is case-insensitive, so older exported files (which had
-  // Title Case labels) still round-trip correctly against these.
-  {key:'clientName', label:'Client name', default:''},
-  {key:'siteName', label:'Site name', default:''},
-  {key:'siteAddress', label:'Site address', default:''},
+  // Labels match the client's finalized 15-field Audit Details list. `aliases` lets the
+  // case-insensitive import matcher below still recognize rows from files exported under an
+  // older label, so renaming a label here never silently drops a previously-saved value.
+  {key:'clientName', label:'Client', default:'', aliases:['Client name']},
+  {key:'account', label:'Account', default:''},
+  {key:'siteName', label:'Client Site Name', default:'', aliases:['Site name']},
+  {key:'siteId', label:'Site ID', default:''},
+  {key:'projectId', label:'Project ID', default:''},
+  {key:'siteAddress', label:'Site Address', default:''},
+  {key:'accountType', label:'Account Type', default:''},
+  {key:'facilityType', label:'Facility Type', default:''},
+  // inputmode:'numeric' (not type:'number') so values like "1,200,000" or "~500" are still
+  // accepted, and so the number-input spinner/mouse-wheel problem fixed elsewhere doesn't
+  // come back for these two fields.
+  {key:'squareFootage', label:'Square Footage', default:'', inputmode:'numeric'},
+  {key:'siteOccupancy', label:'Occupancy', default:'', inputmode:'numeric', aliases:['Site occupancy']},
   {key:'hauler', label:'Hauler', default:''},
-  {key:'tenantBreakouts', label:'Tenants/Area Breakouts', default:''},
-  {key:'auditors', label:'Auditors', default:''},
   {key:'auditDate', label:'Audit Date', default:'', type:'date'},
-  // Dropped from the redesigned Audit Details card per client request, but kept here (rather
-  // than deleted outright) so it still round-trips through Excel export/import for any
-  // session file that already carries a value in this column.
-  {key:'siteOccupancy', label:'Site Occupancy', default:'', showInForm:false},
+  {key:'auditors', label:'Auditors', default:''},
+  {key:'startTime', label:'Start time', default:'', type:'time'},
+  {key:'stopTime', label:'Stop time', default:'', type:'time'},
+  // Dropped from the redesigned Audit Details card — it duplicated the Areas section and
+  // nothing else in the file reads it — but kept here (rather than deleted outright) so it
+  // still round-trips through Excel export/import for any session file that already carries
+  // a value in this column.
+  {key:'tenantBreakouts', label:'Tenants/Area Breakouts', default:'', showInForm:false, aliases:['Tenants/Area Breakouts']},
 ];
 
 // ============================================================
@@ -1363,20 +1391,42 @@ function renderHeader(){
 }
 
 // ---------- Audit Info tab ----------
+function makeAuditField(f){
+  const wrap = document.createElement('div');
+  wrap.className = 'info-field';
+  const label = document.createElement('label');
+  label.textContent = f.label;
+  const input = document.createElement('input');
+  input.type = f.type || 'text';
+  if (f.inputmode) input.setAttribute('inputmode', f.inputmode);
+  input.value = auditMeta[f.key] || '';
+  input.addEventListener('change', () => { auditMeta[f.key] = input.value; saveMeta(); renderHeader(); });
+  wrap.appendChild(label); wrap.appendChild(input);
+  return wrap;
+}
+// Pairs of fields that read as one logical unit and should always sit on the same line —
+// Square Footage/Occupancy and Start/Stop time — rather than wherever they happen to land in
+// the outer grid's left-to-right flow. Each pair is wrapped in its own full-width sub-grid, so
+// this holds regardless of how many fields precede them or how narrow the viewport is.
+const AUDIT_FIELD_PAIRS = [['squareFootage','siteOccupancy'], ['startTime','stopTime']];
 function renderAuditInfoForm(){
   const box = document.getElementById('auditInfoForm');
   box.innerHTML = '';
-  AUDIT_FIELDS.filter(f => f.showInForm !== false).forEach(f => {
-    const wrap = document.createElement('div');
-    wrap.className = 'info-field';
-    const label = document.createElement('label');
-    label.textContent = f.label;
-    const input = document.createElement('input');
-    input.type = f.type || 'text';
-    input.value = auditMeta[f.key] || '';
-    input.addEventListener('change', () => { auditMeta[f.key] = input.value; saveMeta(); renderHeader(); });
-    wrap.appendChild(label); wrap.appendChild(input);
-    box.appendChild(wrap);
+  const visible = AUDIT_FIELDS.filter(f => f.showInForm !== false);
+  const byKey = key => visible.find(f => f.key === key);
+  const paired = new Set(AUDIT_FIELD_PAIRS.flat());
+  visible.forEach(f => {
+    if (paired.has(f.key)){
+      const pair = AUDIT_FIELD_PAIRS.find(p => p[0] === f.key);
+      if (!pair) return; // this is the pair's second field — already rendered alongside its first
+      const row = document.createElement('div');
+      row.className = 'info-field-pair';
+      row.appendChild(makeAuditField(byKey(pair[0])));
+      row.appendChild(makeAuditField(byKey(pair[1])));
+      box.appendChild(row);
+      return;
+    }
+    box.appendChild(makeAuditField(f));
   });
 }
 let mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No'};
@@ -3800,6 +3850,23 @@ function svgToPngBlob(svgEl){
     img.src = url;
   });
 }
+// Strips characters that are illegal (or awkward) in a filename on Windows/macOS and collapses
+// whitespace to underscores, falling back to a generic label per field when it hasn't been
+// filled in yet rather than producing a filename with a blank gap in it.
+function slugifyForFilename(s, fallback){
+  const clean = (s || '').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
+  return clean || fallback;
+}
+// Shared filename stem for the PDF summaries and PNG/SVG chart zip downloads:
+// "<client>_<site>_<today>". The Excel export uses its own, richer convention (see exportBtn
+// below) that also includes Account — kept separate rather than merged in here since these
+// three downloads weren't asked to pick up Account too.
+function exportFileBase(){
+  const clientSlug = slugifyForFilename(auditMeta.clientName, 'Client');
+  const siteSlug = slugifyForFilename(auditMeta.siteName, 'Site');
+  const dateStr = new Date().toISOString().slice(0,10);
+  return `${clientSlug}_${siteSlug}_${dateStr}`;
+}
 function downloadBlob(blob, filename){
   const link = document.createElement('a');
   link.download = filename;
@@ -4465,7 +4532,13 @@ function buildWorkbook(){
 
   // Audit Info
   const infoRows = [['Audit Info'], []];
-  AUDIT_FIELDS.forEach(f => infoRows.push([f.label, auditMeta[f.key] || '']));
+  AUDIT_FIELDS.forEach(f => {
+    // A hidden field (e.g. the retired Tenants/Area Breakouts) only gets a row when it
+    // actually carries a value round-tripped from an older file — otherwise every new export
+    // would carry a permanently-empty row for a field nobody can even see or fill in anymore.
+    if (f.showInForm === false && !auditMeta[f.key]) return;
+    infoRows.push([f.label, auditMeta[f.key] || '']);
+  });
   infoRows.push(['Source', 'Collected via tablet field form']);
   XLSX.utils.book_append_sheet(wb, makeSheet(infoRows), 'Audit Info');
 
@@ -4552,7 +4625,7 @@ function buildWorkbook(){
                      'material_name','material_category','currently_divertible','accepted_in_program',
                      'belongs_here','rollup_group','non_representative','notes','area_id'];
   const fsRows = [fsHeader];
-  sortedEntries.forEach(e => fsRows.push([AUDIT_ID, e.stream, null, e.materialId, e.weight,
+  sortedEntries.forEach(e => fsRows.push([auditId(), e.stream, null, e.materialId, e.weight,
     null,null,null,null,null,null, e.nonRepresentative ? 'Yes' : 'No', e.note || '', e.areaId]));
   const FS_LAST = fsRows.length;
   for (let r = 2; r <= FS_LAST; r++){
@@ -4573,7 +4646,7 @@ function buildWorkbook(){
   presortEntries.forEach(e => {
     const key = e.stream + '|' + e.areaId;
     bagCounters[key] = (bagCounters[key] || 0) + 1;
-    psRows.push([AUDIT_ID, e.stream, null, bagCounters[key], e.weight, e.knownMaterialId || '', e.note || '', e.areaId]);
+    psRows.push([auditId(), e.stream, null, bagCounters[key], e.weight, e.knownMaterialId || '', e.note || '', e.areaId]);
   });
   const PS_LAST = psRows.length;
   for (let r = 2; r <= PS_LAST; r++){
@@ -5104,9 +5177,12 @@ function parseImportedWorkbook(wb){
   if (infoRows){
     infoRows.forEach(r => {
       if (!r || !r[0]) return;
-      // Case-insensitive so files exported before the Audit Details labels were changed to
-      // match the Figma redesign (Title Case, e.g. "Client Name") still import correctly.
-      const field = AUDIT_FIELDS.find(f => f.label.toLowerCase() === String(r[0]).toLowerCase());
+      // Case-insensitive, and matches either the field's current label or any of its
+      // `aliases` — so a file exported under a retired label (e.g. "Client name" before it
+      // became "Client") still imports into the same field instead of silently losing the value.
+      const rowLabel = String(r[0]).toLowerCase();
+      const field = AUDIT_FIELDS.find(f => f.label.toLowerCase() === rowLabel ||
+        (f.aliases && f.aliases.some(a => a.toLowerCase() === rowLabel)));
       if (field && r[1]) result.auditMeta[field.key] = r[1];
     });
   }
@@ -5259,9 +5335,12 @@ document.getElementById('exportBtn').onclick = () => {
   // Allowed with no entries logged: the file still carries the full Areas / Streams /
   // Materials Master config, which is how a configuration is shared or saved as a template.
   const wb = buildWorkbook();
-  const dateStr = new Date().toISOString().slice(0,10);
   const configOnly = sortedEntries.length === 0 && presortEntries.length === 0;
-  XLSX.writeFile(wb, `120_Park_Ave_Field_Data_${dateStr}.xlsx`);
+  const clientSlug = slugifyForFilename(auditMeta.clientName, 'Client');
+  const accountSlug = slugifyForFilename(auditMeta.account, 'Account');
+  const siteSlug = slugifyForFilename(auditMeta.siteName, 'Site');
+  const dateStr = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `${clientSlug}_${accountSlug}_${siteSlug}_Field Data_${dateStr}.xlsx`);
   showToast(configOnly ? 'Config exported (no entries logged yet)' : 'Excel file downloaded');
 };
 
@@ -5286,9 +5365,13 @@ document.getElementById('exportAllSummariesPdfBtn').onclick = () => {
   }
   const root = document.getElementById('printExportRoot');
   root.innerHTML = buildAllAreasSummaryHtml();
-  // afterprint cleans up regardless of whether the user actually saved a PDF or cancelled —
-  // the content only needs to exist for the moment the print dialog reads it.
-  const cleanup = () => { root.innerHTML = ''; window.removeEventListener('afterprint', cleanup); };
+  // "Save as PDF" has no filename API — every browser instead defaults the suggested filename
+  // to document.title, so swap it in for the print dialog and restore it afterward. afterprint
+  // cleans up regardless of whether the user actually saved a PDF or cancelled — the content
+  // (and the title swap) only need to hold for the moment the print dialog reads them.
+  const originalTitle = document.title;
+  document.title = `${exportFileBase()}_summaries`;
+  const cleanup = () => { root.innerHTML = ''; document.title = originalTitle; window.removeEventListener('afterprint', cleanup); };
   window.addEventListener('afterprint', cleanup);
   window.print();
 };
@@ -5397,7 +5480,7 @@ document.getElementById('exportAllChartsZipBtn').onclick = async () => {
       const blob = await svgToPngBlob(svgEl);
       files.push({name, data: new Uint8Array(await blob.arrayBuffer())});
     }
-    downloadBlob(buildZip(files), 'charts.zip');
+    downloadBlob(buildZip(files), `${exportFileBase()}_charts.zip`);
   } catch (e){
     showToast('Chart export failed');
   }
@@ -5429,7 +5512,7 @@ document.getElementById('exportAllChartsSvgBtn').onclick = () => {
       const svgText = new XMLSerializer().serializeToString(svgEl);
       files.push({name, data: encoder.encode(svgText)});
     });
-    downloadBlob(buildZip(files), 'charts_svg.zip');
+    downloadBlob(buildZip(files), `${exportFileBase()}_charts_svg.zip`);
   } catch (e){
     showToast('Chart export failed');
   }
