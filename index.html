@@ -866,13 +866,21 @@ function defaultFallbackStream(){
 }
 function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && m.divertible === 'Yes' && stream !== landfillStreamName(); }
 // Potential Diversion Rate is the ceiling: everything that *could* be diverted in this
-// program if it were placed perfectly. That's driven by "currently divertible" (actually
-// recyclable/compostable here), NOT "accepted in program" — a material can be accepted (e.g.
-// allowed into a waste stream as non-hazardous solid waste) without being divertible (Film
-// Plastics, PPE, Waste Disposal Bags are the concrete cases). Counting accepted-but-not-
-// divertible weight would inflate the Potential ceiling. Still require a genuine non-landfill
-// target — a material marked divertible with nowhere to divert it to shouldn't count either.
-function materialHasDivertiblePath(m){ return m.divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName()); }
+// program if it were placed perfectly. Two independent ways to qualify: (1) accepted in the
+// program AND marked divertible AND has a genuine non-landfill target configured — a material
+// marked divertible with nowhere to divert it to still shouldn't count; or (2)
+// divertibleWithProperHandling — a soiled-but-otherwise-recyclable material (Soiled Cardboard,
+// Soiled Paper, etc.) that has no real pathway *today* and, in practice, is often marked
+// not-accepted precisely because it can't be handled as-is. That's a hypothetical ceiling
+// claim about what's possible with proper handling, not a description of today's program, so
+// it deliberately skips both the accepted check and the target-list check — requiring
+// accepted='Yes' here would make it impossible for exactly the soiled/rejected materials this
+// flag exists for. See materialCorrectlyPlacedIn below, which must never reference this flag,
+// since Current Diversion stays blind to it regardless.
+function materialHasDivertiblePath(m){
+  return (m.accepted === 'Yes' && m.divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName())) ||
+    m.divertibleWithProperHandling === 'Yes';
+}
 
 // ============================================================
 // Configuration scenarios — presets that swap Areas/Streams/Materials Master together as a
@@ -882,10 +890,12 @@ function materialHasDivertiblePath(m){ return m.divertible === 'Yes' && m.target
 // Master/Areas/Streams parsing against them in a standalone script, not hand-transcribed, so
 // this is byte-for-byte what "Import session file" would produce from the same files; see
 // technique-scenario-from-client-xlsx). The client's own templates are the only presets;
-// SCENARIOS[0] doubles as the app's built-in starting point (first load, "Start a new
-// session") so there's one source of truth for "default" rather than a separate hardcoded
-// copy that could drift from what the dropdown actually offers. Picking one seeds all three
-// sections; Great Forest can still rename/edit anything afterward, same as always.
+// "Start a new session" (performNewSessionReset) starts from the 'empty' entry specifically,
+// not SCENARIOS[0] — a blank slate rather than whichever client preset happens to sort first.
+// SCENARIOS[0] still doubles as this file's inert pre-loadState() placeholder state, which is
+// never actually shown (the intro page covers it until the user picks an action). Picking a
+// scenario from the dropdown seeds all three sections; Great Forest can still rename/edit
+// anything afterward, same as always.
 // ============================================================
 const SCENARIO_NATIONWIDE_NO_ORGANICS_MATERIALS = [
   ['FIB01','Corrugated Cardboard','Fibers','Yes',['Mixed Recycling','Cardboard Recycling'],'Yes'],
@@ -1429,7 +1439,7 @@ function renderAuditInfoForm(){
     box.appendChild(makeAuditField(f));
   });
 }
-let mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No'};
+let mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No', divertibleWithProperHandling:'No'};
 
 function makeTargetChips(m){
   const wrap = document.createElement('div');
@@ -1455,9 +1465,11 @@ function makeTargetChips(m){
           // Materials classified as Unacceptable may have no correct placement stream at
           // all — e.g. batteries or e-waste don't have a "correct" home among the routine
           // collection streams this tool tracks, so finding them anywhere (including Trash)
-          // is itself worth flagging. Every other material still needs at least one target,
-          // or it'd be uncategorizable in every report.
-          if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = [defaultFallbackStream()];
+          // is itself worth flagging. Divertible with proper handling is the other
+          // legitimate zero-target case — that flag exists specifically for a material with
+          // no real target today. Every other material still needs at least one target, or
+          // it'd be uncategorizable in every report.
+          if (m.targets.length === 0 && m.divertible !== 'Unacceptable' && m.divertibleWithProperHandling !== 'Yes') m.targets = [defaultFallbackStream()];
         } else {
           m.targets = m.targets.filter(t => t !== defaultFallbackStream()).concat([s]);
         }
@@ -1605,11 +1617,24 @@ function renderMaterialsMasterForm(){
       togglesRow.className = 'mm-card-toggles-row';
       togglesRow.appendChild(makeStatusField('Accepted?', ['Yes','No'], m.accepted, 'accepted', v => {
         m.accepted = v;
-        if (v !== 'Yes') m.targets = (m.divertible === 'Unacceptable') ? [] : [defaultFallbackStream()];
+        if (v !== 'Yes') m.targets = (m.divertible === 'Unacceptable' || m.divertibleWithProperHandling === 'Yes') ? [] : [defaultFallbackStream()];
         saveMaterials();
         renderMaterialsMasterForm();
       }));
-      togglesRow.appendChild(makeStatusField('Divertible?', DIVERTIBLE_OPTIONS, m.divertible, 'divertible', v => { m.divertible = v; saveMaterials(); }));
+      togglesRow.appendChild(makeStatusField('Divertible?', DIVERTIBLE_OPTIONS, m.divertible, 'divertible', v => {
+        m.divertible = v;
+        saveMaterials();
+        renderMaterialsMasterForm(); // re-render so Divertible with proper handling? shows/hides
+      }));
+      // Only meaningful when Divertible is specifically "No" — "Yes" already has a real target
+      // (this flag would be redundant), and "Unacceptable" has no valid destination even in
+      // principle (batteries, e-waste), which is a different thing than this flag claims.
+      if (m.divertible === 'No'){
+        togglesRow.appendChild(makeStatusField('Divertible with proper handling?', ['Yes','No'], m.divertibleWithProperHandling || 'No', 'properHandling', v => {
+          m.divertibleWithProperHandling = v;
+          saveMaterials();
+        }));
+      }
 
       const targetsRow = document.createElement('div');
       targetsRow.className = 'mm-card-targets-row';
@@ -1635,7 +1660,7 @@ function renderMaterialsMasterForm(){
 // #addMaterialFormRoot each time it opens (and on every keystroke/selection inside it, same
 // as the rest of Materials Master) so it always reflects the live streams/categories.
 function openAddMaterialModal(){
-  mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No'};
+  mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No', divertibleWithProperHandling:'No'};
   renderAddMaterialForm();
   document.getElementById('addMaterialModal').classList.add('show');
 }
@@ -1666,11 +1691,25 @@ function renderAddMaterialForm(){
   statusRow.className = 'add-material-status-row';
   statusRow.appendChild(makeStatusField('Accepted?', ['Yes','No'], mmNewMaterial.accepted, 'accepted', v => {
     mmNewMaterial.accepted = v;
-    if (v !== 'Yes') mmNewMaterial.targets = (mmNewMaterial.divertible === 'Unacceptable') ? [] : [defaultFallbackStream()];
+    if (v !== 'Yes') mmNewMaterial.targets = (mmNewMaterial.divertible === 'Unacceptable' || mmNewMaterial.divertibleWithProperHandling === 'Yes') ? [] : [defaultFallbackStream()];
     renderAddMaterialForm();
   }));
-  statusRow.appendChild(makeStatusField('Divertible?', DIVERTIBLE_OPTIONS, mmNewMaterial.divertible, 'divertible', v => { mmNewMaterial.divertible = v; }));
+  statusRow.appendChild(makeStatusField('Divertible?', DIVERTIBLE_OPTIONS, mmNewMaterial.divertible, 'divertible', v => {
+    mmNewMaterial.divertible = v;
+    renderAddMaterialForm(); // re-render so Divertible with proper handling? shows/hides
+  }));
   form.appendChild(statusRow);
+
+  // Same restriction as the main Materials Master row: only meaningful when Divertible is
+  // specifically "No".
+  if (mmNewMaterial.divertible === 'No'){
+    const properHandlingRow = document.createElement('div');
+    properHandlingRow.className = 'add-material-status-row';
+    properHandlingRow.appendChild(makeStatusField('Divertible with proper handling?', ['Yes','No'], mmNewMaterial.divertibleWithProperHandling, 'properHandling', v => {
+      mmNewMaterial.divertibleWithProperHandling = v;
+    }));
+    form.appendChild(properHandlingRow);
+  }
 
   const targetChips = document.createElement('div');
   targetChips.className = 'mm-targets';
@@ -1709,12 +1748,18 @@ function renderAddMaterialForm(){
   saveBtn.onclick = () => {
     const name = mmNewMaterial.name.trim();
     if (!name){ showToast('Enter a material name'); return; }
-    if (mmNewMaterial.targets.length === 0 && mmNewMaterial.divertible !== 'Unacceptable'){ showToast('Pick at least one target stream, or set Divertible to Unacceptable'); return; }
+    // Divertible with proper handling is the other legitimate case for zero targets — that
+    // flag exists specifically for a material with no real target today (see
+    // materialHasDivertiblePath), so requiring one here would make it impossible to ever save.
+    if (mmNewMaterial.targets.length === 0 && mmNewMaterial.divertible !== 'Unacceptable' && mmNewMaterial.divertibleWithProperHandling !== 'Yes'){
+      showToast('Pick at least one target stream, or set Divertible to Unacceptable or Divertible with proper handling to Yes');
+      return;
+    }
     const prefix = mmNewMaterial.category.slice(0,3).toUpperCase();
     let n = 1;
     let id = `${prefix}C${n}`;
     while (materials.some(m => m.id === id)){ n++; id = `${prefix}C${n}`; }
-    materials.push({id, name, category: mmNewMaterial.category, accepted: mmNewMaterial.accepted, targets: mmNewMaterial.targets.slice(), divertible: mmNewMaterial.divertible});
+    materials.push({id, name, category: mmNewMaterial.category, accepted: mmNewMaterial.accepted, targets: mmNewMaterial.targets.slice(), divertible: mmNewMaterial.divertible, divertibleWithProperHandling: mmNewMaterial.divertibleWithProperHandling});
     saveMaterials();
     closeAddMaterialModal();
     renderAll();
@@ -2699,10 +2744,14 @@ document.getElementById('presortWeight').addEventListener('input', renderPresort
 async function performNewSessionReset(){
   sortedEntries = []; presortEntries = [];
   applyingScenario = true;
-  materials = SCENARIOS[0].materials.map(m => ({...m}));
-  areas = SCENARIOS[0].areas.map(a => ({...a}));
-  applyStreamConfig(SCENARIOS[0].streamConfig.map(s => ({...s})));
-  activeScenarioId = SCENARIOS[0].id;
+  // "Start a new session" begins from a blank slate (the 'empty' scenario), not from whichever
+  // preset happens to be first in the dropdown — a client-specific preset defaulting in here
+  // would mean every new site starts pre-loaded with a different client's Materials Master.
+  const startScenario = SCENARIOS.find(s => s.id === 'empty') || SCENARIOS[0];
+  materials = startScenario.materials.map(m => ({...m}));
+  areas = startScenario.areas.map(a => ({...a}));
+  applyStreamConfig(startScenario.streamConfig.map(s => ({...s})));
+  activeScenarioId = startScenario.id;
   scenarioEdited = false;
   AUDIT_FIELDS.forEach(f => auditMeta[f.key] = f.default);
   auditMeta.auditDate = new Date().toISOString().slice(0,10);
@@ -4088,8 +4137,13 @@ function buildDiversionTrackSvg(title, groups, explanationNote){
 // problem than a recyclable simply ending up in the wrong stream, so it gets its own color.
 const PLACEMENT_COLORS = { correct: '#2f7a4f', neutral: '#c98a1f', contamination: '#a1372c', unacceptable: '#7b4098' }; // --ok / --amber / --danger / purple
 const PLACEMENT_LIGHT_COLORS = { correct: '#dcebe6', neutral: '#faedd3', contamination: '#f6dedb', unacceptable: '#e8dcef' }; // --brand-light / --amber-light / --danger-light / light purple
-function placementKind(correctlyPlaced, belongsHere, divertible){
-  if (divertible === 'Unacceptable') return 'unacceptable';
+function placementKind(correctlyPlaced, belongsHere, divertible, accepted){
+  // Not accepted anywhere in the program reads the same as Unacceptable here — purple, no
+  // correct destination in this chart's terms — even when Divertible with proper handling is
+  // Yes. That flag only affects the Potential Diversion ceiling; it's a hypothetical claim
+  // about what's possible, not a description of today's program, so it must never change how
+  // a not-accepted material is colored in an as-found characterization chart like this one.
+  if (divertible === 'Unacceptable' || accepted === 'No') return 'unacceptable';
   if (correctlyPlaced) return 'correct';
   if (belongsHere) return 'neutral';
   return 'contamination';
@@ -4114,7 +4168,7 @@ function computeCharacterizationMatrix(scope, hideZeroRows){
     .map(cat => ({
       category: cat,
       materials: materials.filter(m => m.category === cat).map(m => ({
-        id: m.id, name: m.name, divertible: m.divertible,
+        id: m.id, name: m.name, divertible: m.divertible, accepted: m.accepted,
         values: STREAMS.map(s => cell(m.id, s)),
       })),
     }))
@@ -4173,8 +4227,8 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
   const legendItems = [
     ['Correctly diverted', PLACEMENT_COLORS.correct],
     ['Not divertible', PLACEMENT_COLORS.neutral],
-    ['Contamination — wrong stream', PLACEMENT_COLORS.contamination],
-    ['Unacceptable material', PLACEMENT_COLORS.unacceptable],
+    ['wrong stream', PLACEMENT_COLORS.contamination],
+    ['not accepted', PLACEMENT_COLORS.unacceptable],
   ];
   // Two per line rather than one long strip — four items squeezed onto one row ran together
   // and was hard to scan at this font size.
@@ -4214,7 +4268,7 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
         const value = m.values[i];
         const trackX = ML + nameColW + i*streamColW + 6;
         const trackY = rowY + (rowH-trackH)/2;
-        const kind = placementKind(value.correctlyPlaced, value.belongsHere, m.divertible);
+        const kind = placementKind(value.correctlyPlaced, value.belongsHere, m.divertible, m.accepted);
         const lightColor = PLACEMENT_LIGHT_COLORS[kind];
         // The track itself carries the placement tint, not just the fill — so a 0-value cell
         // still reads as "this stream isn't/is a correct target for this material" instead of
@@ -4554,6 +4608,10 @@ function buildWorkbook(){
   const lastTargetCol = colLetter(targetColStart + STREAMS.length - 1);
   const acceptedCol = 'E';
   const divertibleCol = 'D';
+  // Appended after every target column (not between accepted_in_program and the target
+  // columns) — targetColStart/firstTargetCol/lastTargetCol and everything computed from them
+  // stay unaffected by this column's existence.
+  const properHandlingCol = colLetter(targetColStart + STREAMS.length);
   // The disposal/landfill stream, resolved by the `protected` flag (not a hardcoded name),
   // baked into the formulas below as a literal so a renamed protected stream still stays
   // excluded from diversion credit. Doubled quotes keep it a valid Excel string literal.
@@ -4563,11 +4621,12 @@ function buildWorkbook(){
   const landfillName = landfillStreamName();
   const landfillNameEsc = landfillName ? landfillName.replace(/"/g, '""') : null;
   const mmHeader = ['material_id','material_name','material_category','currently_divertible','accepted_in_program',
-                     ...STREAMS.map(s => `target: ${s}`)];
+                     ...STREAMS.map(s => `target: ${s}`), 'divertible_with_proper_handling'];
   const mmRows = [mmHeader];
   materials.forEach(m => {
     mmRows.push([m.id, m.name, m.category, m.divertible, m.accepted,
-                 ...STREAMS.map(s => m.targets.includes(s) ? 'Yes' : 'No')]);
+                 ...STREAMS.map(s => m.targets.includes(s) ? 'Yes' : 'No'),
+                 m.divertibleWithProperHandling === 'Yes' ? 'Yes' : 'No']);
   });
   const MM_LAST = mmRows.length;
   XLSX.utils.book_append_sheet(wb, makeSheet(mmRows), 'Materials Master');
@@ -4781,14 +4840,20 @@ function buildWorkbook(){
         // in Trash (correctly placed as non-divertible), so 1-belongs_here correctly measures
         // what share of Trash is actually divertible material thrown away wrongly.
         const belongsHereExpr = {f:`IF(${belongsExpr},1,0)`};
-        // "has_divertible_path" — currently_divertible AND has some real (non-Trash) target
-        // configured; this, not accepted_in_program, is what Potential Diversion Rate sums.
-        // A material can be accepted (allowed into a waste stream) without being divertible
-        // (actually recyclable/compostable here) — e.g. Film Plastics, PPE, Waste Disposal
-        // Bags — and counting that weight would inflate the Potential ceiling. A material
-        // marked divertible with no real target still can't become correctly_placed, so both
-        // conditions are required.
-        const hasPathExpr = {f:`IF(AND(${divertibleExpr}="Yes",${mmHasRealTargetExpr(matRef)}),1,0)`};
+        // "has_divertible_path" — either of two independent branches: (1) accepted_in_program
+        // AND currently_divertible AND has some real (non-Trash) target configured — a
+        // material can be accepted without being divertible (Film Plastics, PPE, Waste
+        // Disposal Bags), and counting that weight would inflate the Potential ceiling; a
+        // material marked divertible with no real target still can't become correctly_placed,
+        // so all three conditions are required — or (2) divertible_with_proper_handling, a
+        // hypothetical "could be diverted if handled correctly" ceiling claim (soiled
+        // materials with no real target today, and often marked not-accepted precisely
+        // because they can't be handled as-is) that deliberately skips both the
+        // accepted_in_program check and the target check. Mirrors materialHasDivertiblePath()
+        // in the live app exactly; correctly_placed (cpExpr above) must never reference this
+        // column — Current stays blind to it.
+        const properHandlingExpr = `INDEX('Materials Master'!$${properHandlingCol}$2:$${properHandlingCol}$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
+        const hasPathExpr = {f:`IF(OR(AND(${acceptedExpr}="Yes",${divertibleExpr}="Yes",${mmHasRealTargetExpr(matRef)}),${properHandlingExpr}="Yes"),1,0)`};
         fexRows.push([a.id, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr, a.name]);
       });
     });
@@ -5116,6 +5181,7 @@ function parseImportedWorkbook(wb){
     const catIdx = header.indexOf('material_category');
     const divIdx = header.indexOf('currently_divertible');
     const accIdx = header.indexOf('accepted_in_program');
+    const properHandlingIdx = header.indexOf('divertible_with_proper_handling');
     const legacyTargetIdx = header.indexOf('target_stream'); // pre-multi-target export format
 
     result.materials = mmRows.slice(1).filter(r => r[0]).map(r => {
@@ -5138,6 +5204,9 @@ function parseImportedWorkbook(wb){
         accepted: (accIdx >= 0 ? r[accIdx] : r[3]) || 'No',
         targets,
         divertible: (divIdx >= 0 ? r[divIdx] : r[5]) || 'No',
+        // Missing on every file exported before this column existed — default to 'No' rather
+        // than erroring or dropping the material, same as every other optional column here.
+        divertibleWithProperHandling: (properHandlingIdx >= 0 ? r[properHandlingIdx] : null) || 'No',
       };
     });
   }
