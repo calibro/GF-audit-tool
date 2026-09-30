@@ -346,6 +346,23 @@
   .area-field input, .area-field select{width:100%; padding:8px 10px; border-radius:6px; border:1.5px solid var(--line); font-size:14px; box-sizing:border-box;}
   .area-del-btn{flex:0 0 auto;} /* bottom-aligned via the row's own align-items, not centered */
   .add-area-btn{margin-top:12px; background:var(--brand-light); color:var(--brand-dark); border:none; border-radius:8px; padding:10px 14px; font-size:12px; font-weight:400; cursor:pointer;}
+  /* area-specific.html only: per-Area x Material program overrides, collapsed by default. */
+  .area-overrides{margin:0 4px 10px; font-size:13px;}
+  .area-overrides summary{cursor:pointer; color:var(--brand-dark); font-weight:600; padding:6px 0; list-style:none;}
+  .area-overrides summary::-webkit-details-marker{display:none;}
+  .area-overrides summary::before{content:'▸ '; font-size:11px;}
+  .area-overrides[open] summary::before{content:'▾ ';}
+  .area-overrides-cat{font-weight:600; font-size:11px; color:#5c584d; text-transform:uppercase; margin:10px 0 3px;}
+  .area-overrides-row{display:flex; align-items:center; gap:16px; padding:3px 0; border-bottom:1px solid #f0ece2;}
+  .area-overrides-name{flex:1; min-width:0;}
+  .area-overrides-toggle{display:flex; align-items:center; gap:4px; white-space:nowrap; font-size:12px; color:#5c584d; cursor:pointer;}
+  /* area-specific.html only: the what-if hypothetical-program chip selector, shared by
+     Summaries and Charts. */
+  .hypothetical-section{margin-top:16px; font-size:13px;}
+  .hypothetical-section summary{cursor:pointer; color:var(--brand-dark); font-weight:600; padding:6px 0;}
+  .hypothetical-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .hypo-chip{border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:100px; padding:6px 12px; font-size:12px; cursor:pointer;}
+  .hypo-chip.selected{background:var(--brand); border-color:var(--brand); color:#fff;}
   /* Streams get a two-line row (Figma "Redesign" file, streams tab): name + reorder/delete
      on top, full width, then the checkbox/baseline options below — rather than cramming all
      five controls into one non-wrapping row, which truncated the name field. */
@@ -864,7 +881,42 @@ function landfillStreamName(){
 function defaultFallbackStream(){
   return landfillStreamName() || (streamConfig[0] || {}).name || 'Trash';
 }
-function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && m.divertible === 'Yes' && stream !== landfillStreamName(); }
+// area-specific.html only: looks up this Area x Material pair's override, if any. A pair with
+// no override (the overwhelming majority — the array is sparse) returns null, and every
+// caller below falls back to the material's own accepted/divertible values exactly as before
+// this feature existed, so a session with zero overrides defined is a byte-for-byte no-op.
+function getAreaMaterialOverride(areaId, materialId){
+  return areaMaterialOverrides.find(o => o.areaId === areaId && o.materialId === materialId) || null;
+}
+// Finds or creates the (areaId, materialId) override entry and sets one flag on it, pruning
+// the entry back out the moment both flags are false again — an override only exists to record
+// a departure from "inherit the material's own values," so there's nothing to keep once neither
+// flag is set.
+function setAreaMaterialOverrideFlag(areaId, materialId, flag, value){
+  let o = getAreaMaterialOverride(areaId, materialId);
+  if (!o){
+    if (!value) return;
+    o = {areaId, materialId, unavailable:false, hypothetical:false};
+    areaMaterialOverrides.push(o);
+  }
+  o[flag] = value;
+  if (!o.unavailable && !o.hypothetical) areaMaterialOverrides = areaMaterialOverrides.filter(x => x !== o);
+  saveAreaMaterialOverrides();
+}
+// `unavailable` treats a material as though its accepted/divertible were both 'No' for this
+// one Area, regardless of what the material's own global values say — the concrete case is a
+// material that's globally divertible but has no real program in one specific Area today.
+// Read only by materialCorrectlyPlacedIn/materialHasDivertiblePath below; `hypothetical` never
+// appears here (see materialHasDivertiblePathWithHypothetical further down).
+function effectiveAcceptedDivertible(m, areaId){
+  const o = getAreaMaterialOverride(areaId, m.id);
+  if (o && o.unavailable) return {accepted:'No', divertible:'No'};
+  return {accepted:m.accepted, divertible:m.divertible};
+}
+function materialCorrectlyPlacedIn(m, stream, areaId){
+  const {accepted, divertible} = effectiveAcceptedDivertible(m, areaId);
+  return materialBelongsIn(m, stream) && accepted === 'Yes' && divertible === 'Yes' && stream !== landfillStreamName();
+}
 // Potential Diversion Rate is the ceiling: everything that *could* be diverted in this
 // program if it were placed perfectly. Two independent ways to qualify: (1) accepted in the
 // program AND marked divertible AND has a genuine non-landfill target configured — a material
@@ -875,11 +927,27 @@ function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, strea
 // claim about what's possible with proper handling, not a description of today's program, so
 // it deliberately skips both the accepted check and the target-list check — requiring
 // accepted='Yes' here would make it impossible for exactly the soiled/rejected materials this
-// flag exists for. See materialCorrectlyPlacedIn below, which must never reference this flag,
+// flag exists for. See materialCorrectlyPlacedIn above, which must never reference this flag,
 // since Current Diversion stays blind to it regardless.
-function materialHasDivertiblePath(m){
-  return (m.accepted === 'Yes' && m.divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName())) ||
+// areaId threads through to effectiveAcceptedDivertible for the `unavailable` override — every
+// caller already has an areaId in scope (computeExtrapolatedRows iterates per logged row, and
+// each row carries its own areaId), so this is a threading change, not new data.
+function materialHasDivertiblePath(m, areaId){
+  const {accepted, divertible} = effectiveAcceptedDivertible(m, areaId);
+  return (accepted === 'Yes' && divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName())) ||
     m.divertibleWithProperHandling === 'Yes';
+}
+// area-specific.html only: the parallel "what if we added this program" computation behind the
+// second, separately-displayed Potential Diversion Rate. `activeSet` is the currently-selected
+// set of hypothetical "areaId|materialId" keys (see hypotheticalKey) — being in that set makes
+// this pair count toward the what-if Potential unconditionally, bypassing `unavailable`
+// entirely for that one pair, since proposing the hypothetical program is exactly what sets
+// today's real-world constraint aside. Falls through to the normal (area-aware, unavailable-
+// respecting) check otherwise. Never called from computeExtrapolatedRows/materialCorrectlyPlacedIn
+// — this must only ever feed the separate what-if total, never Current or the default Potential.
+function materialHasDivertiblePathWithHypothetical(m, areaId, activeSet){
+  if (activeSet && activeSet.has(hypotheticalKey(areaId, m.id))) return true;
+  return materialHasDivertiblePath(m, areaId);
 }
 
 // ============================================================
@@ -1186,6 +1254,16 @@ auditMeta.auditDate = new Date().toISOString().slice(0,10); // YYYY-MM-DD
 let sortedEntries = [];   // {areaId, stream, materialId, materialName, weight, note, ts}
 let presortEntries = [];  // {areaId, stream, weight, note, ts}
 
+// area-specific.html only: per-Area x Material overrides layered on top of the material's own
+// accepted/divertible values. Sparse — an entry only exists while at least one of its two
+// flags is true (see setAreaMaterialOverrideFlag), so a session with no overrides at all has
+// an empty array and every calculation that consults it is a no-op, same as before this
+// feature existed. `unavailable` feeds Current/default-Potential (materialCorrectlyPlacedIn/
+// materialHasDivertiblePath); `hypothetical` only feeds the separate what-if Potential figure
+// (materialHasDivertiblePathWithHypothetical) and has zero effect on anything else — the two
+// flags are independent and can both be set on the same Area x Material pair at once.
+let areaMaterialOverrides = []; // [{areaId, materialId, unavailable, hypothetical}]
+
 let sortedSel = {rollup:null, areaId:null, stream:null, category:null, materialId:null, nonRepresentative:false};
 let presortSel = {rollup:null, areaId:null, stream:null, knownMaterialId:null};
 let editingSortedTs = null;
@@ -1263,6 +1341,7 @@ function loadState(){
   try { const m = localStorage.getItem('materials'); if (m) materials = JSON.parse(m); } catch(e){}
   try { const ar = localStorage.getItem('areas'); if (ar) areas = JSON.parse(ar); } catch(e){}
   try { const sc = localStorage.getItem('streamConfig'); if (sc) applyStreamConfig(JSON.parse(sc)); } catch(e){}
+  try { const amo = localStorage.getItem('areaMaterialOverrides'); if (amo) areaMaterialOverrides = JSON.parse(amo); } catch(e){}
   try { const si = localStorage.getItem('activeScenarioId'); if (si) activeScenarioId = si; } catch(e){}
   try { const se = localStorage.getItem('scenarioEdited'); if (se) scenarioEdited = JSON.parse(se); } catch(e){}
   migrateLoadedState();
@@ -1299,6 +1378,7 @@ function markScenarioEdited(){
 function saveMaterials(){ try { localStorage.setItem('materials', JSON.stringify(materials)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
 function saveAreas(){ try { localStorage.setItem('areas', JSON.stringify(areas)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
 function saveStreamConfig(){ try { localStorage.setItem('streamConfig', JSON.stringify(streamConfig)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
+function saveAreaMaterialOverrides(){ try { localStorage.setItem('areaMaterialOverrides', JSON.stringify(areaMaterialOverrides)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
 
 // Generic confirm dialog — the app's own modal, never window.confirm() (some embedded
 // webviews suppress it). Pass {title, message, confirmLabel, danger, onConfirm, onCancel}.
@@ -1338,7 +1418,12 @@ function applyScenario(scenarioId){
   materials = sc.materials.map(m => ({...m, targets:[...m.targets]}));
   areas = sc.areas.map(a => ({...a}));
   applyStreamConfig(sc.streamConfig.map(s => ({...s})));
-  saveMaterials(); saveAreas(); saveStreamConfig(); saveSorted(); savePresort();
+  // Same "switching scenario is a fresh start" reasoning as sortedEntries/presortEntries above
+  // — every bundled scenario reuses the same area/material ids (e.g. 'OFFICES'), so leaving a
+  // stale override in place could silently carry over and apply to a completely different
+  // scenario's same-named area/material.
+  areaMaterialOverrides = [];
+  saveMaterials(); saveAreas(); saveStreamConfig(); saveAreaMaterialOverrides(); saveSorted(); savePresort();
   applyingScenario = false;
   activeScenarioId = scenarioId;
   scenarioEdited = false;
@@ -1768,6 +1853,72 @@ function renderAddMaterialForm(){
   form.appendChild(saveBtn);
 }
 document.getElementById('closeAddMaterialModalBtn').onclick = closeAddMaterialModal;
+// area-specific.html only: per-Area x Material overrides. Collapsed by default (33+ materials
+// listed per area would otherwise dominate the Areas tab) — matches the existing "default
+// material" pattern's placement (area selected first via the outer loop in renderAreasForm,
+// then the material list here), just as its own expandable block rather than a single select,
+// since this needs two independent toggles per material instead of one pick.
+function renderAreaOverridesSection(a){
+  const details = document.createElement('details');
+  details.className = 'area-overrides';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Program overrides (per-material availability)';
+  details.appendChild(summary);
+  const table = document.createElement('div');
+  table.className = 'area-overrides-table';
+  CATEGORY_ORDER.forEach(cat => {
+    const catMaterials = materials.filter(m => m.category === cat);
+    if (!catMaterials.length) return;
+    const catHeader = document.createElement('div');
+    catHeader.className = 'area-overrides-cat';
+    catHeader.textContent = cat.toUpperCase();
+    table.appendChild(catHeader);
+    catMaterials.forEach(m => {
+      const override = getAreaMaterialOverride(a.id, m.id);
+      const row = document.createElement('div');
+      row.className = 'area-overrides-row';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'area-overrides-name';
+      nameSpan.textContent = m.name;
+      row.appendChild(nameSpan);
+
+      const unavailLabel = document.createElement('label');
+      unavailLabel.className = 'area-overrides-toggle';
+      const unavailCb = document.createElement('input');
+      unavailCb.type = 'checkbox';
+      unavailCb.checked = !!(override && override.unavailable);
+      unavailCb.addEventListener('change', () => {
+        setAreaMaterialOverrideFlag(a.id, m.id, 'unavailable', unavailCb.checked);
+        renderAll();
+      });
+      unavailLabel.appendChild(unavailCb);
+      unavailLabel.appendChild(document.createTextNode(' Unavailable'));
+      row.appendChild(unavailLabel);
+
+      // Only meaningful for a material that isn't already globally divertible — a material
+      // that's already divertible=Yes gains nothing from being marked hypothetical, since it
+      // already counts toward Potential on its own. Same visibility rule as the
+      // divertibleWithProperHandling toggle.
+      if (m.divertible !== 'Yes'){
+        const hypoLabel = document.createElement('label');
+        hypoLabel.className = 'area-overrides-toggle';
+        const hypoCb = document.createElement('input');
+        hypoCb.type = 'checkbox';
+        hypoCb.checked = !!(override && override.hypothetical);
+        hypoCb.addEventListener('change', () => {
+          setAreaMaterialOverrideFlag(a.id, m.id, 'hypothetical', hypoCb.checked);
+          renderAll();
+        });
+        hypoLabel.appendChild(hypoCb);
+        hypoLabel.appendChild(document.createTextNode(' Hypothetical'));
+        row.appendChild(hypoLabel);
+      }
+      table.appendChild(row);
+    });
+  });
+  details.appendChild(table);
+  return details;
+}
 function renderAreasForm(){
   const box = document.getElementById('areasForm');
   box.innerHTML = '';
@@ -1865,8 +2016,11 @@ function renderAreasForm(){
         areas.splice(idx, 1);
         sortedEntries = sortedEntries.filter(e => e.areaId !== removedId);
         presortEntries = presortEntries.filter(e => e.areaId !== removedId);
+        // Any override for this area is meaningless once the area itself is gone — same
+        // cleanup as the entries above, so it doesn't linger as dead weight in storage.
+        areaMaterialOverrides = areaMaterialOverrides.filter(o => o.areaId !== removedId);
         cancelEditSorted(); cancelEditPresort();
-        saveAreas(); saveSorted(); savePresort();
+        saveAreas(); saveSorted(); savePresort(); saveAreaMaterialOverrides();
         renderAll();
         showToast('Removed ' + removedName);
       };
@@ -1893,7 +2047,11 @@ function renderAreasForm(){
     ));
     defaultMatRow.appendChild(delBtn);
     row.appendChild(rollupWrap); row.appendChild(nameWrap); row.appendChild(defaultMatWrap);
-    box.appendChild(row);
+    const areaBlock = document.createElement('div');
+    areaBlock.className = 'area-block';
+    areaBlock.appendChild(row);
+    areaBlock.appendChild(renderAreaOverridesSection(a));
+    box.appendChild(areaBlock);
   });
 
   const addBtn = document.createElement('button');
@@ -2743,6 +2901,10 @@ document.getElementById('presortWeight').addEventListener('input', renderPresort
 // itself doesn't care which one triggered it.
 async function performNewSessionReset(){
   sortedEntries = []; presortEntries = [];
+  // Overrides reference specific area/material ids — a fresh scenario hands out entirely new
+  // ones, so any override from the previous session would just be dead weight, not a real
+  // no-op risk, but there's no reason to carry it forward either.
+  areaMaterialOverrides = [];
   applyingScenario = true;
   // "Start a new session" begins from a blank slate (the 'empty' scenario), not from whichever
   // preset happens to be first in the dropdown — a client-specific preset defaulting in here
@@ -2758,7 +2920,7 @@ async function performNewSessionReset(){
   // applyingScenario must still be true through these saves — saveMaterials/saveAreas/
   // saveStreamConfig would otherwise see scenarioEdited=false and immediately flip it back
   // to true via markScenarioEdited(), undoing the reset just above.
-  await saveSorted(); await savePresort(); await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta();
+  await saveSorted(); await savePresort(); await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveAreaMaterialOverrides(); await saveMeta();
   applyingScenario = false;
   saveScenarioState();
 }
@@ -2886,9 +3048,9 @@ function computeExtrapolatedRows(){
         materials.forEach(m => {
           const weight = sortedEntries.filter(e => e.areaId === a.id && e.stream === s && e.materialId === m.id).reduce((sum,e) => sum + e.weight, 0);
           const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
-          const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
+          const correctlyPlaced = materialCorrectlyPlacedIn(m, s, a.id) ? 1 : 0;
           rows.push({areaId:a.id, stream:s, materialId:m.id, materialName:m.name, category:m.category,
-                     weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m), rollup:a.rollup});
+                     weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m, a.id), rollup:a.rollup});
         });
         return;
       }
@@ -2914,9 +3076,9 @@ function computeExtrapolatedRows(){
           : (repSortedWeight / sortedTotal) * effectivePool;
         const weight = knownWeight + nonRepWeight + ratioTerm;
         const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
-        const correctlyPlaced = materialCorrectlyPlacedIn(m, s) ? 1 : 0;
+        const correctlyPlaced = materialCorrectlyPlacedIn(m, s, a.id) ? 1 : 0;
         rows.push({areaId:a.id, stream:s, materialId:m.id, materialName:m.name, category:m.category,
-                   weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m), rollup:a.rollup});
+                   weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m, a.id), rollup:a.rollup});
       });
     });
   });
@@ -3958,27 +4120,102 @@ window.downloadChartCard = function(btn){
 // group per individual Area (labeled with its tenant), or one per Tenant with its areas
 // combined — mirrors computeContaminationByStream's byArea so the two never disagree about
 // what a "group" means on the same tab.
-function computeDiversionByArea(byArea){
+// `activeSet` (optional): the currently-selected set of hypothetical "areaId|materialId" keys
+// — see materialHasDivertiblePathWithHypothetical. Omitted (the normal/default call, used
+// everywhere this function was already called before this feature existed), each group's
+// current/potential are computed exactly as before — this param is purely additive. Passed,
+// each group also gets a `potentialHypothetical` field: the same Potential calculation, but
+// with materialHasDivertiblePathWithHypothetical instead of the plain per-row hasDivertiblePath,
+// so selecting a hypothetical never touches current/potential, only this third field.
+function computeDiversionByArea(byArea, activeSet){
   const fex = computeExtrapolatedRows();
   const groupDefs = byArea
     ? areas.map(a => ({label: areaLabel(a.id), areaIds: [a.id]}))
     : distinctRollups().map(rg => ({label: rg, areaIds: areas.filter(a => a.rollup === rg).map(a => a.id)}));
+  const hasHypoPath = activeSet ? (r => {
+    const m = materials.find(mm => mm.id === r.materialId);
+    return m ? materialHasDivertiblePathWithHypothetical(m, r.areaId, activeSet) : false;
+  }) : null;
   const groups = groupDefs.map(({label, areaIds}) => {
     const total = areaIds.reduce((s,id) => s + areaTotalPresortLive(id), 0);
     const gData = fex.filter(r => areaIds.includes(r.areaId));
     const diverted = gData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
     const potential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-    return {label, current: total ? diverted/total : 0, potential: total ? potential/total : 0};
+    const g = {label, current: total ? diverted/total : 0, potential: total ? potential/total : 0};
+    if (hasHypoPath){
+      const potentialHypothetical = gData.filter(hasHypoPath).reduce((s,r) => s + r.weight, 0);
+      g.potentialHypothetical = total ? potentialHypothetical/total : 0;
+    }
+    return g;
   });
   const allTotal = areas.reduce((s,a) => s + areaTotalPresortLive(a.id), 0);
   const allDiverted = fex.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
   const allPotential = fex.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-  groups.push({label: 'Total', current: allTotal ? allDiverted/allTotal : 0, potential: allTotal ? allPotential/allTotal : 0, isTotal: true});
+  const totalGroup = {label: 'Total', current: allTotal ? allDiverted/allTotal : 0, potential: allTotal ? allPotential/allTotal : 0, isTotal: true};
+  if (hasHypoPath){
+    const allPotentialHypothetical = fex.filter(hasHypoPath).reduce((s,r) => s + r.weight, 0);
+    totalGroup.potentialHypothetical = allTotal ? allPotentialHypothetical/allTotal : 0;
+  }
+  groups.push(totalGroup);
   // A group sitting at 0% current AND 0% potential has nothing divertible either way (e.g.
   // Bathroom's default material isn't accepted anywhere) — a flat pair of empty bars is just
   // clutter, not information. Total always stays, since it's the one number that summarizes
   // everything regardless of which groups got filtered out here.
-  return groups.filter(g => g.isTotal || g.current > 0 || g.potential > 0);
+  // A group with a non-zero what-if figure stays too — that's exactly the case where an
+  // `unavailable` override zeroed out current/potential for this group, and the whole point
+  // of selecting a hypothetical there is to see this row's number, not have it vanish.
+  return groups.filter(g => g.isTotal || g.current > 0 || g.potential > 0 || g.potentialHypothetical > 0);
+}
+
+// area-specific.html only: which defined hypotheticals (areaMaterialOverrides entries with
+// hypothetical:true) are currently toggled on for the what-if Potential figure. UI-only,
+// intentionally not persisted — this is a live "what if" exploration, not a saved decision;
+// which Area x Material pairs are even available to explore (hypothetical:true) is the part
+// that's actually saved, in areaMaterialOverrides itself.
+let activeHypotheticalKeys = new Set();
+function hypotheticalKey(areaId, materialId){ return areaId + '|' + materialId; }
+function definedHypotheticals(){
+  return areaMaterialOverrides.filter(o => o.hypothetical).map(o => ({areaId:o.areaId, materialId:o.materialId}));
+}
+// Dynamic label for the what-if figure/chip — the exact wording the client asked for: name the
+// one program when there's exactly one active, otherwise just the count. Returns null when
+// nothing is active, since the caller's job in that case is to hide the figure entirely, not
+// show a number identical to the default Potential with a label attached.
+function hypotheticalLabel(pairs){
+  if (!pairs.length) return null;
+  if (pairs.length === 1){
+    const m = materials.find(mm => mm.id === pairs[0].materialId);
+    return `Potential Diversion Rate, with ${m ? m.name : pairs[0].materialId} in ${areaLabel(pairs[0].areaId)}`;
+  }
+  return `Potential Diversion Rate, with ${pairs.length} programs in place`;
+}
+window.toggleHypothetical = function(areaId, materialId){
+  const key = hypotheticalKey(areaId, materialId);
+  if (activeHypotheticalKeys.has(key)) activeHypotheticalKeys.delete(key); else activeHypotheticalKeys.add(key);
+  renderAll();
+};
+// Shared chip-selector block for the what-if Potential figure — used identically by both
+// Summaries (buildSummaryTablesHtml) and Charts (renderChartsTab), so the same selection
+// applies consistently wherever Potential Diversion Rate is shown, per one global
+// activeHypotheticalKeys. Returns '' when no hypotheticals are defined anywhere, so a session
+// with none configured shows nothing extra at all.
+// bodyHtml (optional): extra markup rendered after the chip row, inside the same <details> —
+// used by Summaries to show the what-if table/empty-state right below the chips. Charts
+// doesn't pass one, since the chart itself (outside this block, in chartCardHtml's footer)
+// already carries the what-if figure via buildDiversionTrackSvg's alt-scenario rendering.
+function buildHypotheticalChipsHtml(bodyHtml){
+  const allHypos = definedHypotheticals();
+  if (!allHypos.length) return '';
+  const chips = allHypos.map(({areaId, materialId}) => {
+    const m = materials.find(mm => mm.id === materialId);
+    const active = activeHypotheticalKeys.has(hypotheticalKey(areaId, materialId));
+    return `<button type="button" class="hypo-chip${active ? ' selected' : ''}" onclick="window.toggleHypothetical('${areaId}','${materialId}')">${escapeHtml(m ? m.name : materialId)} in ${escapeHtml(areaLabel(areaId))}</button>`;
+  }).join('');
+  return `<details class="hypothetical-section">
+    <summary>What if? (hypothetical program expansion)</summary>
+    <div class="hypothetical-chips">${chips}</div>
+    ${bodyHtml || ''}
+  </details>`;
 }
 
 const DIVERSION_CURRENT_COLOR = '#c98a1f'; // --amber
@@ -4365,7 +4602,22 @@ function renderChartsTab(){
   // sidebar's Grouping control (renderGroupingToggle), shared with the Contamination chart
   // below so the two never disagree about what a "group" means on this tab.
   const title2 = 'Current v Potential Diversion by ' + (chartsByArea ? 'Area' : 'Tenant');
-  const diversionGroups = computeDiversionByArea(chartsByArea);
+  const diversionGroups = computeDiversionByArea(chartsByArea, activeHypotheticalKeys);
+  // area-specific.html only: when at least one hypothetical is actively selected, feed
+  // buildDiversionTrackSvg's existing alt-scenario rendering (altPotential/potentialLabel/
+  // altPotentialLabel) with the what-if figure — none selected leaves every group exactly as
+  // it always was (no alt fields set), which is what keeps the chart byte-for-byte identical
+  // to before this feature existed whenever nothing is selected.
+  const activeHypoPairs = definedHypotheticals().filter(p => activeHypotheticalKeys.has(hypotheticalKey(p.areaId, p.materialId)));
+  if (activeHypoPairs.length){
+    const hypoLabel = hypotheticalLabel(activeHypoPairs);
+    diversionGroups.forEach(g => {
+      g.altPotential = g.potentialHypothetical;
+      g.potentialLabel = 'Potential';
+      g.altPotentialLabel = hypoLabel;
+    });
+  }
+  const diversionChipsHtml = buildHypotheticalChipsHtml();
 
   // Same matrix as the Summaries tab's "Waste Stream Contamination" table — also always the
   // full breakdown, same reasoning as the diversion charts above, and sharing the same
@@ -4395,7 +4647,7 @@ function renderChartsTab(){
   container.innerHTML =
     chartCardHtml(title1, buildDonutSvg(title1, donutData)) +
     chartCardHtml(title1b, buildMaterialTableSvg(title1b, materialRows)) +
-    chartCardHtml(title2, buildDiversionTrackSvg(title2, diversionGroups)) +
+    chartCardHtml(title2, buildDiversionTrackSvg(title2, diversionGroups), diversionChipsHtml) +
     chartCardHtml(title0, buildAlluvialSvg(title0, flow, chartsByArea ? 'Area' : 'Tenant')) +
     chartCardHtml(title3, buildCharacterizationSvg(title3, matrix, charSharedScale), char3ToggleHtml) +
     chartCardHtml(title2d, buildContaminationSvg(title2d, contamination, chartsByArea ? 'Area' : 'Tenant'), contam2dToggleHtml);
@@ -4596,6 +4848,36 @@ function buildSummaryTablesHtml(scope){
     const curRateTot = allTotal ? allDiverted/allTotal : 0, potRateTot = allTotal ? allPotential/allTotal : 0;
     t5Html += `<tr class="total-row"><td>Total</td><td class="num">${pct(curRateTot)}</td><td class="num">${pct(potRateTot)}</td><td class="num">${pct(potRateTot-curRateTot)}</td></tr>`;
     html += renderAnalysisTable('Current v Potential Diversion', [groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Gap'], t5Html);
+
+    // ---- What-if: hypothetical program expansion (area-specific.html only) ----
+    // Collapsed by default via buildHypotheticalChipsHtml's <details> — this is a "what if we
+    // added X" exploration, never part of Table 5's as-found numbers above, so it renders
+    // nothing extra at all until at least one hypothetical is actually defined AND selected.
+    if (definedHypotheticals().length){
+      const activePairs = definedHypotheticals().filter(p => activeHypotheticalKeys.has(hypotheticalKey(p.areaId, p.materialId)));
+      let whatIfBodyHtml;
+      if (activePairs.length){
+        const hypoLabel = hypotheticalLabel(activePairs);
+        const hasHypoPath = r => {
+          const m = materials.find(mm => mm.id === r.materialId);
+          return m ? materialHasDivertiblePathWithHypothetical(m, r.areaId, activeHypotheticalKeys) : false;
+        };
+        let hypoRowsHtml = '';
+        let hAllTotal = 0, hAllPotential = 0;
+        rowGroups.forEach(({label, match, denomIds}) => {
+          const total = denomIds.reduce((s,id) => s + areaTotalPresortLive(id), 0);
+          const gData = fex.filter(match);
+          const potentialHypo = gData.filter(hasHypoPath).reduce((s,r) => s + r.weight, 0);
+          hAllTotal += total; hAllPotential += potentialHypo;
+          hypoRowsHtml += `<tr><td>${label}</td><td class="num">${pct(total ? potentialHypo/total : 0)}</td></tr>`;
+        });
+        hypoRowsHtml += `<tr class="total-row"><td>Total</td><td class="num">${pct(hAllTotal ? hAllPotential/hAllTotal : 0)}</td></tr>`;
+        whatIfBodyHtml = renderAnalysisTable(hypoLabel, [groupColLabel, hypoLabel], hypoRowsHtml);
+      } else {
+        whatIfBodyHtml = '<p class="note">Select one or more programs above to see the what-if Potential Diversion Rate.</p>';
+      }
+      html += buildHypotheticalChipsHtml(whatIfBodyHtml);
+    }
   }
 
   return html;
@@ -5400,7 +5682,11 @@ document.getElementById('replaceImportBtn').onclick = async () => {
   auditMeta = {...auditMeta, ...pendingImport.auditMeta};
   sortedEntries = pendingImport.sortedEntries;
   presortEntries = pendingImport.presortEntries;
-  await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta(); await saveSorted(); await savePresort();
+  // The imported file's Areas/Materials Master carry their own ids — any override left over
+  // from the session being replaced would reference stale ids that no longer resolve to
+  // anything, so this is the same "start fresh" point as performNewSessionReset().
+  areaMaterialOverrides = [];
+  await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveAreaMaterialOverrides(); await saveMeta(); await saveSorted(); await savePresort();
   document.getElementById('importModal').classList.remove('show');
   pendingImport = null;
   renderAll();
