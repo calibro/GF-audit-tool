@@ -135,6 +135,12 @@
   .copy-table-btn:active{background:var(--brand); color:#fff;}
   table.analysis{width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:6px;}
   table.analysis th{background:var(--brand); color:#fff; text-align:left; padding:6px 8px; font-size:11px; font-weight:600; text-transform:uppercase; cursor:pointer; user-select:none; white-space:nowrap;}
+  /* Current v Potential Diversion's header labels (e.g. "Programs Applied Everywhere + <ghost
+     stream>") can run much longer than this table's other headers — letting them wrap onto a
+     second line, capped to a sane width, keeps the table from being stretched absurdly wide by
+     one column instead. Scoped to this table only (via renderAnalysisTable's extraClass) since
+     every other analysis table's headers are short enough that nowrap already reads fine. */
+  table.analysis.wrap-headers th{white-space:normal; line-height:1.25; max-width:150px; vertical-align:bottom;}
   table.analysis th:hover{background:var(--brand-dark);}
   table.analysis th .sort-arrow{display:inline-block; width:0.9em; opacity:0.6; font-size:10px;}
   table.analysis td{padding:6px 8px; border-bottom:1px solid var(--line);}
@@ -346,23 +352,6 @@
   .area-field input, .area-field select{width:100%; padding:8px 10px; border-radius:6px; border:1.5px solid var(--line); font-size:14px; box-sizing:border-box;}
   .area-del-btn{flex:0 0 auto;} /* bottom-aligned via the row's own align-items, not centered */
   .add-area-btn{margin-top:12px; background:var(--brand-light); color:var(--brand-dark); border:none; border-radius:8px; padding:10px 14px; font-size:12px; font-weight:400; cursor:pointer;}
-  /* area-specific.html only: per-Area x Material program overrides, collapsed by default. */
-  .area-overrides{margin:0 4px 10px; font-size:13px;}
-  .area-overrides summary{cursor:pointer; color:var(--brand-dark); font-weight:600; padding:6px 0; list-style:none;}
-  .area-overrides summary::-webkit-details-marker{display:none;}
-  .area-overrides summary::before{content:'▸ '; font-size:11px;}
-  .area-overrides[open] summary::before{content:'▾ ';}
-  .area-overrides-cat{font-weight:600; font-size:11px; color:#5c584d; text-transform:uppercase; margin:10px 0 3px;}
-  .area-overrides-row{display:flex; align-items:center; gap:16px; padding:3px 0; border-bottom:1px solid #f0ece2;}
-  .area-overrides-name{flex:1; min-width:0;}
-  .area-overrides-toggle{display:flex; align-items:center; gap:4px; white-space:nowrap; font-size:12px; color:#5c584d; cursor:pointer;}
-  /* area-specific.html only: the what-if hypothetical-program chip selector, shared by
-     Summaries and Charts. */
-  .hypothetical-section{margin-top:16px; font-size:13px;}
-  .hypothetical-section summary{cursor:pointer; color:var(--brand-dark); font-weight:600; padding:6px 0;}
-  .hypothetical-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
-  .hypo-chip{border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:100px; padding:6px 12px; font-size:12px; cursor:pointer;}
-  .hypo-chip.selected{background:var(--brand); border-color:var(--brand); color:#fff;}
   /* Streams get a two-line row (Figma "Redesign" file, streams tab): name + reorder/delete
      on top, full width, then the checkbox/baseline options below — rather than cramming all
      five controls into one non-wrapping row, which truncated the name field. */
@@ -373,6 +362,10 @@
   .field-input-row input, .field-input-row select{flex:1; min-width:0;}
   .reorder-btns button{flex:1;}
   .stream-row-options{display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-top:10px;}
+  .stream-scope{margin-top:10px;}
+  .stream-scope select{max-width:220px; padding:8px 10px; border-radius:6px; border:1.5px solid var(--line); font-size:13px; box-sizing:border-box; font-family:inherit; margin-top:4px;}
+  .stream-scope-areas{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:8px;}
+  .stream-scope-area-toggle{display:flex; align-items:center; gap:5px; font-size:13px; color:var(--ink); cursor:pointer;}
   /* Figma shows a plain checkbox with no surrounding box, and a real radio for the baseline
      pick — not the bordered "chip" .toggle-field is elsewhere in the app, and not a button. */
   #panel-info .toggle-field, #panel-presort .toggle-field, #panel-sorted .toggle-field{
@@ -520,7 +513,7 @@
     <p>This is a prototype — session data is saved only in this browser, on this device. If you clear your browser's site data, everything will be deleted permanently. Export your session to Excel to open it on another device or to back up your work.</p>
   </div>
 
-  <p class="intro-footer">Prototype designed and developed by Calibro for Great Forest.</p>
+  <p class="intro-footer">Prototype designed and developed by Calibro srls (VAT IT09323480963) for Great Forest.</p>
 </div>
 
 <div id="appRoot" hidden>
@@ -881,42 +874,26 @@ function landfillStreamName(){
 function defaultFallbackStream(){
   return landfillStreamName() || (streamConfig[0] || {}).name || 'Trash';
 }
-// area-specific.html only: looks up this Area x Material pair's override, if any. A pair with
-// no override (the overwhelming majority — the array is sparse) returns null, and every
-// caller below falls back to the material's own accepted/divertible values exactly as before
-// this feature existed, so a session with zero overrides defined is a byte-for-byte no-op.
-function getAreaMaterialOverride(areaId, materialId){
-  return areaMaterialOverrides.find(o => o.areaId === areaId && o.materialId === materialId) || null;
+// Whether a stream is actually offered for data entry in a given area — 'everywhere' always,
+// 'specific' only when areaId is in its list, 'notPresent' never, for any area. Shared by the
+// data-entry restriction (streamsAvailableForArea, below) and the calculation-level guarantee
+// (materialCorrectlyPlacedIn/materialHasDivertiblePathInArea) — the same defense-in-depth
+// pattern the landfill-baseline check already uses: a UI restriction plus an independent
+// calculation-level check, not just one or the other. A stream missing areaScope entirely
+// (shouldn't happen — applyStreamConfig guarantees one — but checked defensively) reads as
+// 'everywhere', matching that same default.
+function streamValidForArea(streamName, areaId){
+  const cfg = streamConfig.find(s => s.name === streamName);
+  const scope = (cfg && cfg.areaScope) || {type:'everywhere'};
+  if (scope.type === 'notPresent') return false;
+  if (scope.type === 'specific') return !!areaId && scope.areaIds.includes(areaId);
+  return true;
 }
-// Finds or creates the (areaId, materialId) override entry and sets one flag on it, pruning
-// the entry back out the moment both flags are false again — an override only exists to record
-// a departure from "inherit the material's own values," so there's nothing to keep once neither
-// flag is set.
-function setAreaMaterialOverrideFlag(areaId, materialId, flag, value){
-  let o = getAreaMaterialOverride(areaId, materialId);
-  if (!o){
-    if (!value) return;
-    o = {areaId, materialId, unavailable:false, hypothetical:false};
-    areaMaterialOverrides.push(o);
-  }
-  o[flag] = value;
-  if (!o.unavailable && !o.hypothetical) areaMaterialOverrides = areaMaterialOverrides.filter(x => x !== o);
-  saveAreaMaterialOverrides();
-}
-// `unavailable` treats a material as though its accepted/divertible were both 'No' for this
-// one Area, regardless of what the material's own global values say — the concrete case is a
-// material that's globally divertible but has no real program in one specific Area today.
-// Read only by materialCorrectlyPlacedIn/materialHasDivertiblePath below; `hypothetical` never
-// appears here (see materialHasDivertiblePathWithHypothetical further down).
-function effectiveAcceptedDivertible(m, areaId){
-  const o = getAreaMaterialOverride(areaId, m.id);
-  if (o && o.unavailable) return {accepted:'No', divertible:'No'};
-  return {accepted:m.accepted, divertible:m.divertible};
-}
-function materialCorrectlyPlacedIn(m, stream, areaId){
-  const {accepted, divertible} = effectiveAcceptedDivertible(m, areaId);
-  return materialBelongsIn(m, stream) && accepted === 'Yes' && divertible === 'Yes' && stream !== landfillStreamName();
-}
+// areaId is a defensive floor, not the primary defense — streamsAvailableForArea already keeps
+// an out-of-scope stream off the picker, so this only matters for data that got here some
+// other way (a pre-existing entry, a direct import). Current must stay just as blind to
+// divertibleWithProperHandling as ever; this only adds the area-scope check on top.
+function materialCorrectlyPlacedIn(m, stream, areaId){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && m.divertible === 'Yes' && stream !== landfillStreamName() && streamValidForArea(stream, areaId) && !isStreamNotDiverted(stream); }
 // Potential Diversion Rate is the ceiling: everything that *could* be diverted in this
 // program if it were placed perfectly. Two independent ways to qualify: (1) accepted in the
 // program AND marked divertible AND has a genuine non-landfill target configured — a material
@@ -929,25 +906,80 @@ function materialCorrectlyPlacedIn(m, stream, areaId){
 // accepted='Yes' here would make it impossible for exactly the soiled/rejected materials this
 // flag exists for. See materialCorrectlyPlacedIn above, which must never reference this flag,
 // since Current Diversion stays blind to it regardless.
-// areaId threads through to effectiveAcceptedDivertible for the `unavailable` override — every
-// caller already has an areaId in scope (computeExtrapolatedRows iterates per logged row, and
-// each row carries its own areaId), so this is a threading change, not new data.
-function materialHasDivertiblePath(m, areaId){
-  const {accepted, divertible} = effectiveAcceptedDivertible(m, areaId);
-  return (accepted === 'Yes' && divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName())) ||
+//
+// This is deliberately NOT area-aware — "Potential Diversion Rate, if every existing program
+// were active everywhere" is a real, useful number on its own (see the Global column added to
+// the Current v Potential Diversion table), so this function and every one of its existing
+// callers stay exactly as they are. materialHasDivertiblePathInArea, right below, is the new
+// area-aware version that becomes the default Potential Diversion Rate.
+function materialHasDivertiblePath(m){
+  return (m.accepted === 'Yes' && m.divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName())) ||
     m.divertibleWithProperHandling === 'Yes';
 }
-// area-specific.html only: the parallel "what if we added this program" computation behind the
-// second, separately-displayed Potential Diversion Rate. `activeSet` is the currently-selected
-// set of hypothetical "areaId|materialId" keys (see hypotheticalKey) — being in that set makes
-// this pair count toward the what-if Potential unconditionally, bypassing `unavailable`
-// entirely for that one pair, since proposing the hypothetical program is exactly what sets
-// today's real-world constraint aside. Falls through to the normal (area-aware, unavailable-
-// respecting) check otherwise. Never called from computeExtrapolatedRows/materialCorrectlyPlacedIn
-// — this must only ever feed the separate what-if total, never Current or the default Potential.
-function materialHasDivertiblePathWithHypothetical(m, areaId, activeSet){
-  if (activeSet && activeSet.has(hypotheticalKey(areaId, m.id))) return true;
-  return materialHasDivertiblePath(m, areaId);
+// The area-aware Potential: identical to materialHasDivertiblePath, except a target only
+// counts if that specific stream is actually valid in this area (streamValidForArea) — a
+// material whose only real target is a stream scoped to a different area has no genuine path
+// here, so it shouldn't count toward this area's ceiling even though it counts toward the
+// global one above. divertibleWithProperHandling still skips the target-list check entirely
+// (same reasoning as materialHasDivertiblePath — it's a hypothetical claim, not tied to any
+// one area's configured streams), so it's unaffected by area-scoping here.
+function materialHasDivertiblePathInArea(m, areaId){
+  return (m.accepted === 'Yes' && m.divertible === 'Yes' && m.targets.some(t => t !== landfillStreamName() && streamValidForArea(t, areaId))) ||
+    m.divertibleWithProperHandling === 'Yes';
+}
+// Every stream configured as areaScope: {type:'notPresent'} — a program that doesn't exist
+// anywhere yet, but could. The standing, always-on ghost-stream ceiling (below) is computed
+// once per stream in this list, not combined into one number.
+function ghostStreamNames(){
+  return streamConfig.filter(s => ((s.areaScope) || {type:'everywhere'}).type === 'notPresent').map(s => s.name);
+}
+// STREAMS minus the ghost ones — a ghost stream physically exists nowhere yet, so it has no
+// business appearing as its own row/column in Summaries or Charts (Waste Stream
+// Characterization, Waste Stream Contamination, Total Waste Generation): those views list
+// streams a site actually has, not ones that are merely configured. This is unconditional,
+// unlike the "hide zero weight" toggles — a ghost stream is excluded regardless of toggle
+// state, since it isn't a "present but empty" stream, it's not present at all. STREAMS itself,
+// streamConfig, and every calculation stay untouched; this is a display-only filter, same as
+// the hideZeroCols toggles it composes with.
+function presentStreamNames(){
+  const ghosts = new Set(ghostStreamNames());
+  return STREAMS.filter(s => !ghosts.has(s));
+}
+// A material's own, explicit claim that it could go to a specific not-yet-existing stream —
+// independent of accepted/divertible entirely, unlike every other flag on this page. That's
+// deliberate: the whole point of a ghost stream is that no real program exists for it today,
+// so requiring accepted='Yes' (as the real target-stream chips do) would make it impossible to
+// mark exactly the not-accepted materials this is for — Electronics-as-e-waste is the concrete
+// case. A material with no ghostTargets at all (the overwhelming majority) is unaffected.
+function materialGhostTargets(m){
+  return Array.isArray(m.ghostTargets) ? m.ghostTargets : [];
+}
+// The extra weight one specific ghost stream would add on top of the existing Global
+// Potential, for a given set of already-area-filtered fex rows. Only counts weight NOT already
+// counted by materialHasDivertiblePath (r.hasDivertiblePath) — a material that happens to
+// qualify both ways (e.g. already globally divertible AND separately ghost-targeted) is never
+// double-counted. "Any non-divertible material" per the client's own framing — this has no
+// divertible/accepted check of its own beyond that dedupe, since materialGhostTargets already
+// carries that intent (a material only appears there if someone explicitly marked it).
+function ghostPotentialWeightForStream(gData, streamName){
+  return gData.filter(r => {
+    if (r.hasDivertiblePath) return false;
+    const m = materials.find(mm => mm.id === r.materialId);
+    return m && materialGhostTargets(m).includes(streamName);
+  }).reduce((s,r) => s + r.weight, 0);
+}
+// Same idea, but combined across every ghost stream at once ("if every not-yet-existing
+// program were in place", not just one specific one) — a material only needs to be targeted at
+// ANY ghost stream to count here, and is still never double-counted against hasDivertiblePath.
+// Used for the single, standing "Potential diversion rate C" figure in the Current v Potential
+// Diversion chart, as opposed to the per-stream breakdown ghostPotentialWeightForStream still
+// feeds in the Summaries tab's table.
+function ghostPotentialWeightCombined(gData){
+  return gData.filter(r => {
+    if (r.hasDivertiblePath) return false;
+    const m = materials.find(mm => mm.id === r.materialId);
+    return m && materialGhostTargets(m).length > 0;
+  }).reduce((s,r) => s + r.weight, 0);
 }
 
 // ============================================================
@@ -1007,9 +1039,9 @@ const SCENARIO_NATIONWIDE_NO_ORGANICS_AREAS = [
 ];
 
 const SCENARIO_NATIONWIDE_NO_ORGANICS_STREAM_CONFIG = [
-  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
-  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, notDiverted:false, protected:false},
 ];
 
 const SCENARIO_NATIONWIDE_WITH_ORGANICS_MATERIALS = [
@@ -1054,10 +1086,10 @@ const SCENARIO_NATIONWIDE_WITH_ORGANICS_AREAS = [
 ];
 
 const SCENARIO_NATIONWIDE_WITH_ORGANICS_STREAM_CONFIG = [
-  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
-  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
-  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
 ];
 
 const SCENARIO_CBRE_BLOOMBERG_MATERIALS = [
@@ -1103,11 +1135,11 @@ const SCENARIO_CBRE_BLOOMBERG_AREAS = [
 ];
 
 const SCENARIO_CBRE_BLOOMBERG_STREAM_CONFIG = [
-  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
-  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
-  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
-  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false, protected:false},
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
 ];
 
 const SCENARIOS = [
@@ -1130,7 +1162,7 @@ const SCENARIOS = [
     id:'empty', label:'Empty',
     description:'Start from scratch — just the Trash landfill baseline, no areas, materials or recycling streams. Rename Trash to match the site and build the rest.',
     materials:[], areas:[],
-    streamConfig:[{name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true}],
+    streamConfig:[{name:'Trash', combinedWeighSort:false, excludeSoiled:true, notDiverted:false, protected:true}],
   },
 ];
 
@@ -1147,8 +1179,35 @@ function streamExcludesSoiled(streamName){
   const cfg = streamConfig.find(s => s.name === streamName);
   return cfg ? !!cfg.excludeSoiled : false;
 }
+// Independent of `protected` (the landfill baseline, already excluded from Current by
+// definition) and independent of areaScope — a stream can be valid-for-area and still flagged
+// notDiverted. An explicit, separate per-stream override for a non-landfill stream whose
+// weight still shouldn't count toward Current (e.g. "collected separately but not actually
+// sent anywhere yet"). Current only — materialHasDivertiblePath / materialHasDivertiblePathInArea
+// never reference this flag; a material that still has a real path elsewhere (in this area or
+// globally) keeps its full Potential credit regardless of this stream's flag.
+function isStreamNotDiverted(streamName){
+  const cfg = streamConfig.find(s => s.name === streamName);
+  return cfg ? !!cfg.notDiverted : false;
+}
+// The data-entry restriction that makes an Office/Organics-style mislog structurally
+// impossible: a stream is offered for a given area only when its areaScope allows it there —
+// 'everywhere' always, 'specific' only when areaId is in its list, 'notPresent' never, for any
+// area. currentStream (optional) is always kept in the list regardless of scope, so editing an
+// existing entry never hides its own already-logged stream out from under it — this restricts
+// what a NEW pick can choose, not what an edit can display.
+function streamsAvailableForArea(areaId, currentStream){
+  return STREAMS.filter(name => name === currentStream || streamValidForArea(name, areaId));
+}
 function applyStreamConfig(newConfig){
-  streamConfig = newConfig;
+  // Every stream gets an area-scope: 'everywhere' (valid for data entry in any area),
+  // 'specific' (only the listed areaIds), or 'notPresent' (not offered anywhere yet). Default
+  // to 'everywhere' whenever a stream doesn't already carry one — covers scenario presets
+  // (which don't define this field), files imported from before this feature existed, and
+  // freshly-added streams. This is the single choke point every streamConfig assignment goes
+  // through (scenario apply, loadState, import replace/merge, +Add stream), so defaulting
+  // here makes the whole feature a no-op for any site that never touches the new picker.
+  streamConfig = newConfig.map(s => s.areaScope ? s : {...s, areaScope: {type:'everywhere'}});
   STREAMS = streamConfig.map(s => s.name);
 }
 // All weights are stored internally in lbs regardless of what unit was entered — this
@@ -1254,16 +1313,6 @@ auditMeta.auditDate = new Date().toISOString().slice(0,10); // YYYY-MM-DD
 let sortedEntries = [];   // {areaId, stream, materialId, materialName, weight, note, ts}
 let presortEntries = [];  // {areaId, stream, weight, note, ts}
 
-// area-specific.html only: per-Area x Material overrides layered on top of the material's own
-// accepted/divertible values. Sparse — an entry only exists while at least one of its two
-// flags is true (see setAreaMaterialOverrideFlag), so a session with no overrides at all has
-// an empty array and every calculation that consults it is a no-op, same as before this
-// feature existed. `unavailable` feeds Current/default-Potential (materialCorrectlyPlacedIn/
-// materialHasDivertiblePath); `hypothetical` only feeds the separate what-if Potential figure
-// (materialHasDivertiblePathWithHypothetical) and has zero effect on anything else — the two
-// flags are independent and can both be set on the same Area x Material pair at once.
-let areaMaterialOverrides = []; // [{areaId, materialId, unavailable, hypothetical}]
-
 let sortedSel = {rollup:null, areaId:null, stream:null, category:null, materialId:null, nonRepresentative:false};
 let presortSel = {rollup:null, areaId:null, stream:null, knownMaterialId:null};
 let editingSortedTs = null;
@@ -1341,7 +1390,6 @@ function loadState(){
   try { const m = localStorage.getItem('materials'); if (m) materials = JSON.parse(m); } catch(e){}
   try { const ar = localStorage.getItem('areas'); if (ar) areas = JSON.parse(ar); } catch(e){}
   try { const sc = localStorage.getItem('streamConfig'); if (sc) applyStreamConfig(JSON.parse(sc)); } catch(e){}
-  try { const amo = localStorage.getItem('areaMaterialOverrides'); if (amo) areaMaterialOverrides = JSON.parse(amo); } catch(e){}
   try { const si = localStorage.getItem('activeScenarioId'); if (si) activeScenarioId = si; } catch(e){}
   try { const se = localStorage.getItem('scenarioEdited'); if (se) scenarioEdited = JSON.parse(se); } catch(e){}
   migrateLoadedState();
@@ -1378,7 +1426,6 @@ function markScenarioEdited(){
 function saveMaterials(){ try { localStorage.setItem('materials', JSON.stringify(materials)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
 function saveAreas(){ try { localStorage.setItem('areas', JSON.stringify(areas)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
 function saveStreamConfig(){ try { localStorage.setItem('streamConfig', JSON.stringify(streamConfig)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
-function saveAreaMaterialOverrides(){ try { localStorage.setItem('areaMaterialOverrides', JSON.stringify(areaMaterialOverrides)); setSaveStatus(true); } catch(e){ setSaveStatus(false); } markScenarioEdited(); }
 
 // Generic confirm dialog — the app's own modal, never window.confirm() (some embedded
 // webviews suppress it). Pass {title, message, confirmLabel, danger, onConfirm, onCancel}.
@@ -1418,12 +1465,7 @@ function applyScenario(scenarioId){
   materials = sc.materials.map(m => ({...m, targets:[...m.targets]}));
   areas = sc.areas.map(a => ({...a}));
   applyStreamConfig(sc.streamConfig.map(s => ({...s})));
-  // Same "switching scenario is a fresh start" reasoning as sortedEntries/presortEntries above
-  // — every bundled scenario reuses the same area/material ids (e.g. 'OFFICES'), so leaving a
-  // stale override in place could silently carry over and apply to a completely different
-  // scenario's same-named area/material.
-  areaMaterialOverrides = [];
-  saveMaterials(); saveAreas(); saveStreamConfig(); saveAreaMaterialOverrides(); saveSorted(); savePresort();
+  saveMaterials(); saveAreas(); saveStreamConfig(); saveSorted(); savePresort();
   applyingScenario = false;
   activeScenarioId = scenarioId;
   scenarioEdited = false;
@@ -1524,7 +1566,7 @@ function renderAuditInfoForm(){
     box.appendChild(makeAuditField(f));
   });
 }
-let mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No', divertibleWithProperHandling:'No'};
+let mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No', divertibleWithProperHandling:'No', ghostTargets:[]};
 
 function makeTargetChips(m){
   const wrap = document.createElement('div');
@@ -1578,6 +1620,38 @@ function makeTargetChips(m){
     note.textContent = 'No target stream — this material has no correct placement anywhere; finding it in any stream (including Trash) counts as contamination.';
     wrap.appendChild(note);
   }
+  return wrap;
+}
+// A material's claim that it could go to a specific not-yet-existing (ghost) stream — see
+// materialGhostTargets. Deliberately NEVER locked by accepted/divertible, unlike the real
+// target chips above: the whole point is imagining a program that doesn't exist today, so a
+// material that isn't accepted (or is Unacceptable) is exactly what this is for — Electronics-
+// as-e-waste is the concrete case. Returns null when there are no ghost streams configured at
+// all, so nothing renders until one actually exists.
+function makeGhostTargetChips(m, onChange){
+  const names = ghostStreamNames();
+  if (!names.length) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'mm-targets';
+  const lab = document.createElement('span');
+  lab.className = 'mm-label';
+  lab.textContent = 'Could go to, if this program existed (ghost stream)';
+  const chipRow = document.createElement('div');
+  chipRow.className = 'mm-target-chips';
+  const current = materialGhostTargets(m);
+  names.forEach(s => {
+    const c = document.createElement('div');
+    c.className = 'mm-target-chip' + (current.includes(s) ? ' selected' : '');
+    c.textContent = s;
+    c.onclick = () => {
+      const set = new Set(materialGhostTargets(m));
+      if (set.has(s)) set.delete(s); else set.add(s);
+      m.ghostTargets = [...set];
+      onChange();
+    };
+    chipRow.appendChild(c);
+  });
+  wrap.appendChild(lab); wrap.appendChild(chipRow);
   return wrap;
 }
 
@@ -1724,6 +1798,14 @@ function renderMaterialsMasterForm(){
       const targetsRow = document.createElement('div');
       targetsRow.className = 'mm-card-targets-row';
       targetsRow.appendChild(makeTargetChips(m));
+      // Same visibility rule as Divertible with proper handling — meaningless for a material
+      // that's already divertible=Yes, since it already counts without imagining anything.
+      // Unlike that flag, this one also applies to Unacceptable materials (that's the whole
+      // Electronics/e-waste case), so the gate is just divertible !== 'Yes'.
+      if (m.divertible !== 'Yes'){
+        const ghostChips = makeGhostTargetChips(m, () => { saveMaterials(); renderMaterialsMasterForm(); });
+        if (ghostChips) targetsRow.appendChild(ghostChips);
+      }
 
       card.appendChild(headerRow); card.appendChild(togglesRow); card.appendChild(targetsRow);
       body.appendChild(card);
@@ -1745,7 +1827,7 @@ function renderMaterialsMasterForm(){
 // #addMaterialFormRoot each time it opens (and on every keystroke/selection inside it, same
 // as the rest of Materials Master) so it always reflects the live streams/categories.
 function openAddMaterialModal(){
-  mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No', divertibleWithProperHandling:'No'};
+  mmNewMaterial = {name:'', category:CATEGORY_ORDER[0], accepted:'No', targets:[], divertible:'No', divertibleWithProperHandling:'No', ghostTargets:[]};
   renderAddMaterialForm();
   document.getElementById('addMaterialModal').classList.add('show');
 }
@@ -1826,6 +1908,11 @@ function renderAddMaterialForm(){
   }
   form.appendChild(targetChips);
 
+  if (mmNewMaterial.divertible !== 'Yes'){
+    const ghostChips = makeGhostTargetChips(mmNewMaterial, () => renderAddMaterialForm());
+    if (ghostChips) form.appendChild(ghostChips);
+  }
+
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button';
   saveBtn.className = 'btn btn-primary';
@@ -1844,7 +1931,7 @@ function renderAddMaterialForm(){
     let n = 1;
     let id = `${prefix}C${n}`;
     while (materials.some(m => m.id === id)){ n++; id = `${prefix}C${n}`; }
-    materials.push({id, name, category: mmNewMaterial.category, accepted: mmNewMaterial.accepted, targets: mmNewMaterial.targets.slice(), divertible: mmNewMaterial.divertible, divertibleWithProperHandling: mmNewMaterial.divertibleWithProperHandling});
+    materials.push({id, name, category: mmNewMaterial.category, accepted: mmNewMaterial.accepted, targets: mmNewMaterial.targets.slice(), divertible: mmNewMaterial.divertible, divertibleWithProperHandling: mmNewMaterial.divertibleWithProperHandling, ghostTargets: mmNewMaterial.ghostTargets.slice()});
     saveMaterials();
     closeAddMaterialModal();
     renderAll();
@@ -1853,72 +1940,6 @@ function renderAddMaterialForm(){
   form.appendChild(saveBtn);
 }
 document.getElementById('closeAddMaterialModalBtn').onclick = closeAddMaterialModal;
-// area-specific.html only: per-Area x Material overrides. Collapsed by default (33+ materials
-// listed per area would otherwise dominate the Areas tab) — matches the existing "default
-// material" pattern's placement (area selected first via the outer loop in renderAreasForm,
-// then the material list here), just as its own expandable block rather than a single select,
-// since this needs two independent toggles per material instead of one pick.
-function renderAreaOverridesSection(a){
-  const details = document.createElement('details');
-  details.className = 'area-overrides';
-  const summary = document.createElement('summary');
-  summary.textContent = 'Program overrides (per-material availability)';
-  details.appendChild(summary);
-  const table = document.createElement('div');
-  table.className = 'area-overrides-table';
-  CATEGORY_ORDER.forEach(cat => {
-    const catMaterials = materials.filter(m => m.category === cat);
-    if (!catMaterials.length) return;
-    const catHeader = document.createElement('div');
-    catHeader.className = 'area-overrides-cat';
-    catHeader.textContent = cat.toUpperCase();
-    table.appendChild(catHeader);
-    catMaterials.forEach(m => {
-      const override = getAreaMaterialOverride(a.id, m.id);
-      const row = document.createElement('div');
-      row.className = 'area-overrides-row';
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'area-overrides-name';
-      nameSpan.textContent = m.name;
-      row.appendChild(nameSpan);
-
-      const unavailLabel = document.createElement('label');
-      unavailLabel.className = 'area-overrides-toggle';
-      const unavailCb = document.createElement('input');
-      unavailCb.type = 'checkbox';
-      unavailCb.checked = !!(override && override.unavailable);
-      unavailCb.addEventListener('change', () => {
-        setAreaMaterialOverrideFlag(a.id, m.id, 'unavailable', unavailCb.checked);
-        renderAll();
-      });
-      unavailLabel.appendChild(unavailCb);
-      unavailLabel.appendChild(document.createTextNode(' Unavailable'));
-      row.appendChild(unavailLabel);
-
-      // Only meaningful for a material that isn't already globally divertible — a material
-      // that's already divertible=Yes gains nothing from being marked hypothetical, since it
-      // already counts toward Potential on its own. Same visibility rule as the
-      // divertibleWithProperHandling toggle.
-      if (m.divertible !== 'Yes'){
-        const hypoLabel = document.createElement('label');
-        hypoLabel.className = 'area-overrides-toggle';
-        const hypoCb = document.createElement('input');
-        hypoCb.type = 'checkbox';
-        hypoCb.checked = !!(override && override.hypothetical);
-        hypoCb.addEventListener('change', () => {
-          setAreaMaterialOverrideFlag(a.id, m.id, 'hypothetical', hypoCb.checked);
-          renderAll();
-        });
-        hypoLabel.appendChild(hypoCb);
-        hypoLabel.appendChild(document.createTextNode(' Hypothetical'));
-        row.appendChild(hypoLabel);
-      }
-      table.appendChild(row);
-    });
-  });
-  details.appendChild(table);
-  return details;
-}
 function renderAreasForm(){
   const box = document.getElementById('areasForm');
   box.innerHTML = '';
@@ -2016,11 +2037,8 @@ function renderAreasForm(){
         areas.splice(idx, 1);
         sortedEntries = sortedEntries.filter(e => e.areaId !== removedId);
         presortEntries = presortEntries.filter(e => e.areaId !== removedId);
-        // Any override for this area is meaningless once the area itself is gone — same
-        // cleanup as the entries above, so it doesn't linger as dead weight in storage.
-        areaMaterialOverrides = areaMaterialOverrides.filter(o => o.areaId !== removedId);
         cancelEditSorted(); cancelEditPresort();
-        saveAreas(); saveSorted(); savePresort(); saveAreaMaterialOverrides();
+        saveAreas(); saveSorted(); savePresort();
         renderAll();
         showToast('Removed ' + removedName);
       };
@@ -2047,11 +2065,7 @@ function renderAreasForm(){
     ));
     defaultMatRow.appendChild(delBtn);
     row.appendChild(rollupWrap); row.appendChild(nameWrap); row.appendChild(defaultMatWrap);
-    const areaBlock = document.createElement('div');
-    areaBlock.className = 'area-block';
-    areaBlock.appendChild(row);
-    areaBlock.appendChild(renderAreaOverridesSection(a));
-    box.appendChild(areaBlock);
+    box.appendChild(row);
   });
 
   const addBtn = document.createElement('button');
@@ -2211,6 +2225,32 @@ function renderStreamsForm(){
     lab.textContent = 'Combined weigh-and-sort (no separate bagging)';
     toggleWrap.appendChild(cb); toggleWrap.appendChild(lab);
 
+    // Not diverted — independent of the landfill baseline (`protected`) and of areaScope: a
+    // stream that isn't the baseline but whose weight still shouldn't count as Current
+    // diversion (e.g. collected separately but with no real outlet yet). Affects Current only;
+    // Potential stays untouched (see isStreamNotDiverted). Hidden on the protected stream
+    // itself — it's already excluded from Current by definition, so a second, redundant
+    // control there would just be confusing.
+    let notDivertedWrap = null;
+    if (!s.protected){
+      notDivertedWrap = document.createElement('label');
+      notDivertedWrap.className = 'toggle-field';
+      const ndCb = document.createElement('input');
+      ndCb.type = 'checkbox';
+      ndCb.checked = !!s.notDiverted;
+      ndCb.addEventListener('change', () => {
+        s.notDiverted = ndCb.checked;
+        saveStreamConfig();
+        renderAll();
+        showToast(s.notDiverted
+          ? s.name + ': no longer counts toward Current Diversion Rate'
+          : s.name + ': counts toward Current Diversion Rate again');
+      });
+      const ndLab = document.createElement('span');
+      ndLab.textContent = 'Not diverted';
+      notDivertedWrap.appendChild(ndCb); notDivertedWrap.appendChild(ndLab);
+    }
+
     // Landfill-baseline control — exactly one stream is the disposal baseline every
     // diversion figure is measured against. A real radio group (shared `name`) both shows
     // and sets it: picking a different stream's radio moves the flag there for free via
@@ -2304,10 +2344,70 @@ function renderStreamsForm(){
     const optionsRow = document.createElement('div');
     optionsRow.className = 'stream-row-options';
     optionsRow.appendChild(toggleWrap);
+    if (notDivertedWrap) optionsRow.appendChild(notDivertedWrap);
     optionsRow.appendChild(baseWrap);
+
+    // Where this stream is actually offered for data entry — the control that makes an
+    // Office/Organics-style mislog structurally impossible rather than just discouraged (see
+    // streamsAvailableForArea, which the Pre-Sort/Sorted Weights stream pickers both read).
+    if (!s.areaScope) s.areaScope = {type:'everywhere'}; // defensive; applyStreamConfig already guarantees this
+    const scopeWrap = document.createElement('div');
+    scopeWrap.className = 'stream-scope';
+    const scopeLabel = document.createElement('span');
+    scopeLabel.className = 'mm-label';
+    scopeLabel.textContent = 'Where this stream is offered';
+    const scopeSelect = document.createElement('select');
+    [['everywhere','Everywhere'], ['specific','Specific areas'], ['notPresent','Not present yet']].forEach(([val, optLabel]) => {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = optLabel;
+      if (s.areaScope.type === val) opt.selected = true;
+      scopeSelect.appendChild(opt);
+    });
+    scopeSelect.addEventListener('change', () => {
+      const type = scopeSelect.value;
+      s.areaScope = type === 'specific'
+        ? {type, areaIds: (s.areaScope.type === 'specific' ? s.areaScope.areaIds : [])}
+        : {type};
+      applyStreamConfig(streamConfig);
+      saveStreamConfig();
+      renderAll();
+    });
+    scopeWrap.appendChild(scopeLabel);
+    scopeWrap.appendChild(scopeSelect);
+
+    if (s.areaScope.type === 'specific'){
+      const areaChecks = document.createElement('div');
+      areaChecks.className = 'stream-scope-areas';
+      if (!areas.length){
+        const none = document.createElement('span');
+        none.className = 'empty-hint';
+        none.textContent = 'No areas configured yet';
+        areaChecks.appendChild(none);
+      }
+      areas.forEach(a => {
+        const areaToggle = document.createElement('label');
+        areaToggle.className = 'stream-scope-area-toggle';
+        const areaCb = document.createElement('input');
+        areaCb.type = 'checkbox';
+        areaCb.checked = s.areaScope.areaIds.includes(a.id);
+        areaCb.addEventListener('change', () => {
+          const ids = new Set(s.areaScope.areaIds);
+          if (areaCb.checked) ids.add(a.id); else ids.delete(a.id);
+          s.areaScope = {type:'specific', areaIds:[...ids]};
+          applyStreamConfig(streamConfig);
+          saveStreamConfig();
+          renderAll();
+        });
+        areaToggle.appendChild(areaCb);
+        areaToggle.appendChild(document.createTextNode(' ' + areaLabel(a.id)));
+        areaChecks.appendChild(areaToggle);
+      });
+      scopeWrap.appendChild(areaChecks);
+    }
 
     row.appendChild(nameWrap);
     row.appendChild(optionsRow);
+    row.appendChild(scopeWrap);
     box.appendChild(row);
   });
 
@@ -2323,7 +2423,7 @@ function renderStreamsForm(){
     // adding a stream after the site-level baseline toggle above has been explicitly switched
     // off doesn't silently turn it back on.
     const firstBaseline = streamConfig.length === 0;
-    streamConfig.push({name, combinedWeighSort:false, excludeSoiled:false, protected: firstBaseline});
+    streamConfig.push({name, combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected: firstBaseline});
     applyStreamConfig(streamConfig);
     saveStreamConfig();
     renderAll();
@@ -2486,7 +2586,7 @@ function renderSortedAreas(){
 function renderSortedStreams(){
   const box = document.getElementById('sortedStreamChips');
   box.innerHTML = '';
-  STREAMS.forEach(s => {
+  streamsAvailableForArea(sortedSel.areaId, sortedSel.stream).forEach(s => {
     box.appendChild(chip(s, sortedSel.stream === s, () => {
       sortedSel.stream = s;
       // Same edit-mode carve-out as the rollup chip above: area/stream are the error-prone
@@ -2574,7 +2674,7 @@ function renderPresortStreams(){
   // Combined weigh-and-sort streams (e.g. loose cardboard) skip this tab entirely — there's
   // no separate bag weight to log, since weighing and sorting happen in one action on the
   // Sorted Weights tab.
-  STREAMS.filter(s => !isCombinedWeighSort(s)).forEach(s => {
+  streamsAvailableForArea(presortSel.areaId, presortSel.stream).filter(s => !isCombinedWeighSort(s)).forEach(s => {
     box.appendChild(chip(s, presortSel.stream === s, () => { presortSel.stream = s; renderAll(); }));
   });
 }
@@ -2591,7 +2691,7 @@ function renderPresortKnownToggle(){
     renderAll();
   });
   const lab = document.createElement('span');
-  lab.textContent = 'Known composition — this whole bag is one material';
+  lab.textContent = 'Known Composition — the material is loose, or the whole bag is one material';
   wrap.appendChild(cb); wrap.appendChild(lab);
   box.appendChild(wrap);
   if (presortSel.knownMaterialId !== null){
@@ -2624,7 +2724,7 @@ function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 function knownBadge(e){
   if (!e.knownMaterialId) return '';
   const mat = materials.find(m => m.id === e.knownMaterialId);
-  return ` <span class="flag-badge" title="Known composition — excluded from the extrapolation pool">known: ${escapeHtml(mat ? mat.name : e.knownMaterialId)}</span>`;
+  return ` <span class="flag-badge" title="Known Composition — loose or single-material, excluded from the extrapolation pool">known: ${escapeHtml(mat ? mat.name : e.knownMaterialId)}</span>`;
 }
 function nonRepBadge(e){
   if (!e.nonRepresentative) return '';
@@ -2901,10 +3001,6 @@ document.getElementById('presortWeight').addEventListener('input', renderPresort
 // itself doesn't care which one triggered it.
 async function performNewSessionReset(){
   sortedEntries = []; presortEntries = [];
-  // Overrides reference specific area/material ids — a fresh scenario hands out entirely new
-  // ones, so any override from the previous session would just be dead weight, not a real
-  // no-op risk, but there's no reason to carry it forward either.
-  areaMaterialOverrides = [];
   applyingScenario = true;
   // "Start a new session" begins from a blank slate (the 'empty' scenario), not from whichever
   // preset happens to be first in the dropdown — a client-specific preset defaulting in here
@@ -2920,7 +3016,7 @@ async function performNewSessionReset(){
   // applyingScenario must still be true through these saves — saveMaterials/saveAreas/
   // saveStreamConfig would otherwise see scenarioEdited=false and immediately flip it back
   // to true via markScenarioEdited(), undoing the reset just above.
-  await saveSorted(); await savePresort(); await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveAreaMaterialOverrides(); await saveMeta();
+  await saveSorted(); await savePresort(); await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta();
   applyingScenario = false;
   saveScenarioState();
 }
@@ -3013,7 +3109,7 @@ let chartsByArea = false;
 // Charts each get their own copy (chartsContamHideZeroCols, declared near the other Charts
 // toggles), matching how summaryByArea/chartsByArea are already independent per tab rather
 // than one shared control.
-let summaryContamHideZeroCols = false;
+let summaryContamHideZeroCols = true;
 // Qualified "Name — Tenant" label for an area — safe to show in any context that lists
 // entries across more than one area/tenant at once, since two different areas can share a
 // bare name and only the pairing with its tenant is guaranteed to identify which one. Skips
@@ -3050,7 +3146,8 @@ function computeExtrapolatedRows(){
           const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
           const correctlyPlaced = materialCorrectlyPlacedIn(m, s, a.id) ? 1 : 0;
           rows.push({areaId:a.id, stream:s, materialId:m.id, materialName:m.name, category:m.category,
-                     weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m, a.id), rollup:a.rollup});
+                     weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m),
+                     hasDivertiblePath:materialHasDivertiblePath(m), hasDivertiblePathInArea:materialHasDivertiblePathInArea(m, a.id), rollup:a.rollup});
         });
         return;
       }
@@ -3078,7 +3175,8 @@ function computeExtrapolatedRows(){
         const belongsHere = materialBelongsIn(m, s) ? 1 : 0;
         const correctlyPlaced = materialCorrectlyPlacedIn(m, s, a.id) ? 1 : 0;
         rows.push({areaId:a.id, stream:s, materialId:m.id, materialName:m.name, category:m.category,
-                   weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m), hasDivertiblePath:materialHasDivertiblePath(m, a.id), rollup:a.rollup});
+                   weight, belongsHere, correctlyPlaced, accepted:materialAccepted(m),
+                   hasDivertiblePath:materialHasDivertiblePath(m), hasDivertiblePathInArea:materialHasDivertiblePathInArea(m, a.id), rollup:a.rollup});
       });
     });
   });
@@ -3406,8 +3504,8 @@ const CATEGORY_COLORS = {
 };
 let charSharedScale = false; // false = each stream column scaled to its own max; true = one scale for all columns
 let charHideZeroRows = true; // true = hide materials with 0 weight across every stream
-let charHideZeroCols = false; // true = hide streams with 0 weight logged across every material
-let chartsContamHideZeroCols = false; // Waste Stream Contamination chart's own copy of the same toggle
+let charHideZeroCols = true; // true = hide streams with 0 weight logged across every material
+let chartsContamHideZeroCols = true; // Waste Stream Contamination chart's own copy of the same toggle
 
 // ============================================================
 // Total Waste Generation — alluvial (Sankey-style) diagram: Area -> Stream -> Diverted /
@@ -3679,9 +3777,11 @@ function computeContaminationByStream(byArea, hideZeroCols){
   // whether it gets a column here. This chart is always the full unscoped breakdown (never
   // filtered by the Filter Sidebar — see the "always the full breakdown" callers), so
   // "observed" is checked across every area, not just whichever byArea grouping is active.
+  // Ghost streams are excluded unconditionally (presentStreamNames), independent of the
+  // hideZeroCols toggle — they're not "present but empty," they're not present at all.
   const streamsList = hideZeroCols
-    ? STREAMS.filter(s => areas.reduce((sum,a) => sum + streamWeightForArea(a.id, s), 0) > 0)
-    : STREAMS;
+    ? presentStreamNames().filter(s => areas.reduce((sum,a) => sum + streamWeightForArea(a.id, s), 0) > 0)
+    : presentStreamNames();
   function rowFor(label, areaIds, isTotal){
     const cells = streamsList.map(s => {
       const total = areaIds.reduce((sum,id) => sum + streamWeightForArea(id, s), 0);
@@ -4120,158 +4220,165 @@ window.downloadChartCard = function(btn){
 // group per individual Area (labeled with its tenant), or one per Tenant with its areas
 // combined — mirrors computeContaminationByStream's byArea so the two never disagree about
 // what a "group" means on the same tab.
-// `activeSet` (optional): the currently-selected set of hypothetical "areaId|materialId" keys
-// — see materialHasDivertiblePathWithHypothetical. Omitted (the normal/default call, used
-// everywhere this function was already called before this feature existed), each group's
-// current/potential are computed exactly as before — this param is purely additive. Passed,
-// each group also gets a `potentialHypothetical` field: the same Potential calculation, but
-// with materialHasDivertiblePathWithHypothetical instead of the plain per-row hasDivertiblePath,
-// so selecting a hypothetical never touches current/potential, only this third field.
-function computeDiversionByArea(byArea, activeSet){
+// `potential` (area-aware, via hasDivertiblePathInArea) is the default Potential Diversion
+// Rate — a target only counts if its stream is actually valid in that specific area.
+// `globalPotential` (via hasDivertiblePath, unchanged) is "if every existing program were
+// active everywhere" — kept as its own explicit column (see the Current v Potential Diversion
+// table/chart) rather than folded away, since it's still a real, useful ceiling on its own.
+function computeDiversionByArea(byArea){
   const fex = computeExtrapolatedRows();
   const groupDefs = byArea
     ? areas.map(a => ({label: areaLabel(a.id), areaIds: [a.id]}))
     : distinctRollups().map(rg => ({label: rg, areaIds: areas.filter(a => a.rollup === rg).map(a => a.id)}));
-  const hasHypoPath = activeSet ? (r => {
-    const m = materials.find(mm => mm.id === r.materialId);
-    return m ? materialHasDivertiblePathWithHypothetical(m, r.areaId, activeSet) : false;
-  }) : null;
+  const ghostRateFor = (gData, total, globalPotential) => {
+    const weight = globalPotential + ghostPotentialWeightCombined(gData);
+    return total ? weight/total : 0;
+  };
   const groups = groupDefs.map(({label, areaIds}) => {
     const total = areaIds.reduce((s,id) => s + areaTotalPresortLive(id), 0);
     const gData = fex.filter(r => areaIds.includes(r.areaId));
     const diverted = gData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-    const potential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-    const g = {label, current: total ? diverted/total : 0, potential: total ? potential/total : 0};
-    if (hasHypoPath){
-      const potentialHypothetical = gData.filter(hasHypoPath).reduce((s,r) => s + r.weight, 0);
-      g.potentialHypothetical = total ? potentialHypothetical/total : 0;
-    }
-    return g;
+    const potential = gData.filter(r => r.hasDivertiblePathInArea).reduce((s,r) => s + r.weight, 0);
+    const globalPotential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+    return {label, current: total ? diverted/total : 0, potential: total ? potential/total : 0,
+             globalPotential: total ? globalPotential/total : 0,
+             ghostPotential: ghostRateFor(gData, total, globalPotential)};
   });
   const allTotal = areas.reduce((s,a) => s + areaTotalPresortLive(a.id), 0);
   const allDiverted = fex.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-  const allPotential = fex.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-  const totalGroup = {label: 'Total', current: allTotal ? allDiverted/allTotal : 0, potential: allTotal ? allPotential/allTotal : 0, isTotal: true};
-  if (hasHypoPath){
-    const allPotentialHypothetical = fex.filter(hasHypoPath).reduce((s,r) => s + r.weight, 0);
-    totalGroup.potentialHypothetical = allTotal ? allPotentialHypothetical/allTotal : 0;
-  }
-  groups.push(totalGroup);
+  const allPotential = fex.filter(r => r.hasDivertiblePathInArea).reduce((s,r) => s + r.weight, 0);
+  const allGlobalPotential = fex.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+  groups.push({label: 'Total', current: allTotal ? allDiverted/allTotal : 0, potential: allTotal ? allPotential/allTotal : 0,
+               globalPotential: allTotal ? allGlobalPotential/allTotal : 0,
+               ghostPotential: ghostRateFor(fex, allTotal, allGlobalPotential), isTotal: true});
   // A group sitting at 0% current AND 0% potential has nothing divertible either way (e.g.
   // Bathroom's default material isn't accepted anywhere) — a flat pair of empty bars is just
   // clutter, not information. Total always stays, since it's the one number that summarizes
-  // everything regardless of which groups got filtered out here.
-  // A group with a non-zero what-if figure stays too — that's exactly the case where an
-  // `unavailable` override zeroed out current/potential for this group, and the whole point
-  // of selecting a hypothetical there is to see this row's number, not have it vanish.
-  return groups.filter(g => g.isTotal || g.current > 0 || g.potential > 0 || g.potentialHypothetical > 0);
-}
-
-// area-specific.html only: which defined hypotheticals (areaMaterialOverrides entries with
-// hypothetical:true) are currently toggled on for the what-if Potential figure. UI-only,
-// intentionally not persisted — this is a live "what if" exploration, not a saved decision;
-// which Area x Material pairs are even available to explore (hypothetical:true) is the part
-// that's actually saved, in areaMaterialOverrides itself.
-let activeHypotheticalKeys = new Set();
-function hypotheticalKey(areaId, materialId){ return areaId + '|' + materialId; }
-function definedHypotheticals(){
-  return areaMaterialOverrides.filter(o => o.hypothetical).map(o => ({areaId:o.areaId, materialId:o.materialId}));
-}
-// Dynamic label for the what-if figure/chip — the exact wording the client asked for: name the
-// one program when there's exactly one active, otherwise just the count. Returns null when
-// nothing is active, since the caller's job in that case is to hide the figure entirely, not
-// show a number identical to the default Potential with a label attached.
-function hypotheticalLabel(pairs){
-  if (!pairs.length) return null;
-  if (pairs.length === 1){
-    const m = materials.find(mm => mm.id === pairs[0].materialId);
-    return `Potential Diversion Rate, with ${m ? m.name : pairs[0].materialId} in ${areaLabel(pairs[0].areaId)}`;
-  }
-  return `Potential Diversion Rate, with ${pairs.length} programs in place`;
-}
-window.toggleHypothetical = function(areaId, materialId){
-  const key = hypotheticalKey(areaId, materialId);
-  if (activeHypotheticalKeys.has(key)) activeHypotheticalKeys.delete(key); else activeHypotheticalKeys.add(key);
-  renderAll();
-};
-// Shared chip-selector block for the what-if Potential figure — used identically by both
-// Summaries (buildSummaryTablesHtml) and Charts (renderChartsTab), so the same selection
-// applies consistently wherever Potential Diversion Rate is shown, per one global
-// activeHypotheticalKeys. Returns '' when no hypotheticals are defined anywhere, so a session
-// with none configured shows nothing extra at all.
-// bodyHtml (optional): extra markup rendered after the chip row, inside the same <details> —
-// used by Summaries to show the what-if table/empty-state right below the chips. Charts
-// doesn't pass one, since the chart itself (outside this block, in chartCardHtml's footer)
-// already carries the what-if figure via buildDiversionTrackSvg's alt-scenario rendering.
-function buildHypotheticalChipsHtml(bodyHtml){
-  const allHypos = definedHypotheticals();
-  if (!allHypos.length) return '';
-  const chips = allHypos.map(({areaId, materialId}) => {
-    const m = materials.find(mm => mm.id === materialId);
-    const active = activeHypotheticalKeys.has(hypotheticalKey(areaId, materialId));
-    return `<button type="button" class="hypo-chip${active ? ' selected' : ''}" onclick="window.toggleHypothetical('${areaId}','${materialId}')">${escapeHtml(m ? m.name : materialId)} in ${escapeHtml(areaLabel(areaId))}</button>`;
-  }).join('');
-  return `<details class="hypothetical-section">
-    <summary>What if? (hypothetical program expansion)</summary>
-    <div class="hypothetical-chips">${chips}</div>
-    ${bodyHtml || ''}
-  </details>`;
+  // everything regardless of which groups got filtered out here. globalPotential/ghostPotential
+  // deliberately aren't part of this check — a group can have a genuine global or ghost-stream
+  // ceiling (e.g. a program that exists elsewhere but not here) while its area-aware potential
+  // sits at exactly 0.
+  return groups.filter(g => g.isTotal || g.current > 0 || g.potential > 0 || g.globalPotential > 0 || g.ghostPotential > 0);
 }
 
 const DIVERSION_CURRENT_COLOR = '#c98a1f'; // --amber
 const DIVERSION_POTENTIAL_COLOR = '#1f5c4c'; // --brand
 
 // Current v Potential Diversion — one full-width progress track per group: a solid fill up
-// to the current rate, with the potential rate marked as a threshold line further along the
-// same track, plus the gap between the two spelled out in points at the right of the group's
-// own label line (potential minus current — the improvement still on the table).
-// A group can optionally carry a second, alternately-scoped Potential rate alongside the
-// primary one — e.g. "Excluding Unacceptable" vs. "Including Unacceptable" — for comparing
-// two same-moment scenarios, not a before/after over time (a "previous/ghost marker" framing
-// was tried and tested as confusing, since it reads as timeline language for something that
-// isn't one). All three of altPotential/potentialLabel/altPotentialLabel must be present
-// together for a group to render this way; a group with none of them renders exactly as
-// before — same output, byte for byte.
-function buildDiversionTrackSvg(title, groups, explanationNote){
+// to the current rate, plus up to three vertical threshold markers further along the same
+// track, each a different "what if" scenario, each with its own line style/color. Which of
+// A/B/C a given call actually draws is up to opts.showA/showB/showC — the three call sites in
+// renderChartsTab each draw exactly one, as three entirely separate chart cards (plain
+// Current-v-Potential with A, "(programs active across all areas)" with B, "(with new
+// programs)" with C) so a reader never has to work out which line on a chart a given label
+// belongs to:
+//   A — if everything already divertible under today's programs, in the areas those programs
+//     actually run in, were placed correctly. g.potential.
+//   B (only meaningful when at least one stream is scoped to specific areas rather than
+//     everywhere) — if those same existing programs ran in every area instead of just where
+//     they're scoped today. g.globalPotential. A no-op (identical to A) when every stream is
+//     already everywhere, which is why renderChartsTab skips B's whole chart card in that case.
+//   C (only meaningful when at least one "not present yet" ghost stream is configured) — B
+//     plus every not-yet-existing program a material has been explicitly marked as a candidate
+//     for (materialGhostTargets). g.ghostPotential. Skipped entirely when there's no ghost
+//     stream configured.
+// Each marker gets its own "+n.n%" gap-to-current label above the track and its own absolute
+// rate below it; a short explanatory paragraph per series actually shown runs along the
+// bottom, so each chart is self-contained without needing the legend alone to carry the
+// meaning of its lines.
+// Series definitions shared by both the legend, the per-row markers, and the bottom
+// explanation paragraphs — keyed the same way opts.show{A,B,C} is, so a chart only ever
+// renders a series it was actually asked to show. A and B share the same ink (both describe
+// "programs as they exist today, just applied differently"); C is recolored to the brand green
+// to set it apart as the more speculative, not-yet-existing-program scenario. Dash patterns go
+// solid -> dotted -> dash-dot so the three read as progressively more hypothetical at a glance
+// even in black and white.
+const DIVERSION_SERIES = {
+  A: {color: '#1a1a1a', dash: null, sw: 2, label: 'Potential diversion rate',
+      desc: 'if all the materials were placed correctly without any change in the programs',
+      getValue: g => g.potential},
+  B: {color: '#1a1a1a', dash: '1 2.4', sw: 1.5, label: 'Potential diversion rate (programs active across all areas)',
+      desc: 'if the materials were placed correctly',
+      getValue: g => g.globalPotential},
+  C: {color: DIVERSION_POTENTIAL_COLOR, dash: '4 1.5 1 1.5', sw: 1.5, label: 'Potential diversion rate with new programs',
+      desc: 'if the materials were correctly placed',
+      getValue: g => g.ghostPotential},
+};
+function buildDiversionTrackSvg(title, groups, opts){
+  opts = opts || {};
+  const activeKeys = ['A','B','C'].filter(k => opts['show'+k]);
   const W = 560;
   const ML = 13, MR = 19;
   const plotW = W - ML - MR;
-  const MT = 52, rowStep = 54, barH = 23, MB = 16;
-  const totalBarH = 46, totalGapAfterDivider = 25, totalBarTopOffset = 17, totalCaptionGap = 15, dividerPad = 4;
-  // Alt-scenario rows need extra headroom above the track for the second label — barTop moves
-  // from rowTop+20 to rowTop+altTopPad, and the row grows by the same amount so the bottom
-  // label (which is anchored off barBottom) doesn't creep into the next row.
-  const altTopPad = 64, altExtraH = altTopPad - 20;
-  const CUR = DIVERSION_CURRENT_COLOR, POT = DIVERSION_POTENTIAL_COLOR;
+  const rowStep = 80, barH = 23, totalBarH = 40, topOffset = 28, MB = 16;
+  const totalGapAfterDivider = 20, dividerPad = 4;
+  const CUR = DIVERSION_CURRENT_COLOR;
   const TRACK_BG = '#e9e7e0';
 
-  // Legend: a small amber swatch + "Current diversion rate", a vertical divider, then
-  // "Potential diversion rate" — drawn once above the tracks instead of repeating per row.
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  const NORMAL_FONT = '11px Poppins, Arial, sans-serif';
+  const BOLD_FONT = '700 11px Poppins, Arial, sans-serif';
+  function textWidth(text, font){ measureCtx.font = font; return measureCtx.measureText(text).width; }
+
+  // Legend: a swatch/line sample + label per series actually shown in this chart. Current +
+  // the first potential series share the first row; any further series each get their own row
+  // below.
   function legendSvg(){
-    const swatchY = 11, dividerX = ML + 152, text2X = ML + 157.8;
-    return `<rect x="${ML}" y="${swatchY}" width="10" height="10" rx="2" fill="${CUR}" />
-      <text x="${ML+14.5}" y="${swatchY+8.5}" font-size="12" fill="#1a1a1a">Current diversion rate</text>
-      <line x1="${dividerX}" y1="${swatchY}" x2="${dividerX}" y2="${swatchY+10}" stroke="#1a1a1a" stroke-width="1" />
-      <text x="${text2X}" y="${swatchY+8.5}" font-size="12" fill="#1a1a1a">Potential diversion rate</text>`;
+    const rowH = 18;
+    let y = 11;
+    const label1 = 'Current diversion rate';
+    let svg = `<rect x="${ML}" y="${y}" width="10" height="10" rx="2" fill="${CUR}" />
+      <text x="${ML+15}" y="${y+8.5}" font-size="12" fill="#1a1a1a">${label1}</text>`;
+    activeKeys.forEach((key, i) => {
+      const s = DIVERSION_SERIES[key];
+      const dashAttr = s.dash ? ` stroke-dasharray="${s.dash}"` : '';
+      if (i === 0){
+        const x2 = ML + 15 + textWidth(label1, '12px Poppins, Arial, sans-serif') + 18;
+        svg += `<line x1="${x2}" y1="${y-2}" x2="${x2}" y2="${y+12}" stroke="${s.color}" stroke-width="2"${dashAttr} />
+          <text x="${x2+9}" y="${y+8.5}" font-size="12" fill="#1a1a1a">${s.label}</text>`;
+        y += rowH + 6;
+      } else {
+        svg += `<line x1="${ML+5}" y1="${y-2}" x2="${ML+5}" y2="${y+12}" stroke="${s.color}" stroke-width="1.5"${dashAttr} />
+          <text x="${ML+15}" y="${y+8.5}" font-size="12" fill="#1a1a1a">${s.label}</text>`;
+        y += rowH;
+      }
+    });
+    return {svg, bottom: y};
   }
+  const legend = legendSvg();
 
   if (!groups.length){
     const H = 160;
     return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
       <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
-      ${legendSvg()}
+      ${legend.svg}
       <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
     </svg>`;
   }
 
-  const hasAlt = g => g.altPotential !== undefined && g.potentialLabel !== undefined && g.altPotentialLabel !== undefined;
-  const noteLines = explanationNote ? explanationNote.split('\n') : [];
-  const noteH = noteLines.length ? (14 + noteLines.length * 13) : 0;
+  const MT = legend.bottom + 14;
+
+  // Bottom explanation — bold label + word-wrapped description, one short paragraph per
+  // series actually shown in this chart.
+  function wrapParagraph(label, desc){
+    const tokens = [{text: label + ':', bold: true}, ...desc.split(' ').map(w => ({text: w, bold: false}))];
+    const spaceW = textWidth(' ', NORMAL_FONT);
+    const lines = [];
+    let cur = [], curW = 0;
+    tokens.forEach(tok => {
+      const w = textWidth(tok.text, tok.bold ? BOLD_FONT : NORMAL_FONT);
+      const addW = w + (cur.length ? spaceW : 0);
+      if (cur.length && curW + addW > plotW){ lines.push(cur); cur = []; curW = 0; }
+      cur.push(tok); curW += addW;
+    });
+    if (cur.length) lines.push(cur);
+    return lines;
+  }
+  const paragraphs = activeKeys.map(key => wrapParagraph(DIVERSION_SERIES[key].label, DIVERSION_SERIES[key].desc));
 
   let rows = '';
   let cursor = MT;
   groups.forEach((g) => {
-    const alt = hasAlt(g);
     if (g.isTotal){
       const dividerY = cursor + dividerPad;
       rows += `<line x1="${ML}" y1="${dividerY}" x2="${W-MR}" y2="${dividerY}" stroke="#c7c2b4" stroke-width="1" stroke-dasharray="3 3" />`;
@@ -4280,39 +4387,13 @@ function buildDiversionTrackSvg(title, groups, explanationNote){
     const rowBase = cursor;
     const thisBarH = g.isTotal ? totalBarH : barH;
     const labelY = rowBase + 9;
-    const barTop = g.isTotal ? rowBase + totalBarTopOffset : rowBase + (alt ? altTopPad - 6 : 15);
+    const barTop = rowBase + topOffset;
     const barBottom = barTop + thisBarH;
-
-    const gapPts = (g.potential - g.current) * 100;
-    const gapLabel = `${gapPts >= 0 ? '+' : ''}${gapPts.toFixed(1)} pts potential gap`;
     const groupLabelText = g.isTotal ? g.label.toUpperCase() : g.label;
-    if (alt){
-      // Two named potentials means "the gap" is ambiguous on its own, so the title takes the
-      // top-right spot instead, freeing top-left for the (still useful) gap-vs-primary label.
-      rows += `<text x="${W-MR}" y="${labelY}" text-anchor="end" font-size="${g.isTotal ? 13 : 12}" font-weight="600" fill="#1a1a1a">${escapeHtml(groupLabelText)}</text>`;
-      rows += `<text x="${ML}" y="${labelY}" font-size="11" font-weight="600" fill="#5c584d">${gapLabel}</text>`;
-    } else {
-      rows += `<text x="${ML}" y="${labelY}" font-size="${g.isTotal ? 13 : 12}" font-weight="600" fill="#1a1a1a">${escapeHtml(groupLabelText)}</text>`;
-      rows += `<text x="${W-MR}" y="${labelY}" text-anchor="end" font-size="11" fill="#6c675a">${gapLabel}</text>`;
-    }
+    rows += `<text x="${ML}" y="${labelY}" font-size="${g.isTotal ? 13 : 12}" font-weight="600" fill="#1a1a1a">${escapeHtml(groupLabelText)}</text>`;
 
-    const markerX = ML + Math.max(0, Math.min(1, g.potential)) * plotW;
     const fillW = Math.max(0, Math.min(1, g.current)) * plotW;
-
-    if (alt){
-      // Shaded band between the two potential markers, drawn before the Current fill so the
-      // fill stays fully opaque on top of it.
-      const altMarkerXForBand = ML + Math.max(0, Math.min(1, g.altPotential)) * plotW;
-      const bandX0 = Math.min(markerX, altMarkerXForBand), bandX1 = Math.max(markerX, altMarkerXForBand);
-      rows += `<rect x="${ML}" y="${barTop}" width="${plotW}" height="${thisBarH}" rx="4" fill="${TRACK_BG}" />`;
-      rows += `<rect x="${bandX0}" y="${barTop}" width="${bandX1-bandX0}" height="${thisBarH}" fill="#1a1a1a" fill-opacity="0.14" />`;
-    } else {
-      rows += `<rect x="${ML}" y="${barTop}" width="${plotW}" height="${thisBarH}" rx="4" fill="${TRACK_BG}" />`;
-      // The stretch between the current fill and the potential marker is filled solid dark —
-      // it's the achievable-but-not-yet-captured gap, distinct from the plain grey track
-      // beyond the potential marker.
-      if (markerX > ML + fillW + 0.5) rows += `<rect x="${ML+fillW}" y="${barTop}" width="${markerX-ML-fillW}" height="${thisBarH}" fill="#cac9c2" />`;
-    }
+    rows += `<rect x="${ML}" y="${barTop}" width="${plotW}" height="${thisBarH}" rx="4" fill="${TRACK_BG}" />`;
     if (fillW > 0.5) rows += `<rect x="${ML}" y="${barTop}" width="${fillW}" height="${thisBarH}" rx="4" fill="${CUR}" />`;
 
     const curLabel = `${(g.current*100).toFixed(1)}%`;
@@ -4322,58 +4403,65 @@ function buildDiversionTrackSvg(title, groups, explanationNote){
       ? `<text x="${ML+10}" y="${valueY}" font-size="${curFontSize}" fill="#ffffff">${curLabel}</text>`
       : `<text x="${ML+fillW+8}" y="${valueY}" font-size="${curFontSize}" fill="${CUR}">${curLabel}</text>`;
 
-    if (alt){
-      // Primary scenario — same marker position as always, just relabeled with its explicit
-      // scenario name and recolored to neutral ink (POT's amber/green no longer applies once
-      // there are two named potentials rather than one implicit "the" potential).
-      rows += `<line x1="${markerX}" y1="${barTop}" x2="${markerX}" y2="${barBottom}" stroke="#1a1a1a" stroke-width="2" />`;
-      const nearRightEdge = (W - MR) - markerX < 90;
-      const potAnchor = nearRightEdge ? 'end' : 'start';
-      const potX = markerX + (nearRightEdge ? -8 : 8);
-      rows += `<text x="${potX}" y="${barBottom+14}" text-anchor="${potAnchor}" font-size="11" font-weight="600" fill="#1a1a1a">${escapeHtml(g.potentialLabel)}: ${(g.potential*100).toFixed(1)}%</text>`;
-
-      // Alternate scenario — dashed marker, label above the track, centered on its own marker.
-      const altMarkerX = ML + Math.max(0, Math.min(1, g.altPotential)) * plotW;
-      rows += `<line x1="${altMarkerX}" y1="${barTop}" x2="${altMarkerX}" y2="${barBottom}" stroke="#6c675a" stroke-width="1.5" stroke-dasharray="3 2" />`;
-      rows += `<text x="${altMarkerX}" y="${barTop-34}" text-anchor="middle" font-size="11" font-weight="600" fill="#6c675a">${escapeHtml(g.altPotentialLabel)}: ${Math.round(g.altPotential*100)}%</text>`;
-    } else {
-      rows += `<line x1="${markerX}" y1="${barTop}" x2="${markerX}" y2="${barBottom}" stroke="#1a1a1a" stroke-width="1.5" />`;
-      if (g.isTotal){
-        // The Total row's potential rate is called out separately below the bar, rather than
-        // squeezed in next to the marker — it's the one number on the chart that deserves its
-        // own line.
-        rows += `<text x="${W/2}" y="${barBottom+totalCaptionGap}" text-anchor="middle" font-size="12" fill="#1a1a1a">Potential rate: ${(g.potential*100).toFixed(1)}%</text>`;
-      } else {
-        const nearRightEdge = (W - MR) - markerX < 90;
-        const potAnchor = nearRightEdge ? 'end' : 'start';
-        const potX = markerX + (nearRightEdge ? -8 : 8);
-        // Flipped to the left of the marker (near the right edge), this label can land on
-        // top of the dark current-to-potential gap segment instead of the plain track — a
-        // white halo behind the dark fill keeps it legible either way without needing to
-        // know which background it landed on.
-        const potHalo = nearRightEdge ? 'stroke="#ffffff" stroke-width="2" paint-order="stroke" stroke-linejoin="round"' : '';
-        rows += `<text x="${potX}" y="${valueY}" text-anchor="${potAnchor}" font-size="11" fill="#1a1a1a" ${potHalo}>${(g.potential*100).toFixed(1)}%</text>`;
-      }
+    // Series in a chart are always shown in A, B, C order — and, since each relaxes the
+    // previous scenario's constraint (B ignores area-scoping that A respects; C adds ghost
+    // streams on top of B), their true positions are never decreasing even when A is left out
+    // of this particular chart. Their STACKED LABELS still need their own declutter pass
+    // though: two scenarios often land at or very near the same rate (e.g. both already at
+    // 100%), and marker lines stay at their true (possibly identical) position regardless —
+    // only the text centers get spread apart, via a measured-width left-to-right pass followed
+    // by a whole-row shift back inside the canvas bounds (never letting the last label run
+    // past the right edge).
+    const markers = activeKeys.map(key => {
+      const s = DIVERSION_SERIES[key];
+      return {value: s.getValue(g), color: s.color, dash: s.dash, sw: s.sw};
+    });
+    markers.forEach(mk => {
+      mk.trueX = ML + Math.max(0, Math.min(1, mk.value)) * plotW;
+      const gapPts = (mk.value - g.current) * 100;
+      mk.gapLabel = `${gapPts >= 0 ? '+' : ''}${gapPts.toFixed(1)}%`;
+      mk.valLabel = `${(mk.value*100).toFixed(1)}%`;
+      mk.halfW = Math.max(textWidth(mk.gapLabel, NORMAL_FONT), textWidth(mk.valLabel, BOLD_FONT)) / 2 + 3;
+    });
+    const labelPad = 5;
+    const labelX = markers.map(mk => mk.trueX);
+    for (let i = 1; i < labelX.length; i++){
+      const minGap = markers[i-1].halfW + markers[i].halfW + labelPad;
+      if (labelX[i] - labelX[i-1] < minGap) labelX[i] = labelX[i-1] + minGap;
     }
+    const rightEdge = labelX[labelX.length-1] + markers[markers.length-1].halfW;
+    if (rightEdge > W - MR){ const d = rightEdge - (W - MR); for (let i=0;i<labelX.length;i++) labelX[i] -= d; }
+    const leftEdge = labelX[0] - markers[0].halfW;
+    if (leftEdge < ML){ const d = ML - leftEdge; for (let i=0;i<labelX.length;i++) labelX[i] += d; }
+    markers.forEach((mk, i) => {
+      const dashAttr = mk.dash ? ` stroke-dasharray="${mk.dash}"` : '';
+      rows += `<line x1="${mk.trueX}" y1="${barTop-4}" x2="${mk.trueX}" y2="${barBottom+4}" stroke="${mk.color}" stroke-width="${mk.sw}"${dashAttr} />`;
+      rows += `<text x="${labelX[i]}" y="${barTop-9}" text-anchor="middle" font-size="10.5" fill="#8a8578">${mk.gapLabel}</text>`;
+      rows += `<text x="${labelX[i]}" y="${barBottom+16}" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1a1a1a">${mk.valLabel}</text>`;
+    });
 
-    cursor = rowBase + rowStep + (alt ? altExtraH : 0) + (g.isTotal ? (totalBarTopOffset + totalBarH - rowStep + totalCaptionGap + 14) : 0);
+    cursor = rowBase + rowStep;
   });
 
   let noteSvg = '';
-  if (noteLines.length){
-    let ny = cursor + 14;
-    noteLines.forEach(line => {
-      noteSvg += `<text x="${ML}" y="${ny}" font-size="9.5" font-style="italic" fill="#8a8578">${escapeHtml(line)}</text>`;
-      ny += 13;
+  if (paragraphs.length){
+    let ny = cursor + 16;
+    paragraphs.forEach(lines => {
+      lines.forEach(line => {
+        const parts = line.map(tok => `<tspan${tok.bold ? ' font-weight="700"' : ''}>${escapeHtml(tok.text)}</tspan>`).join(' ');
+        noteSvg += `<text x="${ML}" y="${ny}" font-size="11" fill="#1a1a1a">${parts}</text>`;
+        ny += 15;
+      });
+      ny += 8;
     });
-    cursor = ny;
+    cursor = ny - 8;
   }
 
   const H = cursor + MB;
 
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
     <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
-    ${legendSvg()}${rows}${noteSvg}
+    ${legend.svg}${rows}${noteSvg}
   </svg>`;
 }
 
@@ -4407,22 +4495,38 @@ function placementKind(correctlyPlaced, belongsHere, divertible, accepted){
 function computeCharacterizationMatrix(scope, hideZeroRows, hideZeroCols){
   const fex = computeExtrapolatedRows();
   const areaIds = resolveScopeAreaIds(scope);
-  // belongsHere/correctlyPlaced depend only on the material + stream (not the area), so
-  // every matching row agrees — reading them off the first one is enough.
+  // belongsHere/correctlyPlaced can legitimately differ between the rows for one material +
+  // stream pair: correctlyPlaced also depends on the area (a stream's areaScope can make it
+  // valid in one area and not another), so the rows can disagree and no single row speaks for
+  // the cell. Both flags are therefore weight-aggregated across the in-scope rows that actually
+  // carry weight, and a cell only reads as true when that weighted share is effectively 100%
+  // (the epsilon absorbs float rounding) — a cell where only part of the weight is correctly
+  // placed must not read as cleanly "correct". With nothing logged in scope there is no weight
+  // to weight by, so it falls back to an equal-weight share across the in-scope rows (or every
+  // row, if the scope is empty) — that only decides the zero-weight cell's tint. Where no
+  // area-scoped stream exists every row agrees, so this reduces to the single value as before.
   const cell = (materialId, stream) => {
     const matched = fex.filter(r => r.materialId === materialId && r.stream === stream);
-    const weight = matched.filter(r => areaIds.includes(r.areaId)).reduce((s,r) => s + r.weight, 0);
-    const first = matched[0] || {};
-    return { weight, belongsHere: !!first.belongsHere, correctlyPlaced: !!first.correctlyPlaced };
+    const inScope = matched.filter(r => areaIds.includes(r.areaId));
+    const weight = inScope.reduce((s,r) => s + r.weight, 0);
+    const loaded = inScope.filter(r => r.weight > 0);
+    const share = key => {
+      if (loaded.length) return loaded.reduce((s,r) => s + (r[key] ? r.weight : 0), 0) / weight;
+      const pool = inScope.length ? inScope : matched;
+      return pool.length ? pool.filter(r => r[key]).length / pool.length : 0;
+    };
+    return { weight, belongsHere: share('belongsHere') > 0.999, correctlyPlaced: share('correctlyPlaced') > 0.999 };
   };
 
   // Display-only column filter — a stream's own place in STREAMS/streamConfig, its targets,
   // and every calculation are all untouched; this only decides whether it gets a column drawn
   // here. Computed once, up front, from every included material's total (not per-material),
   // so a stream that's merely quiet for ONE material but not others still gets its column.
+  // Ghost streams are excluded unconditionally (presentStreamNames), independent of the
+  // hideZeroCols toggle — they're not "present but empty," they're not present at all.
   const streamsList = hideZeroCols
-    ? STREAMS.filter(s => materials.reduce((sum,m) => sum + cell(m.id, s).weight, 0) > 0)
-    : STREAMS;
+    ? presentStreamNames().filter(s => materials.reduce((sum,m) => sum + cell(m.id, s).weight, 0) > 0)
+    : presentStreamNames();
 
   const rows = CATEGORY_ORDER
     .map(cat => ({
@@ -4444,18 +4548,7 @@ function computeCharacterizationMatrix(scope, hideZeroRows, hideZeroCols){
   const colMax = streamsList.map((s, i) => Math.max(0, ...rows.flatMap(g => g.materials.map(m => m.values[i].weight))));
   const sharedMax = Math.max(0, ...colMax);
 
-  // Capture rate per stream — same formula as the Waste Stream Contamination table/chart
-  // (belongs-here weight / that stream's total weight), just framed positively and scoped to
-  // the same areaIds this matrix itself is scoped to (Contamination's own version is always
-  // the full unscoped breakdown, so it can't be reused directly here without disagreeing with
-  // the matrix's own numbers when a Filter selection is active).
-  const streamCapture = streamsList.map(s => {
-    const total = areaIds.reduce((sum,id) => sum + streamWeightForArea(id, s), 0);
-    const belongs = fex.filter(r => areaIds.includes(r.areaId) && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
-    return { stream: s, rate: total === 0 ? 0 : belongs/total, hasData: total > 0.005 };
-  });
-
-  return { rows, colMax, sharedMax, streamCapture, streams: streamsList };
+  return { rows, colMax, sharedMax, streams: streamsList };
 }
 
 function truncateLabel(s, maxLen){
@@ -4477,10 +4570,8 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
   const catHeaderH = 24, rowH = 20, catGap = 6, MB = 12;
   const trackW = streamColW - 24, trackH = 12;
 
-  const captureRowH = catHeaderH + 6;
   let bodyH = 0;
   matrix.rows.forEach(g => { bodyH += catHeaderH + g.materials.length * rowH + catGap; });
-  bodyH += captureRowH;
   const H = bodyStartY + bodyH + MB;
 
   let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
@@ -4553,18 +4644,6 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
     y += catGap;
   });
 
-  // Capture rate — one % per stream (belongs-here weight / that stream's total), the same
-  // metric the Waste Stream Contamination table/chart reports, just framed as the positive
-  // complement and placed here so it reads directly under the material detail it summarizes.
-  svg += `<line x1="${ML}" y1="${y}" x2="${W-MR}" y2="${y}" stroke="#1a1a1a" stroke-width="1.5" />`;
-  svg += `<rect x="${ML}" y="${y+4}" width="${W-ML-MR}" height="${captureRowH-8}" fill="#dcebe6" rx="4" />
-    <text x="${ML+8}" y="${y+captureRowH/2+4}" font-size="13" font-weight="600" fill="#123a30">CAPTURE RATE</text>`;
-  matrix.streamCapture.forEach((c, i) => {
-    const cx = ML + nameColW + i*streamColW + streamColW/2;
-    const label = c.hasData ? pct(c.rate) : '—';
-    svg += `<text x="${cx}" y="${y+captureRowH/2+4}" text-anchor="middle" font-size="14" font-weight="600" fill="#123a30">${label}</text>`;
-  });
-
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">${svg}</svg>`;
 }
 
@@ -4602,22 +4681,27 @@ function renderChartsTab(){
   // sidebar's Grouping control (renderGroupingToggle), shared with the Contamination chart
   // below so the two never disagree about what a "group" means on this tab.
   const title2 = 'Current v Potential Diversion by ' + (chartsByArea ? 'Area' : 'Tenant');
-  const diversionGroups = computeDiversionByArea(chartsByArea, activeHypotheticalKeys);
-  // area-specific.html only: when at least one hypothetical is actively selected, feed
-  // buildDiversionTrackSvg's existing alt-scenario rendering (altPotential/potentialLabel/
-  // altPotentialLabel) with the what-if figure — none selected leaves every group exactly as
-  // it always was (no alt fields set), which is what keeps the chart byte-for-byte identical
-  // to before this feature existed whenever nothing is selected.
-  const activeHypoPairs = definedHypotheticals().filter(p => activeHypotheticalKeys.has(hypotheticalKey(p.areaId, p.materialId)));
-  if (activeHypoPairs.length){
-    const hypoLabel = hypotheticalLabel(activeHypoPairs);
-    diversionGroups.forEach(g => {
-      g.altPotential = g.potentialHypothetical;
-      g.potentialLabel = 'Potential';
-      g.altPotentialLabel = hypoLabel;
-    });
-  }
-  const diversionChipsHtml = buildHypotheticalChipsHtml();
+  const diversionGroups = computeDiversionByArea(chartsByArea);
+  // Rate A (the straightforward "if everything already divertible were placed correctly")
+  // gets its own plain chart, always shown. Rates B and C each get their OWN separate chart
+  // too, rather than sharing one — three differently-styled lines all labeled "Potential
+  // diversion rate" on one chart reads as clutter, and a reader comparing numbers shouldn't
+  // have to work out which line a given label belongs to. Potential diversion rate B
+  // ("programs applied everywhere") only means something distinct from A when some stream is
+  // actually scoped to specific areas today — if every stream is already everywhere, B would
+  // just restate A, so its chart is skipped entirely rather than shown as a no-op duplicate.
+  // Rate C's chart is likewise skipped unless at least one ghost ("not present yet") stream is
+  // configured.
+  const diversionShowB = streamConfig.some(s => ((s.areaScope) || {type:'everywhere'}).type === 'specific');
+  const diversionShowC = ghostStreamNames().length > 0;
+  const title2b = title2 + ' (programs active across all areas)';
+  const title2c = title2 + ' (with new programs)';
+  const diversionBCard = diversionShowB
+    ? chartCardHtml(title2b, buildDiversionTrackSvg(title2b, diversionGroups, {showB: true}))
+    : '';
+  const diversionCCard = diversionShowC
+    ? chartCardHtml(title2c, buildDiversionTrackSvg(title2c, diversionGroups, {showC: true}))
+    : '';
 
   // Same matrix as the Summaries tab's "Waste Stream Contamination" table — also always the
   // full breakdown, same reasoning as the diversion charts above, and sharing the same
@@ -4645,9 +4729,11 @@ function renderChartsTab(){
     </label>`;
 
   container.innerHTML =
+    chartCardHtml(title2, buildDiversionTrackSvg(title2, diversionGroups, {showA: true})) +
+    diversionBCard +
+    diversionCCard +
     chartCardHtml(title1, buildDonutSvg(title1, donutData)) +
     chartCardHtml(title1b, buildMaterialTableSvg(title1b, materialRows)) +
-    chartCardHtml(title2, buildDiversionTrackSvg(title2, diversionGroups), diversionChipsHtml) +
     chartCardHtml(title0, buildAlluvialSvg(title0, flow, chartsByArea ? 'Area' : 'Tenant')) +
     chartCardHtml(title3, buildCharacterizationSvg(title3, matrix, charSharedScale), char3ToggleHtml) +
     chartCardHtml(title2d, buildContaminationSvg(title2d, contamination, chartsByArea ? 'Area' : 'Tenant'), contam2dToggleHtml);
@@ -4697,7 +4783,9 @@ function buildSummaryTablesHtml(scope){
   let html = '';
 
   // ---- Table 1: Total Waste Generation ----
-  let streamRows = STREAMS.map(s => {
+  // Ghost streams excluded — they physically exist nowhere yet, so a row here (always
+  // 0 lbs / 0%) would just be clutter, not information.
+  let streamRows = presentStreamNames().map(s => {
     const weight = activeAreaIds.reduce((sum,id) => sum + presortTotalLive(id, s), 0);
     const diverted = scoped.filter(r => r.stream === s && r.correctlyPlaced).reduce((sum,r) => sum + r.weight, 0);
     return {label: s, weight, diverted};
@@ -4808,9 +4896,10 @@ function buildSummaryTablesHtml(scope){
     // own place in STREAMS/streamConfig and every calculation stay untouched, this only
     // decides whether it gets a column here. Checked across the same activeAreaIds scope the
     // table's own totals below already use, so it agrees with what's actually on screen.
+    // Ghost streams excluded unconditionally (presentStreamNames), independent of the toggle.
     const t4StreamsList = summaryContamHideZeroCols
-      ? STREAMS.filter(s => activeAreaIds.reduce((sum,id) => sum + presortTotalLive(id, s), 0) > 0)
-      : STREAMS;
+      ? presentStreamNames().filter(s => activeAreaIds.reduce((sum,id) => sum + presortTotalLive(id, s), 0) > 0)
+      : presentStreamNames();
     let t4Html = rowGroups.map(({label, match, denomIds}) => {
       const cells = t4StreamsList.map(s => {
         const total = denomIds.reduce((sum,id) => sum + presortTotalLive(id, s), 0);
@@ -4834,50 +4923,51 @@ function buildSummaryTablesHtml(scope){
     html += renderAnalysisTable('Waste Stream Contamination', [groupColLabel, ...t4StreamsList], t4Html);
 
     // ---- Table 5: Current v Potential Diversion, by the same row groups ----
+    // "Potential Diversion Rate" is now the area-aware figure (hasDivertiblePathInArea) — a
+    // target only counts if its stream is actually valid in that row's own area(s). "Global
+    // Potential Diversion Rate" (hasDivertiblePath, unchanged) is the pre-existing "if every
+    // existing program were active everywhere" ceiling, kept as its own explicit column rather
+    // than folded away. One further column per configured ghost stream (a program that doesn't
+    // exist anywhere yet — see ghostStreamNames) extends Global with just that one hypothetical
+    // program's materials. Gap stays tied to the area-aware Potential, same as before.
+    const t5GhostNames = ghostStreamNames();
+    // Every scenario column states its own gap to Current inline — "80.0% (+13.8%)" — instead
+    // of the gap living only in a separate column tied to just the one Potential rate. That
+    // made the old standalone Gap column redundant (it duplicated the Potential cell's own
+    // number) while never showing the gap for Global or ghost-stream scenarios at all; this
+    // reads each cell standalone and drops that column entirely.
+    const withGap = (rate, cur) => {
+      const gap = (rate - cur) * 100;
+      return `${pct(rate)} (${gap >= 0 ? '+' : ''}${gap.toFixed(1)}%)`;
+    };
     let t5Html = '';
-    let allTotal = 0, allDiverted = 0, allPotential = 0;
+    let allTotal = 0, allDiverted = 0, allPotential = 0, allGlobalPotential = 0;
+    const allGhostExtra = t5GhostNames.map(() => 0);
     rowGroups.forEach(({label, match, denomIds}) => {
       const total = denomIds.reduce((s,id) => s + areaTotalPresortLive(id), 0);
       const gData = fex.filter(match);
       const diverted = gData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-      const potential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-      allTotal += total; allDiverted += diverted; allPotential += potential;
-      const curRate = total ? diverted/total : 0, potRate = total ? potential/total : 0;
-      t5Html += `<tr><td>${label}</td><td class="num">${pct(curRate)}</td><td class="num">${pct(potRate)}</td><td class="num">${pct(potRate-curRate)}</td></tr>`;
+      const potential = gData.filter(r => r.hasDivertiblePathInArea).reduce((s,r) => s + r.weight, 0);
+      const globalPotential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+      allTotal += total; allDiverted += diverted; allPotential += potential; allGlobalPotential += globalPotential;
+      const curRate = total ? diverted/total : 0, potRate = total ? potential/total : 0, globalPotRate = total ? globalPotential/total : 0;
+      const ghostCells = t5GhostNames.map((name, gi) => {
+        const extra = ghostPotentialWeightForStream(gData, name);
+        allGhostExtra[gi] += extra;
+        const rate = total ? (globalPotential + extra) / total : 0;
+        return `<td class="num">${withGap(rate, curRate)}</td>`;
+      }).join('');
+      t5Html += `<tr><td>${label}</td><td class="num">${pct(curRate)}</td><td class="num">${withGap(potRate, curRate)}</td><td class="num">${withGap(globalPotRate, curRate)}</td>${ghostCells}</tr>`;
     });
-    const curRateTot = allTotal ? allDiverted/allTotal : 0, potRateTot = allTotal ? allPotential/allTotal : 0;
-    t5Html += `<tr class="total-row"><td>Total</td><td class="num">${pct(curRateTot)}</td><td class="num">${pct(potRateTot)}</td><td class="num">${pct(potRateTot-curRateTot)}</td></tr>`;
-    html += renderAnalysisTable('Current v Potential Diversion', [groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Gap'], t5Html);
-
-    // ---- What-if: hypothetical program expansion (area-specific.html only) ----
-    // Collapsed by default via buildHypotheticalChipsHtml's <details> — this is a "what if we
-    // added X" exploration, never part of Table 5's as-found numbers above, so it renders
-    // nothing extra at all until at least one hypothetical is actually defined AND selected.
-    if (definedHypotheticals().length){
-      const activePairs = definedHypotheticals().filter(p => activeHypotheticalKeys.has(hypotheticalKey(p.areaId, p.materialId)));
-      let whatIfBodyHtml;
-      if (activePairs.length){
-        const hypoLabel = hypotheticalLabel(activePairs);
-        const hasHypoPath = r => {
-          const m = materials.find(mm => mm.id === r.materialId);
-          return m ? materialHasDivertiblePathWithHypothetical(m, r.areaId, activeHypotheticalKeys) : false;
-        };
-        let hypoRowsHtml = '';
-        let hAllTotal = 0, hAllPotential = 0;
-        rowGroups.forEach(({label, match, denomIds}) => {
-          const total = denomIds.reduce((s,id) => s + areaTotalPresortLive(id), 0);
-          const gData = fex.filter(match);
-          const potentialHypo = gData.filter(hasHypoPath).reduce((s,r) => s + r.weight, 0);
-          hAllTotal += total; hAllPotential += potentialHypo;
-          hypoRowsHtml += `<tr><td>${label}</td><td class="num">${pct(total ? potentialHypo/total : 0)}</td></tr>`;
-        });
-        hypoRowsHtml += `<tr class="total-row"><td>Total</td><td class="num">${pct(hAllTotal ? hAllPotential/hAllTotal : 0)}</td></tr>`;
-        whatIfBodyHtml = renderAnalysisTable(hypoLabel, [groupColLabel, hypoLabel], hypoRowsHtml);
-      } else {
-        whatIfBodyHtml = '<p class="note">Select one or more programs above to see the what-if Potential Diversion Rate.</p>';
-      }
-      html += buildHypotheticalChipsHtml(whatIfBodyHtml);
-    }
+    const curRateTot = allTotal ? allDiverted/allTotal : 0, potRateTot = allTotal ? allPotential/allTotal : 0, globalPotRateTot = allTotal ? allGlobalPotential/allTotal : 0;
+    const ghostCellsTot = t5GhostNames.map((name, gi) => {
+      const rate = allTotal ? (allGlobalPotential + allGhostExtra[gi]) / allTotal : 0;
+      return `<td class="num">${withGap(rate, curRateTot)}</td>`;
+    }).join('');
+    t5Html += `<tr class="total-row"><td>Total</td><td class="num">${pct(curRateTot)}</td><td class="num">${withGap(potRateTot, curRateTot)}</td><td class="num">${withGap(globalPotRateTot, curRateTot)}</td>${ghostCellsTot}</tr>`;
+    const t5Headers = [groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Programs Applied Everywhere Potential Diversion Rate',
+      ...t5GhostNames.map(name => `Programs Applied Everywhere + ${name}`)];
+    html += renderAnalysisTable('Current v Potential Diversion', t5Headers, t5Html, 'wrap-headers');
   }
 
   return html;
@@ -4906,7 +4996,14 @@ function makeSheet(matrix){
       if (cell === null || cell === undefined || cell === '') return;
       const addr = XLSX.utils.encode_cell({r, c});
       if (typeof cell === 'object' && 'f' in cell){
-        ws[addr] = {t:'n', f: cell.f, v: cell.v !== undefined ? cell.v : 0};
+        // A formula cell normally returns a number (t:'n', cached v defaults to 0 until Excel
+        // recalculates). A handful of cells (the "rate (+gap%)" combined text below) build
+        // their display string with TEXT()/& inside the formula itself and need their cached
+        // type to be 'str', not 'n', or some viewers show the placeholder 0 instead of
+        // recalculating on open. Pass {f, t:'str'} for those; every other call site is
+        // unaffected since it omits t and keeps the existing numeric default.
+        const t = cell.t || 'n';
+        ws[addr] = {t, f: cell.f, v: cell.v !== undefined ? cell.v : (t === 'n' ? 0 : '')};
       } else if (typeof cell === 'number'){
         ws[addr] = {t:'n', v: cell};
       } else {
@@ -4958,13 +5055,18 @@ function buildWorkbook(){
   // rather than comparing against an empty/invalid string.
   const landfillName = landfillStreamName();
   const landfillNameEsc = landfillName ? landfillName.replace(/"/g, '""') : null;
+  // ghost_targets (comma-separated stream names) round-trips a material's "could go to, if
+  // this program existed" claims — parseImportedWorkbook has read this column for a while,
+  // but buildWorkbook never wrote it, so re-exporting a session always silently dropped every
+  // ghost target. Same column name/format parseImportedWorkbook already expects.
   const mmHeader = ['material_id','material_name','material_category','currently_divertible','accepted_in_program',
-                     ...STREAMS.map(s => `target: ${s}`), 'divertible_with_proper_handling'];
+                     ...STREAMS.map(s => `target: ${s}`), 'divertible_with_proper_handling', 'ghost_targets'];
   const mmRows = [mmHeader];
   materials.forEach(m => {
     mmRows.push([m.id, m.name, m.category, m.divertible, m.accepted,
                  ...STREAMS.map(s => m.targets.includes(s) ? 'Yes' : 'No'),
-                 m.divertibleWithProperHandling === 'Yes' ? 'Yes' : 'No']);
+                 m.divertibleWithProperHandling === 'Yes' ? 'Yes' : 'No',
+                 materialGhostTargets(m).join(', ')]);
   });
   const MM_LAST = mmRows.length;
   XLSX.utils.book_append_sheet(wb, makeSheet(mmRows), 'Materials Master');
@@ -4992,6 +5094,14 @@ function buildWorkbook(){
   // shouldn't count toward Potential Diversion even if it's marked divertible (same second
   // condition as materialHasDivertiblePath() in the app). The landfill column is found by
   // name, not by position, so a reordered protected stream is still excluded correctly.
+  // Joined with a leading "0+" (not just "+") so the comparison forces numeric coercion even
+  // when there's only one check to make — "(check)>0" with a single bare boolean comparison
+  // relies on Excel's TRUE/FALSE-to-1/0 coercion inside a > comparison, which real Excel does
+  // correctly but at least one third-party formula engine used to verify this export does not,
+  // silently evaluating a lone FALSE as truthy. "(0+check)>0" forces arithmetic (and so numeric
+  // coercion) unconditionally, which every engine — Excel included — handles identically to the
+  // multi-check case. A single-check case is routine here: an area-scoped stream often leaves
+  // exactly one eligible target column for a given area.
   function mmHasRealTargetExpr(materialIdRef){
     const materialRowMatch = `MATCH(${materialIdRef},'Materials Master'!$A$2:$A$${MM_LAST},0)`;
     const nonLandfillChecks = [];
@@ -5000,7 +5110,27 @@ function buildWorkbook(){
       const col = colLetter(targetColStart + i);
       nonLandfillChecks.push(`(INDEX('Materials Master'!$${col}$2:$${col}$${MM_LAST},${materialRowMatch})="Yes")`);
     }
-    return nonLandfillChecks.length ? `(${nonLandfillChecks.join('+')})>0` : 'FALSE';
+    return nonLandfillChecks.length ? `(0+${nonLandfillChecks.join('+')})>0` : 'FALSE';
+  }
+
+  // Area-aware variant of the above, for the "Potential Diversion Rate" column (not the
+  // "Programs Applied Everywhere" one, which stays on the plain mmHasRealTargetExpr above) —
+  // mirrors materialHasDivertiblePathInArea() in the live app. Which target columns count is
+  // decided once per (area, stream) pair HERE, in JS, at generation time — via
+  // streamValidForArea, the same area-scope check the live app uses — rather than trying to
+  // parse the Streams sheet's area_scope text back out inside an Excel formula at
+  // recalculation time. A stream scoped away from this area (or not present anywhere yet) is
+  // simply excluded from the sum, same as the landfill stream always is.
+  function mmHasRealTargetInAreaExpr(materialIdRef, areaId){
+    const materialRowMatch = `MATCH(${materialIdRef},'Materials Master'!$A$2:$A$${MM_LAST},0)`;
+    const checks = [];
+    for (let i = 0; i < STREAMS.length; i++){
+      if (STREAMS[i] === landfillName) continue;
+      if (!streamValidForArea(STREAMS[i], areaId)) continue;
+      const col = colLetter(targetColStart + i);
+      checks.push(`(INDEX('Materials Master'!$${col}$2:$${col}$${MM_LAST},${materialRowMatch})="Yes")`);
+    }
+    return checks.length ? `(0+${checks.join('+')})>0` : 'FALSE';
   }
 
   // Areas
@@ -5010,9 +5140,23 @@ function buildWorkbook(){
   const AREAS_LAST = areaRows.length;
 
   // Streams — `protected` marks the landfill baseline stream so a re-import keeps the
-  // diversion math anchored to the same stream even if it's been renamed.
-  const streamRows = [['stream_name','combined_weigh_sort','protected']];
-  streamConfig.forEach(s => streamRows.push([s.name, s.combinedWeighSort ? 'Yes' : 'No', s.protected ? 'Yes' : 'No']));
+  // diversion math anchored to the same stream even if it's been renamed. area_scope
+  // round-trips which areas a stream's program actually runs in — parseImportedWorkbook has
+  // read this column for a while ('notPresent', 'specific: Name, Name', or blank/'everywhere'),
+  // but buildWorkbook never wrote it, so re-exporting a session always silently flattened every
+  // stream back to "everywhere". Area names (not ids) match the human-readable format
+  // parseImportedWorkbook's own 'specific:' parsing expects.
+  function serializeAreaScope(scope){
+    scope = scope || {type:'everywhere'};
+    if (scope.type === 'notPresent') return 'notPresent';
+    if (scope.type === 'specific'){
+      const names = (scope.areaIds || []).map(id => areas.find(a => a.id === id)?.name).filter(Boolean);
+      return names.length ? `specific: ${names.join(', ')}` : 'everywhere';
+    }
+    return 'everywhere';
+  }
+  const streamRows = [['stream_name','combined_weigh_sort','protected','area_scope']];
+  streamConfig.forEach(s => streamRows.push([s.name, s.combinedWeighSort ? 'Yes' : 'No', s.protected ? 'Yes' : 'No', serializeAreaScope(s.areaScope)]));
   XLSX.utils.book_append_sheet(wb, makeSheet(streamRows), 'Streams');
 
   // Fact_SortedWeights — `area` (name) is a formula derived from the trailing `area_id`
@@ -5123,10 +5267,24 @@ function buildWorkbook(){
   // referenced by every SUMIFS below it in this same construction) rather than its name — a
   // trailing area_name column is appended purely for human readability, since it's already
   // known synchronously here and needs no cross-sheet lookup the way material_name does.
-  const fexRows = [['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','rollup_group','belongs_here','has_divertible_path','area_name']];
+  // has_divertible_path_in_area and the per-ghost-stream columns are appended AFTER area_name
+  // (not inserted earlier) so every existing column's letter stays exactly what it was before
+  // area-specific programs got Excel support — nothing downstream that already addresses this
+  // sheet by column letter needs to change.
+  const fexGhostNames = ghostStreamNames();
+  const fexHeader = ['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','rollup_group','belongs_here','has_divertible_path','area_name',
+    'has_divertible_path_in_area', ...fexGhostNames.map(n => `ghost: ${n}`)];
+  const fexRows = [fexHeader];
   areas.forEach(a => {
     STREAMS.forEach(s => {
       const combined = isCombinedWeighSort(s);
+      // Whether THIS stream's program actually runs in THIS area — decided once per
+      // (area, stream) here in JS (streamValidForArea, the live app's own check), then baked
+      // as a plain boolean into every material row below it, exactly like landfillNameEsc is
+      // baked in above. A stream scoped away from this area, or configured as "not present
+      // anywhere yet" (a ghost stream), can never be correctly_placed here even if a legacy or
+      // hand-edited file happens to have weight logged against it.
+      const streamValidHere = streamValidForArea(s, a.id);
       materials.forEach(m => {
         const r = fexRows.length + 1;
         const areaRef = `$A${r}`, streamRef = `$B${r}`, matRef = `$C${r}`;
@@ -5171,7 +5329,11 @@ function buildWorkbook(){
         // happens to be blank/unset instead of excluding none.
         const cpConds = [belongsExpr, `${acceptedExpr}="Yes"`, `${divertibleExpr}="Yes"`];
         if (landfillNameEsc !== null) cpConds.push(`${streamRef}<>"${landfillNameEsc}"`);
-        const cpExpr = {f:`IF(AND(${cpConds.join(',')}),1,0)`};
+        // A stream this area's program doesn't actually run in can never be "correctly
+        // placed" here, regardless of what the formula above would otherwise say — baked as a
+        // literal 0 (skipping the formula entirely) rather than an extra AND() clause, since
+        // streamValidHere is already known and constant for this whole area+stream block.
+        const cpExpr = streamValidHere ? {f:`IF(AND(${cpConds.join(',')}),1,0)`} : 0;
         const rollupExpr = {f:`IFERROR(INDEX(Areas!$C$2:$C$${AREAS_LAST},MATCH(${areaRef},Areas!$A$2:$A$${AREAS_LAST},0)),"")`};
         // "belongs_here" — is this row's stream one of the material's target streams at all
         // (Trash included)? For materials whose only target IS Trash, this is true when found
@@ -5192,7 +5354,19 @@ function buildWorkbook(){
         // column — Current stays blind to it.
         const properHandlingExpr = `INDEX('Materials Master'!$${properHandlingCol}$2:$${properHandlingCol}$${MM_LAST},MATCH(${matRef},'Materials Master'!$A$2:$A$${MM_LAST},0))`;
         const hasPathExpr = {f:`IF(OR(AND(${acceptedExpr}="Yes",${divertibleExpr}="Yes",${mmHasRealTargetExpr(matRef)}),${properHandlingExpr}="Yes"),1,0)`};
-        fexRows.push([a.id, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr, a.name]);
+        // Area-aware variant of has_divertible_path — mirrors materialHasDivertiblePathInArea()
+        // in the live app: same accepted/divertible/proper-handling conditions, but the "has a
+        // real target" check is restricted to streams actually valid in THIS area
+        // (mmHasRealTargetInAreaExpr), not every non-landfill stream site-wide. This is the
+        // figure the Summary sheets' "Potential Diversion Rate" column uses; has_divertible_path
+        // above stays the "Programs Applied Everywhere" ceiling, unchanged.
+        const hasPathInAreaExpr = {f:`IF(OR(AND(${acceptedExpr}="Yes",${divertibleExpr}="Yes",${mmHasRealTargetInAreaExpr(matRef, a.id)}),${properHandlingExpr}="Yes"),1,0)`};
+        // Ghost-stream eligibility is a per-material claim (materialGhostTargets), independent
+        // of area/stream, same as accepted_in_program/divertible_with_proper_handling above —
+        // baked as a literal 1/0 per configured ghost stream rather than a formula, since it's
+        // already fully known here in JS.
+        const ghostFlags = fexGhostNames.map(gn => materialGhostTargets(m).includes(gn) ? 1 : 0);
+        fexRows.push([a.id, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr, a.name, hasPathInAreaExpr, ...ghostFlags]);
       });
     });
   });
@@ -5209,6 +5383,14 @@ function buildWorkbook(){
   const FEX_ROLLUP = `Fact_Extrapolated!$I$2:$I$${FEX_LAST}`;
   const FEX_BELONGS = `Fact_Extrapolated!$J$2:$J$${FEX_LAST}`;
   const FEX_HASPATH = `Fact_Extrapolated!$K$2:$K$${FEX_LAST}`;
+  // has_divertible_path_in_area sits at M (L is area_name) — see the fexHeader comment above
+  // for why these area-specific-programs columns were appended after area_name instead of
+  // inserted earlier. One further column per configured ghost stream follows at N, O, ...
+  const FEX_HASPATH_INAREA = `Fact_Extrapolated!$${colLetter(13)}$2:$${colLetter(13)}$${FEX_LAST}`;
+  const fexGhostCols = fexGhostNames.map((name, i) => {
+    const col = colLetter(14 + i);
+    return {name, range: `Fact_Extrapolated!$${col}$2:$${col}$${FEX_LAST}`};
+  });
 
   function buildSummarySheetRows(areaId, isOverall){
     const ac = areaId ? `,${FEX_AREAID},"${areaId}"` : '';
@@ -5219,11 +5401,15 @@ function buildWorkbook(){
     const rows = [];
 
     // ---- Table 1: Total Waste Generation ----
+    // presentStreamNames() (STREAMS minus any "not present yet" ghost stream), not STREAMS —
+    // matches the live Summaries tab's own Table 1 exactly: a ghost stream is configured but
+    // physically exists nowhere yet, so it has no business appearing as its own row here any
+    // more than it does on screen.
     rows.push(['Total Waste Generation — Day of Audit']);
     rows.push(['Waste Stream','Waste Stream Weight (lbs.)','% of Total Waste Stream',
                 'Weight of Material Diverted (lbs.)','% of Material Diverted']);
     const streamStart = rows.length + 1;
-    STREAMS.forEach(s => {
+    presentStreamNames().forEach(s => {
       const rr = rows.length + 1;
       const weightExpr = activeAreaIds.length
         ? activeAreaIds.map(id => presortTotalFormula(id, s)).join('+')
@@ -5329,21 +5515,25 @@ function buildWorkbook(){
       }
 
       // ---- Table 4: Waste Stream Contamination (group x stream matrix) ----
+      // presentStreamNames(), not STREAMS — same reasoning as Table 1 above: a ghost stream is
+      // never a real column to show contamination for, matching the live Summaries tab's own
+      // Table 4 exactly.
       function pushContaminationTable(byArea){
         const groupColLabel = byArea ? 'Area' : 'Tenant/Area group';
+        const contamStreams = presentStreamNames();
         rows.push([]);
         rows.push([`Waste Stream Contamination (By ${byArea ? 'Tenant and Area' : 'Tenant'})`]);
-        rows.push([groupColLabel, ...STREAMS]);
+        rows.push([groupColLabel, ...contamStreams]);
         diversionContaminationGroups(byArea).forEach(({label, matchField, matchValue, contamDenomIds}) => {
           const row = [label];
-          STREAMS.forEach(s => {
+          contamStreams.forEach(s => {
             const totalExpr = contamDenomIds.length ? contamDenomIds.map(id => presortTotalFormula(id, s)).join('+') : '0';
             row.push({f:`IF((${totalExpr})=0,0,1-SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_STREAM},"${s}",${FEX_BELONGS},1)/(${totalExpr}))`});
           });
           rows.push(row);
         });
         const contTotRow = ['Total'];
-        STREAMS.forEach(s => {
+        contamStreams.forEach(s => {
           const totalExpr = activeAreaIds.length ? activeAreaIds.map(id => presortTotalFormula(id, s)).join('+') : '0';
           contTotRow.push({f:`IF((${totalExpr})=0,0,1-SUMIFS(${FEX_W},${FEX_STREAM},"${s}",${FEX_BELONGS},1)/(${totalExpr}))`});
         });
@@ -5351,11 +5541,27 @@ function buildWorkbook(){
       }
 
       // ---- Table 5: Current vs. Potential Diversion, by the same row groups ----
+      // Every scenario column states its own gap to Current inline — "80.0% (+13.8%)" — same
+      // format the live Summaries tab's Current v Potential Diversion table uses, rather than a
+      // separate Gap column tied to just one of the rates. rateExpr is the plain numeric
+      // formula; curRef is that row's already-computed Current Diversion Rate cell (column B),
+      // so the gap is just rate-minus-curRef rather than re-deriving Current from scratch.
+      function withGapCell(rateExpr, curRef){
+        return {f:`TEXT(${rateExpr},"0.0%")&" ("&TEXT((${rateExpr})-${curRef},"+0.0%;-0.0%")&")"`, t:'str'};
+      }
       function pushDiversionTable(byArea){
         const groupColLabel = byArea ? 'Area' : 'Tenant/Area group';
         rows.push([]);
         rows.push([`Current v Potential Diversion (By ${byArea ? 'Tenant and Area' : 'Tenant'})`]);
-        rows.push([groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Current v Potential (Percentage Point) Gap']);
+        // Potential Diversion Rate is the area-aware ceiling (FEX_HASPATH_INAREA) — a target
+        // only counts if its stream's program actually runs in that row's own area(s), same as
+        // the live Summaries tab. Programs Applied Everywhere is the pre-existing
+        // area-blind ceiling (FEX_HASPATH), kept as its own column rather than folded away. One
+        // further column per configured ghost stream extends that with just that one
+        // not-yet-existing program's eligible materials — mirrors ghostPotentialWeightForStream
+        // in the live app exactly.
+        rows.push([groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Programs Applied Everywhere Potential Diversion Rate',
+          ...fexGhostCols.map(gc => `Programs Applied Everywhere + ${gc.name}`)]);
         diversionContaminationGroups(byArea).forEach(({label, matchField, matchValue, divDenomIds}) => {
           const rr = rows.length + 1;
           // Sum presortTotalFormula across every stream (not just one hardcoded name) — it
@@ -5364,22 +5570,39 @@ function buildWorkbook(){
           const totalExpr = divDenomIds.map(id =>
             STREAMS.map(s => presortTotalFormula(id, s)).join('+')
           ).join('+');
+          const curRateExpr = `IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_CP},1)/(${totalExpr}))`;
+          const potRateExpr = `IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH_INAREA},1)/(${totalExpr}))`;
+          const globalRateExpr = `IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH},1)/(${totalExpr}))`;
+          const curRef = `B${rr}`;
+          const ghostCells = fexGhostCols.map(gc => {
+            const ghostRateExpr = `IF((${totalExpr})=0,0,(SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH},1)+SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH},0,${gc.range},1))/(${totalExpr}))`;
+            return withGapCell(ghostRateExpr, curRef);
+          });
           rows.push([label,
-            {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_CP},1)/(${totalExpr}))`},
-            {f:`IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH},1)/(${totalExpr}))`},
-            {f:`C${rr}-B${rr}`}
+            {f:curRateExpr},
+            withGapCell(potRateExpr, curRef),
+            withGapCell(globalRateExpr, curRef),
+            ...ghostCells
           ]);
         });
         const divTot = rows.length + 1;
         const allAreaTotalExpr = areas.map(a =>
           STREAMS.map(s => presortTotalFormula(a.id, s)).join('+')
         ).join('+');
+        const curRateTotExpr = `IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_CP},1)/(${allAreaTotalExpr}))`;
+        const potRateTotExpr = `IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_HASPATH_INAREA},1)/(${allAreaTotalExpr}))`;
+        const globalRateTotExpr = `IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_HASPATH},1)/(${allAreaTotalExpr}))`;
+        const curRefTot = `B${divTot}`;
+        const ghostCellsTot = fexGhostCols.map(gc => {
+          const ghostRateTotExpr = `IF((${allAreaTotalExpr})=0,0,(SUMIFS(${FEX_W},${FEX_HASPATH},1)+SUMIFS(${FEX_W},${FEX_HASPATH},0,${gc.range},1))/(${allAreaTotalExpr}))`;
+          return withGapCell(ghostRateTotExpr, curRefTot);
+        });
         rows.push(['Total',
-          {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_CP},1)/(${allAreaTotalExpr}))`},
-          {f:`IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_HASPATH},1)/(${allAreaTotalExpr}))`},
-          {f:`C${divTot}-B${divTot}`}
+          {f:curRateTotExpr},
+          withGapCell(potRateTotExpr, curRefTot),
+          withGapCell(globalRateTotExpr, curRefTot),
+          ...ghostCellsTot
         ]);
-        // fix sign convention on the per-group rows to match: gap = potential - current (positive)
       }
 
       pushContaminationTable(false);
@@ -5521,6 +5744,12 @@ function parseImportedWorkbook(wb){
     const accIdx = header.indexOf('accepted_in_program');
     const properHandlingIdx = header.indexOf('divertible_with_proper_handling');
     const legacyTargetIdx = header.indexOf('target_stream'); // pre-multi-target export format
+    // ghost_targets is import-only (not written by buildWorkbook yet), same pattern as
+    // Streams' area_scope column — a hand-authored/test file can pre-configure which
+    // not-yet-existing streams a material could go to: a comma-separated list of stream names.
+    // Absent entirely on every file exported before this existed, same as every other optional
+    // column here — defaults to no ghost targets.
+    const ghostTargetsIdx = header.indexOf('ghost_targets');
 
     result.materials = mmRows.slice(1).filter(r => r[0]).map(r => {
       let targets;
@@ -5536,6 +5765,9 @@ function parseImportedWorkbook(wb){
       // session's landfill stream name — fine, this only fires for a material with no
       // targets at all in the file.)
       if (targets.length === 0) targets = [defaultFallbackStream()];
+      const ghostTargets = (ghostTargetsIdx >= 0 && r[ghostTargetsIdx])
+        ? String(r[ghostTargetsIdx]).split(',').map(s => s.trim()).filter(Boolean)
+        : [];
       return {
         id: r[0], name: r[1],
         category: catIdx >= 0 ? r[catIdx] : r[2],
@@ -5545,6 +5777,7 @@ function parseImportedWorkbook(wb){
         // Missing on every file exported before this column existed — default to 'No' rather
         // than erroring or dropping the material, same as every other optional column here.
         divertibleWithProperHandling: (properHandlingIdx >= 0 ? r[properHandlingIdx] : null) || 'No',
+        ghostTargets,
       };
     });
   }
@@ -5567,11 +5800,33 @@ function parseImportedWorkbook(wb){
     const header = streamSheetRows[0].map(h => (h == null ? '' : String(h)));
     const cwsIdx = header.indexOf('combined_weigh_sort');
     const protIdx = header.indexOf('protected');
-    result.streamConfig = streamSheetRows.slice(1).filter(r => r[0]).map(r => ({
-      name: r[0],
-      combinedWeighSort: cwsIdx >= 0 ? r[cwsIdx] === 'Yes' : false,
-      protected: protIdx >= 0 ? r[protIdx] === 'Yes' : false
-    }));
+    // area_scope is import-only (not written by buildWorkbook yet) — a hand-authored/test file
+    // can pre-configure a stream's areaScope on import: 'notPresent', or 'specific: Name, Name'
+    // (area names, matched case-insensitively against the Areas sheet just parsed above,
+    // resolved to their ids). Absent, blank, or 'everywhere' all fall through unset, and
+    // applyStreamConfig's own default ({type:'everywhere'}) takes over, same as any file that
+    // predates this column entirely.
+    const scopeIdx = header.indexOf('area_scope');
+    result.streamConfig = streamSheetRows.slice(1).filter(r => r[0]).map(r => {
+      const stream = {
+        name: r[0],
+        combinedWeighSort: cwsIdx >= 0 ? r[cwsIdx] === 'Yes' : false,
+        protected: protIdx >= 0 ? r[protIdx] === 'Yes' : false
+      };
+      if (scopeIdx >= 0 && r[scopeIdx]){
+        const raw = String(r[scopeIdx]).trim();
+        if (/^notpresent$/i.test(raw)){
+          stream.areaScope = {type:'notPresent'};
+        } else if (/^specific\s*:/i.test(raw)){
+          const names = raw.slice(raw.indexOf(':')+1).split(',').map(s => s.trim()).filter(Boolean);
+          const areaIds = names
+            .map(n => (result.areas || []).find(a => a.name.toLowerCase() === n.toLowerCase()))
+            .filter(Boolean).map(a => a.id);
+          stream.areaScope = {type:'specific', areaIds};
+        }
+      }
+      return stream;
+    });
     // Legacy file with no `protected` column: the landfill baseline was always the stream
     // literally named 'Trash'. Re-flag it so the diversion math keeps an anchor.
     if (protIdx < 0 && !result.streamConfig.some(s => s.protected)){
@@ -5682,11 +5937,7 @@ document.getElementById('replaceImportBtn').onclick = async () => {
   auditMeta = {...auditMeta, ...pendingImport.auditMeta};
   sortedEntries = pendingImport.sortedEntries;
   presortEntries = pendingImport.presortEntries;
-  // The imported file's Areas/Materials Master carry their own ids — any override left over
-  // from the session being replaced would reference stale ids that no longer resolve to
-  // anything, so this is the same "start fresh" point as performNewSessionReset().
-  areaMaterialOverrides = [];
-  await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveAreaMaterialOverrides(); await saveMeta(); await saveSorted(); await savePresort();
+  await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta(); await saveSorted(); await savePresort();
   document.getElementById('importModal').classList.remove('show');
   pendingImport = null;
   renderAll();

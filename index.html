@@ -503,7 +503,7 @@
     <p>This is a prototype — session data is saved only in this browser, on this device. If you clear your browser's site data, everything will be deleted permanently. Export your session to Excel to open it on another device or to back up your work.</p>
   </div>
 
-  <p class="intro-footer">Prototype designed and developed by Calibro for Great Forest.</p>
+  <p class="intro-footer">Prototype designed and developed by Calibro srls (VAT IT09323480963) for Great Forest.</p>
 </div>
 
 <div id="appRoot" hidden>
@@ -864,7 +864,7 @@ function landfillStreamName(){
 function defaultFallbackStream(){
   return landfillStreamName() || (streamConfig[0] || {}).name || 'Trash';
 }
-function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && m.divertible === 'Yes' && stream !== landfillStreamName(); }
+function materialCorrectlyPlacedIn(m, stream){ return materialBelongsIn(m, stream) && m.accepted === 'Yes' && m.divertible === 'Yes' && stream !== landfillStreamName() && !isStreamNotDiverted(stream); }
 // Potential Diversion Rate is the ceiling: everything that *could* be diverted in this
 // program if it were placed perfectly. Two independent ways to qualify: (1) accepted in the
 // program AND marked divertible AND has a genuine non-landfill target configured — a material
@@ -939,9 +939,9 @@ const SCENARIO_NATIONWIDE_NO_ORGANICS_AREAS = [
 ];
 
 const SCENARIO_NATIONWIDE_NO_ORGANICS_STREAM_CONFIG = [
-  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
-  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, notDiverted:false, protected:false},
 ];
 
 const SCENARIO_NATIONWIDE_WITH_ORGANICS_MATERIALS = [
@@ -986,10 +986,10 @@ const SCENARIO_NATIONWIDE_WITH_ORGANICS_AREAS = [
 ];
 
 const SCENARIO_NATIONWIDE_WITH_ORGANICS_STREAM_CONFIG = [
-  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
-  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
-  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
 ];
 
 const SCENARIO_CBRE_BLOOMBERG_MATERIALS = [
@@ -1035,11 +1035,11 @@ const SCENARIO_CBRE_BLOOMBERG_AREAS = [
 ];
 
 const SCENARIO_CBRE_BLOOMBERG_STREAM_CONFIG = [
-  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, protected:true},
-  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
-  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, protected:false},
-  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, protected:false},
-  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false, protected:false},
+  {name:'Landfill / Incineration', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:true},
+  {name:'Mixed Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Cardboard Recycling', combinedWeighSort:true, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Compost / Organics Recycling', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
+  {name:'Terracycle', combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected:false},
 ];
 
 const SCENARIOS = [
@@ -1062,7 +1062,7 @@ const SCENARIOS = [
     id:'empty', label:'Empty',
     description:'Start from scratch — just the Trash landfill baseline, no areas, materials or recycling streams. Rename Trash to match the site and build the rest.',
     materials:[], areas:[],
-    streamConfig:[{name:'Trash', combinedWeighSort:false, excludeSoiled:true, protected:true}],
+    streamConfig:[{name:'Trash', combinedWeighSort:false, excludeSoiled:true, notDiverted:false, protected:true}],
   },
 ];
 
@@ -1078,6 +1078,16 @@ function isCombinedWeighSort(streamName){
 function streamExcludesSoiled(streamName){
   const cfg = streamConfig.find(s => s.name === streamName);
   return cfg ? !!cfg.excludeSoiled : false;
+}
+// Independent of `protected` — the landfill baseline is excluded from Current by definition
+// (it's what "diverted" is measured against), while notDiverted is an explicit, separate
+// per-stream override for a non-landfill stream whose weight still shouldn't count toward
+// Current (e.g. "collected separately but not actually sent anywhere yet"). Current only —
+// materialHasDivertiblePath never references this flag; a material that still has a real
+// path elsewhere keeps its full Potential credit regardless of this stream's flag.
+function isStreamNotDiverted(streamName){
+  const cfg = streamConfig.find(s => s.name === streamName);
+  return cfg ? !!cfg.notDiverted : false;
 }
 function applyStreamConfig(newConfig){
   streamConfig = newConfig;
@@ -2053,6 +2063,31 @@ function renderStreamsForm(){
     lab.textContent = 'Combined weigh-and-sort (no separate bagging)';
     toggleWrap.appendChild(cb); toggleWrap.appendChild(lab);
 
+    // Not diverted — independent of the landfill baseline (`protected`): a stream that isn't
+    // the baseline but whose weight still shouldn't count as Current diversion (e.g. collected
+    // separately but with no real outlet yet). Affects Current only; Potential stays untouched
+    // (see isStreamNotDiverted). Hidden on the protected stream itself — it's already excluded
+    // from Current by definition, so a second, redundant control there would just be confusing.
+    let notDivertedWrap = null;
+    if (!s.protected){
+      notDivertedWrap = document.createElement('label');
+      notDivertedWrap.className = 'toggle-field';
+      const ndCb = document.createElement('input');
+      ndCb.type = 'checkbox';
+      ndCb.checked = !!s.notDiverted;
+      ndCb.addEventListener('change', () => {
+        s.notDiverted = ndCb.checked;
+        saveStreamConfig();
+        renderAll();
+        showToast(s.notDiverted
+          ? s.name + ': no longer counts toward Current Diversion Rate'
+          : s.name + ': counts toward Current Diversion Rate again');
+      });
+      const ndLab = document.createElement('span');
+      ndLab.textContent = 'Not diverted';
+      notDivertedWrap.appendChild(ndCb); notDivertedWrap.appendChild(ndLab);
+    }
+
     // Landfill-baseline control — exactly one stream is the disposal baseline every
     // diversion figure is measured against. A real radio group (shared `name`) both shows
     // and sets it: picking a different stream's radio moves the flag there for free via
@@ -2146,6 +2181,7 @@ function renderStreamsForm(){
     const optionsRow = document.createElement('div');
     optionsRow.className = 'stream-row-options';
     optionsRow.appendChild(toggleWrap);
+    if (notDivertedWrap) optionsRow.appendChild(notDivertedWrap);
     optionsRow.appendChild(baseWrap);
 
     row.appendChild(nameWrap);
@@ -2165,7 +2201,7 @@ function renderStreamsForm(){
     // adding a stream after the site-level baseline toggle above has been explicitly switched
     // off doesn't silently turn it back on.
     const firstBaseline = streamConfig.length === 0;
-    streamConfig.push({name, combinedWeighSort:false, excludeSoiled:false, protected: firstBaseline});
+    streamConfig.push({name, combinedWeighSort:false, excludeSoiled:false, notDiverted:false, protected: firstBaseline});
     applyStreamConfig(streamConfig);
     saveStreamConfig();
     renderAll();
@@ -2433,7 +2469,7 @@ function renderPresortKnownToggle(){
     renderAll();
   });
   const lab = document.createElement('span');
-  lab.textContent = 'Known composition — this whole bag is one material';
+  lab.textContent = 'Known Composition — the material is loose, or the whole bag is one material';
   wrap.appendChild(cb); wrap.appendChild(lab);
   box.appendChild(wrap);
   if (presortSel.knownMaterialId !== null){
@@ -2466,7 +2502,7 @@ function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 function knownBadge(e){
   if (!e.knownMaterialId) return '';
   const mat = materials.find(m => m.id === e.knownMaterialId);
-  return ` <span class="flag-badge" title="Known composition — excluded from the extrapolation pool">known: ${escapeHtml(mat ? mat.name : e.knownMaterialId)}</span>`;
+  return ` <span class="flag-badge" title="Known Composition — loose or single-material, excluded from the extrapolation pool">known: ${escapeHtml(mat ? mat.name : e.knownMaterialId)}</span>`;
 }
 function nonRepBadge(e){
   if (!e.nonRepresentative) return '';
@@ -2851,7 +2887,7 @@ let chartsByArea = false;
 // Charts each get their own copy (chartsContamHideZeroCols, declared near the other Charts
 // toggles), matching how summaryByArea/chartsByArea are already independent per tab rather
 // than one shared control.
-let summaryContamHideZeroCols = false;
+let summaryContamHideZeroCols = true;
 // Qualified "Name — Tenant" label for an area — safe to show in any context that lists
 // entries across more than one area/tenant at once, since two different areas can share a
 // bare name and only the pairing with its tenant is guaranteed to identify which one. Skips
@@ -3244,8 +3280,8 @@ const CATEGORY_COLORS = {
 };
 let charSharedScale = false; // false = each stream column scaled to its own max; true = one scale for all columns
 let charHideZeroRows = true; // true = hide materials with 0 weight across every stream
-let charHideZeroCols = false; // true = hide streams with 0 weight logged across every material
-let chartsContamHideZeroCols = false; // Waste Stream Contamination chart's own copy of the same toggle
+let charHideZeroCols = true; // true = hide streams with 0 weight logged across every material
+let chartsContamHideZeroCols = true; // Waste Stream Contamination chart's own copy of the same toggle
 
 // ============================================================
 // Total Waste Generation — alluvial (Sankey-style) diagram: Area -> Stream -> Diverted /
@@ -4170,13 +4206,27 @@ function placementKind(correctlyPlaced, belongsHere, divertible, accepted){
 function computeCharacterizationMatrix(scope, hideZeroRows, hideZeroCols){
   const fex = computeExtrapolatedRows();
   const areaIds = resolveScopeAreaIds(scope);
-  // belongsHere/correctlyPlaced depend only on the material + stream (not the area), so
-  // every matching row agrees — reading them off the first one is enough.
+  // belongsHere/correctlyPlaced can legitimately differ between the rows for one material +
+  // stream pair: correctlyPlaced also depends on the area (a stream's areaScope can make it
+  // valid in one area and not another), so the rows can disagree and no single row speaks for
+  // the cell. Both flags are therefore weight-aggregated across the in-scope rows that actually
+  // carry weight, and a cell only reads as true when that weighted share is effectively 100%
+  // (the epsilon absorbs float rounding) — a cell where only part of the weight is correctly
+  // placed must not read as cleanly "correct". With nothing logged in scope there is no weight
+  // to weight by, so it falls back to an equal-weight share across the in-scope rows (or every
+  // row, if the scope is empty) — that only decides the zero-weight cell's tint. Where no
+  // area-scoped stream exists every row agrees, so this reduces to the single value as before.
   const cell = (materialId, stream) => {
     const matched = fex.filter(r => r.materialId === materialId && r.stream === stream);
-    const weight = matched.filter(r => areaIds.includes(r.areaId)).reduce((s,r) => s + r.weight, 0);
-    const first = matched[0] || {};
-    return { weight, belongsHere: !!first.belongsHere, correctlyPlaced: !!first.correctlyPlaced };
+    const inScope = matched.filter(r => areaIds.includes(r.areaId));
+    const weight = inScope.reduce((s,r) => s + r.weight, 0);
+    const loaded = inScope.filter(r => r.weight > 0);
+    const share = key => {
+      if (loaded.length) return loaded.reduce((s,r) => s + (r[key] ? r.weight : 0), 0) / weight;
+      const pool = inScope.length ? inScope : matched;
+      return pool.length ? pool.filter(r => r[key]).length / pool.length : 0;
+    };
+    return { weight, belongsHere: share('belongsHere') > 0.999, correctlyPlaced: share('correctlyPlaced') > 0.999 };
   };
 
   // Display-only column filter — a stream's own place in STREAMS/streamConfig, its targets,
@@ -4207,18 +4257,7 @@ function computeCharacterizationMatrix(scope, hideZeroRows, hideZeroCols){
   const colMax = streamsList.map((s, i) => Math.max(0, ...rows.flatMap(g => g.materials.map(m => m.values[i].weight))));
   const sharedMax = Math.max(0, ...colMax);
 
-  // Capture rate per stream — same formula as the Waste Stream Contamination table/chart
-  // (belongs-here weight / that stream's total weight), just framed positively and scoped to
-  // the same areaIds this matrix itself is scoped to (Contamination's own version is always
-  // the full unscoped breakdown, so it can't be reused directly here without disagreeing with
-  // the matrix's own numbers when a Filter selection is active).
-  const streamCapture = streamsList.map(s => {
-    const total = areaIds.reduce((sum,id) => sum + streamWeightForArea(id, s), 0);
-    const belongs = fex.filter(r => areaIds.includes(r.areaId) && r.stream === s && r.belongsHere).reduce((sum,r) => sum + r.weight, 0);
-    return { stream: s, rate: total === 0 ? 0 : belongs/total, hasData: total > 0.005 };
-  });
-
-  return { rows, colMax, sharedMax, streamCapture, streams: streamsList };
+  return { rows, colMax, sharedMax, streams: streamsList };
 }
 
 function truncateLabel(s, maxLen){
@@ -4240,10 +4279,8 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
   const catHeaderH = 24, rowH = 20, catGap = 6, MB = 12;
   const trackW = streamColW - 24, trackH = 12;
 
-  const captureRowH = catHeaderH + 6;
   let bodyH = 0;
   matrix.rows.forEach(g => { bodyH += catHeaderH + g.materials.length * rowH + catGap; });
-  bodyH += captureRowH;
   const H = bodyStartY + bodyH + MB;
 
   let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
@@ -4314,18 +4351,6 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
       y += rowH;
     });
     y += catGap;
-  });
-
-  // Capture rate — one % per stream (belongs-here weight / that stream's total), the same
-  // metric the Waste Stream Contamination table/chart reports, just framed as the positive
-  // complement and placed here so it reads directly under the material detail it summarizes.
-  svg += `<line x1="${ML}" y1="${y}" x2="${W-MR}" y2="${y}" stroke="#1a1a1a" stroke-width="1.5" />`;
-  svg += `<rect x="${ML}" y="${y+4}" width="${W-ML-MR}" height="${captureRowH-8}" fill="#dcebe6" rx="4" />
-    <text x="${ML+8}" y="${y+captureRowH/2+4}" font-size="13" font-weight="600" fill="#123a30">CAPTURE RATE</text>`;
-  matrix.streamCapture.forEach((c, i) => {
-    const cx = ML + nameColW + i*streamColW + streamColW/2;
-    const label = c.hasData ? pct(c.rate) : '—';
-    svg += `<text x="${cx}" y="${y+captureRowH/2+4}" text-anchor="middle" font-size="14" font-weight="600" fill="#123a30">${label}</text>`;
   });
 
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">${svg}</svg>`;
