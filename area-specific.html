@@ -4217,10 +4217,11 @@ function exportClientSite(){
   return `${slugifyForFilename(auditMeta.clientName, 'Client')}_${slugifyForFilename(auditMeta.siteName, 'Site')}`;
 }
 // Batch stem: "<client>_<site>_<scope>_<today>" for the chart ZIPs and the summaries PDF title.
-// scopeLabel is empty when no Filter is active, and then simply drops out of the name.
+// scopeLabel is never empty: every export carries a scope part, "All_Areas" when no Filter is
+// active.
 function exportFileBase(scopeLabel){
   const dateStr = new Date().toISOString().slice(0,10);
-  return [exportClientSite(), scopeLabel, dateStr].filter(Boolean).join('_');
+  return `${exportClientSite()}_${scopeLabel}_${dateStr}`;
 }
 // Single-file name: "<client>_<site>_<scope>_<today>_<title_slug>.<ext>" — the same
 // "<client>_<site>_<scope>_<today>" stem as the batches, so every export carries its date.
@@ -4234,7 +4235,7 @@ function slugifyScopePart(s){
 }
 // Filename label for a Filter selection (summaryExcludedAreas or chartsExcludedAreas — the two
 // tabs filter independently, so callers always pass their own tab's set):
-//   everything included (no Filter active)    -> "" (the scope part is left out of the name)
+//   everything included (no Filter active)    -> All_Areas (every export carries a scope part)
 //   exactly one or more WHOLE tenants         -> the tenant names
 //   anything else                             -> the area names (qualified "<tenant>_<name>"
 //                                                only when two areas share a name)
@@ -4243,7 +4244,7 @@ function slugifyScopePart(s){
 // truncating names could make two different selections collide on the same filename.
 function exportScopeLabel(excludedSet){
   const included = areas.filter(a => !excludedSet.has(a.id));
-  if (included.length === areas.length) return '';
+  if (included.length === areas.length) return 'All_Areas';
   if (!included.length) return 'No_areas';
   const rollups = distinctRollups();
   const wholeTenants = rollups.filter(rg => areas.filter(a => a.rollup === rg).every(a => !excludedSet.has(a.id)));
@@ -4258,19 +4259,15 @@ function exportScopeLabel(excludedSet){
   const joined = names.map(slugifyScopePart).join('+');
   return (names.length > 3 || joined.length > 60) ? `${n}_of_${total}_${unit}` : joined;
 }
-// With no Filter active there is no scope part at all. With one active, items that ignore it
-// (marked data-scoped="0" when they're rendered — see chartCardHtml / renderAnalysisTable) say
-// "All_areas" instead of the filtered selection: putting a filtered tenant's name on a chart
-// that still shows every tenant would mislabel it, and a bare name would look like a
-// filter-driven chart exported with no filter.
+// Items that ignore the Filter (marked data-scoped="0" when they're rendered — see
+// chartCardHtml / renderAnalysisTable) always say "All_Areas", whatever the Filter says:
+// putting a filtered tenant's name on a chart that still shows every tenant would mislabel it.
 function exportScopeFor(el, excludedSet){
-  const label = exportScopeLabel(excludedSet);
-  if (!label) return '';
-  return (el && el.getAttribute('data-scoped') === '0') ? 'All_areas' : label;
+  return (el && el.getAttribute('data-scoped') === '0') ? 'All_Areas' : exportScopeLabel(excludedSet);
 }
-// Same idea for an export that ignores its tab's Filter altogether (the summaries PDF).
-function exportScopeIgnoringFilter(excludedSet){
-  return exportScopeLabel(excludedSet) ? 'All_areas' : '';
+// Same for an export that ignores its tab's Filter altogether (the summaries PDF).
+function exportScopeIgnoringFilter(){
+  return 'All_Areas';
 }
 function downloadBlob(blob, filename){
   const link = document.createElement('a');
@@ -6136,9 +6133,9 @@ document.getElementById('exportAllSummariesPdfBtn').onclick = () => {
   // (and the title swap) only need to hold for the moment the print dialog reads them.
   const originalTitle = document.title;
   // This PDF is Overall plus one page per area (buildAllAreasSummaryHtml) regardless of the
-  // Summaries Filter, so a filtered scope in its name would mislabel it: no scope part when no
-  // Filter is active, "All_areas" when one is (to flag that it ignores it).
-  document.title = `${exportFileBase(exportScopeIgnoringFilter(summaryExcludedAreas))}_summaries`;
+  // Summaries Filter, so a filtered scope in its name would mislabel it: it is always
+  // "All_Areas".
+  document.title = `${exportFileBase(exportScopeIgnoringFilter())}_summaries`;
   const cleanup = () => { root.innerHTML = ''; document.title = originalTitle; window.removeEventListener('afterprint', cleanup); };
   window.addEventListener('afterprint', cleanup);
   window.print();
