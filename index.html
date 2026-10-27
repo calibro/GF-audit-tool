@@ -3202,6 +3202,8 @@ function pct(n){ return (n*100).toFixed(1) + '%'; }
 // The argument is the raw fraction difference (potential - current); a leading + marks a gain.
 function fmtPts(fraction){ const v = fraction * 100; return `${v >= 0 ? '+' : ''}${v.toFixed(1)} pts`; }
 function lbs(n){ return n.toFixed(2); }
+// One decimal with thousands separators ("1,823.3") — the Characterization chart's Total row.
+function fmtLbs1(n){ return n.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
 
 // scoped=false marks a table built from the Grouping toggle instead of the Filter (see
 // chartCardHtml for how it's used).
@@ -4651,7 +4653,20 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
 
   let bodyH = 0;
   matrix.rows.forEach(g => { bodyH += catHeaderH + g.materials.length * rowH + catGap; });
-  const H = bodyStartY + bodyH + MB;
+
+  // Total row: each visible stream's real total weight (matrix.streamTotals, from the same
+  // flow computation as the Total Waste Generation chart), as a number only — no bar, so the
+  // shared-scale toggle can't touch it. A stream's bars sum to less than its total when some
+  // weight was logged without a material breakdown; whenever any visible stream is short by
+  // 0.05 lbs. or more, a "Not broken down by material" row above the total shows each
+  // stream's difference so every column visibly adds up. Skipped for a matrix without totals.
+  const totals = matrix.streamTotals;
+  const barSums = streamsList.map((s, i) => matrix.rows.reduce((sum, g) => sum + g.materials.reduce((ms, m) => ms + m.values[i].weight, 0), 0));
+  const unbroken = totals ? streamsList.map((s, i) => Math.max(0, totals[i] - barSums[i])) : [];
+  const showUnbroken = unbroken.some(d => d >= 0.05);
+  const unbrokenRowH = showUnbroken ? rowH : 0;
+  const totalRowH = totals ? 28 : 0;
+  const H = bodyStartY + bodyH + unbrokenRowH + totalRowH + MB;
 
   let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
 
@@ -4722,6 +4737,24 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
     });
     y += catGap;
   });
+
+  if (totals){
+    if (showUnbroken){
+      svg += `<text x="${ML}" y="${y+rowH/2+4}" font-size="10" fill="#5c584d">Not broken down by material</text>`;
+      streamsList.forEach((s, i) => {
+        if (unbroken[i] < 0.05) return;
+        const cx = ML + nameColW + i*streamColW + streamColW/2;
+        svg += `<text x="${cx}" y="${y+rowH/2+4}" text-anchor="middle" font-size="10.5" fill="#5c584d">${fmtLbs1(unbroken[i])}</text>`;
+      });
+      y += rowH;
+    }
+    svg += `<line x1="${ML}" y1="${y+2}" x2="${W-MR}" y2="${y+2}" stroke="#1a1a1a" stroke-width="1.5" />`;
+    svg += `<text x="${ML}" y="${y+19}" font-size="11" font-weight="600" fill="#5c584d">Total (lbs.)</text>`;
+    streamsList.forEach((s, i) => {
+      const cx = ML + nameColW + i*streamColW + streamColW/2;
+      svg += `<text x="${cx}" y="${y+19}" text-anchor="middle" font-size="11" font-weight="600" fill="#1a1a1a">${fmtLbs1(totals[i])}</text>`;
+    });
+  }
 
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">${svg}</svg>`;
 }
@@ -4796,6 +4829,10 @@ function renderChartsTab(){
 
   const title3 = 'Waste Stream Characterization (lbs.)';
   const matrix = computeCharacterizationMatrix(includedAreaIds, charHideZeroRows, charHideZeroCols);
+  // Real stream totals (not the sum of the bars) for the chart's Total row — same figures as
+  // the Total Waste Generation chart and the Summaries, under the same filter.
+  const charStreamTotals = computeWasteGenerationFlow(includedAreaIds, false).streamTotals;
+  matrix.streamTotals = matrix.streams.map(s => charStreamTotals[s] || 0);
   const char3ToggleHtml = `<label class="toggle-field" style="margin-top:12px;">
       <input type="checkbox" ${charSharedScale ? 'checked' : ''} onchange="window.toggleCharScale(this.checked)" />
       <span>Use one shared scale across all streams (instead of scaling each stream to its own max)</span>
