@@ -645,6 +645,7 @@
       <h3>Pre-sort bags logged</h3>
       <div class="big" id="reviewPresortCount">0</div>
       <div class="note" id="reviewPresortTotal">0.00 lbs total</div>
+      <div class="note" id="reviewPresortOverall" style="display:none; margin-top:2px;"></div>
     </div>
     <div class="section-label">Filter pre-sort bags</div>
     <div class="field-row" style="margin-top:0;">
@@ -704,6 +705,7 @@
       <h3>Sorted weight entries</h3>
       <div class="big" id="reviewSortedCount">0</div>
       <div class="note" id="reviewSortedTotal">0.00 lbs total</div>
+      <div class="note" id="reviewSortedOverall" style="display:none; margin-top:2px;"></div>
     </div>
     <div class="section-label">Filter sorted weights</div>
     <div class="field-row" style="margin-top:0;">
@@ -2759,11 +2761,39 @@ function buildFilterOptions(selectEl, kind){
   selectEl.dataset.builtSig = sig;
 }
 
-function renderPresortReview(){
-  document.getElementById('reviewPresortCount').textContent = presortEntries.length;
-  document.getElementById('reviewPresortTotal').textContent =
-    presortEntries.reduce((s,e)=>s+e.weight,0).toFixed(2) + ' lbs total';
+// A stored filter value that is no longer an option of its dropdown (area deleted, material
+// renamed, session replaced by an import) would otherwise silently filter everything out.
+function resetStaleFilters(filters, selects){
+  Object.keys(selects).forEach(key => {
+    const v = filters[key];
+    if (v !== 'All' && ![...selects[key].options].some(o => o.value === v)) filters[key] = 'All';
+  });
+}
 
+// Summary box follows the same filtered list as the table; with no filter active it reads
+// exactly as the unfiltered box, otherwise it adds "(filtered)" and an overall-total line.
+function renderReviewSummary(prefix, overallLabel, all, filtered, filtersActive){
+  const countEl = document.getElementById('review' + prefix + 'Count');
+  const titleEl = countEl.parentElement.querySelector('h3');
+  if (titleEl.dataset.baseTitle === undefined) titleEl.dataset.baseTitle = titleEl.textContent;
+  const overallEl = document.getElementById('review' + prefix + 'Overall');
+  const sum = arr => arr.reduce((s,e)=>s+e.weight,0).toFixed(2);
+  if (!filtersActive){
+    titleEl.textContent = titleEl.dataset.baseTitle;
+    countEl.textContent = all.length;
+    document.getElementById('review' + prefix + 'Total').textContent = sum(all) + ' lbs total';
+    overallEl.style.display = 'none';
+    overallEl.textContent = '';
+  } else {
+    titleEl.textContent = titleEl.dataset.baseTitle + ' (filtered)';
+    countEl.textContent = filtered.length;
+    document.getElementById('review' + prefix + 'Total').textContent = sum(filtered) + ' lbs';
+    overallEl.textContent = `${overallLabel}: ${all.length} · ${sum(all)} lbs total`;
+    overallEl.style.display = '';
+  }
+}
+
+function renderPresortReview(){
   const areaSel = document.getElementById('presortAreaFilter');
   const streamSel = document.getElementById('presortStreamFilter');
   buildFilterOptions(areaSel, 'area');
@@ -2772,6 +2802,7 @@ function renderPresortReview(){
     areaSel.onchange = () => { presortReviewFilters.areaId = areaSel.value; renderPresortReview(); };
     streamSel.onchange = () => { presortReviewFilters.stream = streamSel.value; renderPresortReview(); };
   }
+  resetStaleFilters(presortReviewFilters, {areaId: areaSel, stream: streamSel});
   areaSel.value = presortReviewFilters.areaId;
   streamSel.value = presortReviewFilters.stream;
 
@@ -2780,6 +2811,8 @@ function renderPresortReview(){
     (presortReviewFilters.stream === 'All' || e.stream === presortReviewFilters.stream);
 
   const filteredPresort = presortEntries.filter(matchesFilter);
+  renderReviewSummary('Presort', 'All bags', presortEntries, filteredPresort,
+    Object.values(presortReviewFilters).some(v => v !== 'All'));
   const pt = document.getElementById('reviewPresortTable');
   if (filteredPresort.length === 0){
     pt.innerHTML = '<tr><td class="empty-hint">Nothing matches this filter</td></tr>';
@@ -2795,10 +2828,6 @@ function renderPresortReview(){
 }
 
 function renderSortedReview(){
-  document.getElementById('reviewSortedCount').textContent = sortedEntries.length;
-  document.getElementById('reviewSortedTotal').textContent =
-    sortedEntries.reduce((s,e)=>s+e.weight,0).toFixed(2) + ' lbs total';
-
   const areaSel = document.getElementById('sortedAreaFilter');
   const streamSel = document.getElementById('sortedStreamFilter');
   const categorySel = document.getElementById('sortedCategoryFilter');
@@ -2813,6 +2842,7 @@ function renderSortedReview(){
     categorySel.onchange = () => { sortedReviewFilters.category = categorySel.value; renderSortedReview(); };
     materialSel.onchange = () => { sortedReviewFilters.material = materialSel.value; renderSortedReview(); };
   }
+  resetStaleFilters(sortedReviewFilters, {areaId: areaSel, stream: streamSel, category: categorySel, material: materialSel});
   areaSel.value = sortedReviewFilters.areaId;
   streamSel.value = sortedReviewFilters.stream;
   categorySel.value = sortedReviewFilters.category;
@@ -2830,6 +2860,8 @@ function renderSortedReview(){
     (sortedReviewFilters.material === 'All' || e.materialName === sortedReviewFilters.material);
 
   const filteredSorted = sortedEntries.filter(matchesFilter);
+  renderReviewSummary('Sorted', 'All entries', sortedEntries, filteredSorted,
+    Object.values(sortedReviewFilters).some(v => v !== 'All'));
   const st = document.getElementById('reviewSortedTable');
   if (filteredSorted.length === 0){
     st.innerHTML = '<tr><td class="empty-hint">Nothing matches this filter</td></tr>';
