@@ -3856,23 +3856,42 @@ function buildAlluvialSvg(title, flow, groupColLabel){
     col2X + nodeW, col3X, (s,t) => OUTCOME_COLORS[t], 0.38
   );
 
-  // Top-to-bottom pass: a block starting less than 2px below the previous block's bottom is
-  // pushed down by the overlap; then the last block is clamped inside the base canvas,
-  // pushing earlier ones up as needed. Only labels move — rects and ribbons stay put.
-  const LABEL_GAP = 2, LABEL_BOTTOM_LIMIT = H0 - 2;
+  // Cluster-centering placement. Each block starts centered on its node's band (its preferred
+  // position, `top` as set by labelBlockFor). Blocks whose ranges overlap (with a 2px gap) form
+  // a cluster; each cluster is stacked contiguously around the mean of its blocks' preferred
+  // centers and clamped inside [2, H0 − 2]; a cluster that then overlaps its neighbour merges
+  // with it, and the pass repeats (≤ 20 iterations). So the displacement a crowded group needs
+  // is shared above and below it instead of piling onto the labels above. Block order is kept;
+  // only labels move — rects and ribbons stay put.
+  const LABEL_GAP = 2, LABEL_TOP_LIMIT = 2, LABEL_BOTTOM_LIMIT = H0 - 2;
   function resolveLabelOverlaps(blocks){
-    for (let i = 1; i < blocks.length; i++){
-      const minTop = blocks[i-1].top + blocks[i-1].h + LABEL_GAP;
-      if (blocks[i].top < minTop) blocks[i].top = minTop;
-    }
-    const n = blocks.length;
-    if (n && blocks[n-1].top + blocks[n-1].h > LABEL_BOTTOM_LIMIT){
-      blocks[n-1].top = LABEL_BOTTOM_LIMIT - blocks[n-1].h;
-      for (let i = n-2; i >= 0; i--){
-        const maxTop = blocks[i+1].top - LABEL_GAP - blocks[i].h;
-        if (blocks[i].top > maxTop) blocks[i].top = maxTop;
+    if (!blocks.length) return blocks;
+    const pref = blocks.map(b => b.top + b.h/2);
+    let clusters = blocks.map((b, i) => ({first: i, last: i}));
+    const place = c => {
+      let span = -LABEL_GAP, sumPref = 0;
+      for (let i = c.first; i <= c.last; i++){ span += blocks[i].h + LABEL_GAP; sumPref += pref[i]; }
+      const center = sumPref / (c.last - c.first + 1);
+      c.top = Math.max(LABEL_TOP_LIMIT, Math.min(LABEL_BOTTOM_LIMIT - span, center - span/2));
+      c.bottom = c.top + span;
+    };
+    for (let iter = 0; iter < 20; iter++){
+      clusters.forEach(place);
+      const merged = [clusters[0]];
+      let changed = false;
+      for (let k = 1; k < clusters.length; k++){
+        const prev = merged[merged.length-1], c = clusters[k];
+        if (c.top < prev.bottom + LABEL_GAP){ prev.last = c.last; changed = true; }
+        else merged.push(c);
       }
+      clusters = merged;
+      if (!changed) break;
     }
+    clusters.forEach(c => {
+      place(c);
+      let y = c.top;
+      for (let i = c.first; i <= c.last; i++){ blocks[i].top = y; y += blocks[i].h + LABEL_GAP; }
+    });
     return blocks;
   }
 
@@ -3884,15 +3903,36 @@ function buildAlluvialSvg(title, flow, groupColLabel){
     return `<rect x="${x}" y="${y}" width="${nodeW}" height="${drawH}" fill="${fill}" rx="2" />`;
   }
 
-  // Draws one column: every node's rect, then its (overlap-resolved) label block.
-  // fillFn(name) gives the rect color, nameFillFn(name) the label's name-line color; avail and
-  // wrapName are passed through to labelBlockFor's fit fallbacks.
+  // Connector from a node to its displaced label: one straight line from the node's label-side
+  // edge at the node's center to 2px short of the label's first line, at that line's
+  // mid-height (mirrored for the left-anchored generator labels). Straight lines, unlike a
+  // shared vertical elbow, keep each node→label pairing distinguishable. Drawn only when the
+  // block's center is more than 8px from the node's center; a white underlay keeps it legible
+  // over ribbons.
+  const CONNECTOR_MIN_OFFSET = 8;
+  function connectorFor(x, anchor, labelX, p, b){
+    const nodeMid = (p.y0+p.y1)/2;
+    if (Math.abs(b.top + b.h/2 - nodeMid) <= CONNECTOR_MIN_OFFSET) return '';
+    const l0 = b.lines[0];
+    const textMid = b.top + l0.dy - (lineAsc(l0) - lineDesc(l0))/2;
+    const dir = anchor === 'end' ? -1 : 1;
+    const xEdge = anchor === 'end' ? x : x + nodeW;
+    const d = `M${xEdge} ${nodeMid} L${labelX - 2*dir} ${textMid}`;
+    return `<path d="${d}" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" />`
+         + `<path d="${d}" fill="none" stroke="#8a8578" stroke-width="0.9" stroke-linejoin="round" />`;
+  }
+
+  // Draws one column: every node's rect, then connectors for displaced labels, then the
+  // (overlap-resolved) label blocks. fillFn(name) gives the rect color, nameFillFn(name) the
+  // label's name-line color; avail and wrapName are passed through to labelBlockFor's fit
+  // fallbacks.
   function drawNodes(nodeNames, positions, x, fillFn, anchor, totals, haloed, labelFn, nameFillFn, avail, wrapName){
     const halo = haloed ? 'stroke="#ffffff" stroke-width="2" paint-order="stroke" stroke-linejoin="round"' : '';
     const labelX = anchor === 'end' ? x - 8 : x + nodeW + 8;
     let svg = '';
     nodeNames.forEach(name => { svg += nodeRect(x, positions[name], fillFn(name)); });
     const blocks = resolveLabelOverlaps(nodeNames.map(name => labelBlockFor(labelFn(name), totals[name], positions[name], nameFillFn(name), avail, wrapName)));
+    blocks.forEach((b, i) => { svg += connectorFor(x, anchor, labelX, positions[nodeNames[i]], b); });
     blocks.forEach(b => {
       b.lines.forEach(l => {
         svg += `<text x="${labelX}" y="${b.top + l.dy}" text-anchor="${anchor}" font-size="${l.size}"${l.weight ? ` font-weight="${l.weight}"` : ''} fill="${l.fill}" ${halo}>${escapeHtml(l.text)}</text>`;
