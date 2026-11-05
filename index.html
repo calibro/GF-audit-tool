@@ -4687,13 +4687,20 @@ function buildDiversionTrackSvg(title, groups, opts){
 
   // Bottom explanation — bold label + word-wrapped description, one short paragraph per
   // series actually shown in this chart.
+  // Widths use the flow chart's "safe" rule — the wider of the Poppins-stack measurement and
+  // plain Arial ×1.15, plus 2% — since the exported SVG/PNG draws in Poppins even when the page
+  // measuring it only has the narrower Arial fallback, which let lines run past the right edge.
+  function safeParagraphWidth(text, bold){
+    const w = bold ? '700 ' : '';
+    return 1.02 * Math.max(textWidth(text, bold ? BOLD_FONT : NORMAL_FONT), 1.15 * textWidth(text, `${w}11px Arial`));
+  }
   function wrapParagraph(label, desc){
     const tokens = [{text: label + ':', bold: true}, ...desc.split(' ').map(w => ({text: w, bold: false}))];
-    const spaceW = textWidth(' ', NORMAL_FONT);
+    const spaceW = safeParagraphWidth(' ', false);
     const lines = [];
     let cur = [], curW = 0;
     tokens.forEach(tok => {
-      const w = textWidth(tok.text, tok.bold ? BOLD_FONT : NORMAL_FONT);
+      const w = safeParagraphWidth(tok.text, tok.bold);
       const addW = w + (cur.length ? spaceW : 0);
       if (cur.length && curW + addW > plotW){ lines.push(cur); cur = []; curW = 0; }
       cur.push(tok); curW += addW;
