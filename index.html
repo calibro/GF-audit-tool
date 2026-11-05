@@ -3729,29 +3729,94 @@ function buildAlluvialSvg(title, flow, groupColLabel){
   // so "% of total" means the same thing whether it's labeling an area, a stream, or an
   // outcome.
   const grandTotal = flow.areaNodes.reduce((s,n) => s + flow.areaTotals[n], 0);
-  // Measured with the same font stack the SVG draws with, ×1.08 as slack for when the page
-  // itself doesn't have Poppins loaded (the canvas then measures the narrower Arial fallback).
-  const LABEL_FONT_1LINE = '600 10.5px Poppins, Arial, sans-serif';
-  const LABEL_FONT_NAME = '600 11px Poppins, Arial, sans-serif';
-  const LABEL_FONT_SUB = '10px Poppins, Arial, sans-serif';
+  // "Safe" label width: the wider of the Poppins-stack measurement and plain Arial ×1.15, plus
+  // 2%. When the page has Poppins loaded the first wins (a hair generous); when it doesn't, the
+  // canvas measures the narrower Arial fallback, and Arial ×1.15 approximates the Poppins the
+  // SVG/PNG actually draws with. Every margin and "does it fit" test below uses this.
+  function safeWidth(text, weight, size){
+    const w = weight ? `${weight} ` : '';
+    return 1.02 * Math.max(textWidth(text, `${w}${size}px Poppins, Arial, sans-serif`), 1.15 * textWidth(text, `${w}${size}px Arial`));
+  }
+  // A measuring stand-in for wrapText (which only calls ctx.font= and ctx.measureText), so its
+  // line breaking uses safeWidth rather than a single-font canvas measurement.
+  function safeMeasureCtx(weight, size){
+    return {font: '', measureText: t => ({width: safeWidth(t, weight, size)})};
+  }
+  function ellipsize(text, maxW, weight, size){
+    if (safeWidth(text, weight, size) <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && safeWidth(t.trimEnd() + '…', weight, size) > maxW) t = t.slice(0, -1);
+    return t.trimEnd() + '…';
+  }
+
+  // A node's label block — three tiers depending on how much vertical room the node's band
+  // has: tight bands get a single combined line (name — lbs. · %), roomier ones get name and
+  // "lbs. · %" on two lines, and the roomiest get name / lbs. / % on three. Each block is
+  // centered on its node's band; `top` is then nudged by resolveLabelOverlaps so neighbouring
+  // blocks never collide. Line offsets (dy) are baselines relative to the block's top.
+  // `avail` is the horizontal room the label has: a one-liner that doesn't fit falls back to
+  // the two-line layout; a name that still doesn't fit is wrapped onto two lines (wrapName,
+  // generator column — two name lines with "lbs. · %" below) or ellipsized (stream/outcome).
+  // Block geometry comes from the text's real line box (Poppins: ~1.05em above the baseline,
+  // ~0.4em below for semibold / ~0.32em for regular), so the overlap pass and the bottom clamp
+  // work on what the browser actually draws: one line ≈15px, two ≈30px, three ≈44px, wrapped
+  // name + "lbs. · %" ≈46px. Consecutive baselines are spaced so line boxes don't intersect.
+  const lineAsc = l => 1.05 * l.size;
+  const lineDesc = l => (l.weight ? 0.4 : 0.315) * l.size;
+  function labelBlockFor(label, total, p, nameFill, avail, wrapName){
+    const midY = (p.y0+p.y1)/2;
+    const w = `${lbs(total)} lbs.`, share = pctShare(total/grandTotal), sub = `${w} · ${share}`;
+    const block = lines => {
+      let y = lineAsc(lines[0]);
+      lines.forEach((l, i) => {
+        if (i) y += Math.ceil(lineDesc(lines[i-1]) + lineAsc(l));
+        l.dy = y;
+      });
+      const h = y + lineDesc(lines[lines.length-1]);
+      return {top: midY - h/2, h, lines};
+    };
+    const nameLine = text => ({size: 11, weight: 600, fill: nameFill, text});
+    const subLine = text => ({size: 10, fill: '#5c584d', text: ellipsize(text, avail, 0, 10)});
+    let tier = p.h < 26 ? 1 : (p.h < 40 ? 2 : 3);
+    const oneLine = `${label} — ${sub}`;
+    if (tier === 1 && safeWidth(oneLine, 600, 10.5) <= avail){
+      return block([{size: 10.5, weight: 600, fill: nameFill, text: oneLine}]);
+    }
+    if (tier === 1) tier = 2;
+    if (safeWidth(label, 600, 11) > avail){
+      if (wrapName){
+        const nameLines = wrapText(label, avail, '600 11px', 2, safeMeasureCtx(600, 11)).map(l => ellipsize(l, avail, 600, 11));
+        if (nameLines.length === 2){
+          return block([nameLine(nameLines[0]), nameLine(nameLines[1]), subLine(sub)]);
+        }
+        label = nameLines[0];
+      } else {
+        label = ellipsize(label, avail, 600, 11);
+      }
+    }
+    if (tier === 2) return block([nameLine(label), subLine(sub)]);
+    return block([nameLine(label), subLine(w), subLine(share)]);
+  }
+
+  // ML is sized from the widest generator line as actually rendered (after the fit/wrap
+  // fallbacks above, laid out against the widest margin allowed), not the unwrapped one-liner —
+  // so one long name wraps instead of pushing ML to its cap. Re-laying out against the final
+  // ML − 14 gives the same lines, since every line already fits within it.
+  const ML_MAX = 220, ML_MIN = 100, ML_PAD = 14;
   let maxAreaLabelW = 0;
   flow.areaNodes.forEach(name => {
-    const p = areaCol.positions[name];
-    const total = flow.areaTotals[name];
-    const sub = `${lbs(total)} lbs. · ${pctShare(total/grandTotal)}`;
-    const w = 1.08 * (p.h < 26
-      ? textWidth(`${displayName(name)} — ${sub}`, LABEL_FONT_1LINE)
-      : Math.max(textWidth(displayName(name), LABEL_FONT_NAME), textWidth(sub, LABEL_FONT_SUB)));
-    if (w > maxAreaLabelW) maxAreaLabelW = w;
+    const b = labelBlockFor(displayName(name), flow.areaTotals[name], areaCol.positions[name], '#1a1a1a', ML_MAX - ML_PAD, true);
+    b.lines.forEach(l => { maxAreaLabelW = Math.max(maxAreaLabelW, safeWidth(l.text, l.weight, l.size)); });
   });
   // Wide margins on both ends — area names sit to the LEFT of col1 (anchor "end") and
   // outcome names sit to the RIGHT of col3 (anchor "start"), so both need real room or their
   // text runs off the edge of the canvas instead of just getting tight. ML grows with the
   // widest label (capped so one extreme name can't crush the plot area down to nothing); MR
-  // stays fixed since the outcome column's own labels ("Diverted"/"Landfilled / Incinerated"
-  // + a short weight/percent) don't vary with the data the way area names do — sized for the
-  // longer of the two fixed labels, not just "Diverted".
-  const ML = Math.min(260, Math.max(100, maxAreaLabelW + 8 + 6)), MR = 145;
+  // is sized from the widest outcome name ("Landfilled / Incinerated"), measured the same safe
+  // way: labels start at col3X + nodeW + 8 and must end at least 4px before W.
+  const maxOutcomeNameW = Math.max(...Object.values(OUTCOME_LABELS).map(t => safeWidth(t, 600, 11)));
+  const ML = Math.min(ML_MAX, Math.max(ML_MIN, Math.ceil(maxAreaLabelW) + ML_PAD));
+  const MR = Math.max(145, Math.ceil(maxOutcomeNameW + 12));
   const col1X = ML, col3X = W - MR - nodeW, col2X = (col1X + col3X) / 2;
 
   // Stacks each link into a sub-span of its source node's band and its target node's band —
@@ -3791,32 +3856,6 @@ function buildAlluvialSvg(title, flow, groupColLabel){
     col2X + nodeW, col3X, (s,t) => OUTCOME_COLORS[t], 0.38
   );
 
-  // A node's label block — three tiers depending on how much vertical room the node's band
-  // has: tight bands get a single combined line (name — lbs. · %), roomier ones get name and
-  // "lbs. · %" on two lines, and the roomiest get name / lbs. / % on three. Each block is
-  // centered on its node's band; `top` is then nudged by resolveLabelOverlaps so neighbouring
-  // blocks never collide. Line offsets (dy) are baselines relative to the block's top.
-  function labelBlockFor(label, total, p, nameFill){
-    const midY = (p.y0+p.y1)/2;
-    const w = `${lbs(total)} lbs.`, share = pctShare(total/grandTotal);
-    if (p.h < 26){
-      return {top: midY-6, h: 12, lines: [
-        {dy: 10, size: 10.5, weight: 600, fill: nameFill, text: `${label} — ${w} · ${share}`}
-      ]};
-    }
-    if (p.h < 40){
-      return {top: midY-13, h: 26, lines: [
-        {dy: 11, size: 11, weight: 600, fill: nameFill, text: label},
-        {dy: 25, size: 10, fill: '#5c584d', text: `${w} · ${share}`}
-      ]};
-    }
-    return {top: midY-20, h: 40, lines: [
-      {dy: 10, size: 11, weight: 600, fill: nameFill, text: label},
-      {dy: 24, size: 10, fill: '#5c584d', text: w},
-      {dy: 38, size: 10, fill: '#5c584d', text: share}
-    ]};
-  }
-
   // Top-to-bottom pass: a block starting less than 2px below the previous block's bottom is
   // pushed down by the overlap; then the last block is clamped inside the base canvas,
   // pushing earlier ones up as needed. Only labels move — rects and ribbons stay put.
@@ -3846,13 +3885,14 @@ function buildAlluvialSvg(title, flow, groupColLabel){
   }
 
   // Draws one column: every node's rect, then its (overlap-resolved) label block.
-  // fillFn(name) gives the rect color, nameFillFn(name) the label's name-line color.
-  function drawNodes(nodeNames, positions, x, fillFn, anchor, totals, haloed, labelFn, nameFillFn){
+  // fillFn(name) gives the rect color, nameFillFn(name) the label's name-line color; avail and
+  // wrapName are passed through to labelBlockFor's fit fallbacks.
+  function drawNodes(nodeNames, positions, x, fillFn, anchor, totals, haloed, labelFn, nameFillFn, avail, wrapName){
     const halo = haloed ? 'stroke="#ffffff" stroke-width="2" paint-order="stroke" stroke-linejoin="round"' : '';
     const labelX = anchor === 'end' ? x - 8 : x + nodeW + 8;
     let svg = '';
     nodeNames.forEach(name => { svg += nodeRect(x, positions[name], fillFn(name)); });
-    const blocks = resolveLabelOverlaps(nodeNames.map(name => labelBlockFor(labelFn(name), totals[name], positions[name], nameFillFn(name))));
+    const blocks = resolveLabelOverlaps(nodeNames.map(name => labelBlockFor(labelFn(name), totals[name], positions[name], nameFillFn(name), avail, wrapName)));
     blocks.forEach(b => {
       b.lines.forEach(l => {
         svg += `<text x="${labelX}" y="${b.top + l.dy}" text-anchor="${anchor}" font-size="${l.size}"${l.weight ? ` font-weight="${l.weight}"` : ''} fill="${l.fill}" ${halo}>${escapeHtml(l.text)}</text>`;
@@ -3861,10 +3901,16 @@ function buildAlluvialSvg(title, flow, groupColLabel){
     return svg;
   }
 
-  const areaNodesSvg = drawNodes(flow.areaNodes, areaCol.positions, col1X, () => ALLUVIAL_AREA_COLOR, 'end', flow.areaTotals, false, displayName, () => '#1a1a1a');
-  const streamNodesSvg = drawNodes(flow.streamNodes, streamCol.positions, col2X, () => ALLUVIAL_STREAM_COLOR, 'start', flow.streamTotals, true, n => n, () => '#1a1a1a');
+  // Horizontal room per column: generator labels end 8px left of col1 (ML − 14 keeps 6px from
+  // the left edge); stream labels must stop 6px before the outcome bar; outcome labels must
+  // end at least 4px before W.
+  const areaAvail = ML - ML_PAD;
+  const streamAvail = col3X - (col2X + nodeW + 8) - 6;
+  const outcomeAvail = W - 4 - (col3X + nodeW + 8);
+  const areaNodesSvg = drawNodes(flow.areaNodes, areaCol.positions, col1X, () => ALLUVIAL_AREA_COLOR, 'end', flow.areaTotals, false, displayName, () => '#1a1a1a', areaAvail, true);
+  const streamNodesSvg = drawNodes(flow.streamNodes, streamCol.positions, col2X, () => ALLUVIAL_STREAM_COLOR, 'start', flow.streamTotals, true, n => n, () => '#1a1a1a', streamAvail, false);
   // Outcome nodes take per-node color (green/red) for both the rect and the name line.
-  const outcomeNodesColored = drawNodes(flow.outcomeNodes, outcomeCol.positions, col3X, n => OUTCOME_COLORS[n], 'start', flow.outcomeTotals, false, n => OUTCOME_LABELS[n] || n, n => OUTCOME_COLORS[n]);
+  const outcomeNodesColored = drawNodes(flow.outcomeNodes, outcomeCol.positions, col3X, n => OUTCOME_COLORS[n], 'start', flow.outcomeTotals, false, n => OUTCOME_LABELS[n] || n, n => OUTCOME_COLORS[n], outcomeAvail, false);
 
   // "Other (n smaller)" footnote — drawn inside the SVG (below the base canvas) so PNG/SVG
   // exports carry it too. wrapText measures with Arial while the SVG draws Poppins, hence the
@@ -3873,7 +3919,7 @@ function buildAlluvialSvg(title, flow, groupColLabel){
   if (flow.otherMembers && flow.otherMembers.length){
     const noteText = `${displayName('__other__')}: ${flow.otherMembers.map(m => m.name).join(', ')}`;
     const noteLines = wrapText(noteText, 0.92 * (W - 32), '10px Arial', 3, measureCtx);
-    const lineH = 13;
+    const lineH = 14; // ≥ the 10px line box (~13.7px), so wrapped footnote lines never touch
     footnoteHeight = 6 + noteLines.length * lineH + 4;
     noteLines.forEach((line, i) => {
       footnoteSvg += `<text x="16" y="${H0 + 6 + 10 + i*lineH}" font-size="10" fill="#5c584d">${escapeHtml(line)}</text>`;
