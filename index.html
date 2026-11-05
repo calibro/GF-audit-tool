@@ -3152,17 +3152,26 @@ function resolveScopeAreaIds(scope){
 // favors "off" being the exceptional, explicit state.
 let summaryExcludedAreas = new Set();
 let chartsExcludedAreas = new Set();
+// Total row/node label on the Charts tab: says "(selected areas)" whenever the Filter leaves
+// anything out, so a filtered total is never mistaken for the whole building's.
+function chartsTotalLabel(){
+  return chartsExcludedAreas.size > 0 ? 'Total (selected areas)' : 'Total';
+}
 function includedAreaIdsFor(excludedSet){
   return areas.map(a => a.id).filter(id => !excludedSet.has(id));
 }
 
 // Shared "Grouping" toggle (Figma "summaries"/"charts" frames) for the tables/charts that
-// always show every tenant/area side by side regardless of the Filter checkboxes above
-// (Summaries' Waste Stream Contamination + Current v Potential Diversion, Charts' matching
-// pair) — false = one row/bar per tenant (its areas combined), true = one row/bar per
-// individual area. A per-report choice, not a fixed rule, so it's a toggle, not hardcoded.
+// show tenants/areas side by side (Summaries' Waste Stream Contamination + Current v
+// Potential Diversion, Charts' matching pair and the Total Waste Generation chart) — false =
+// one row/bar per tenant (its areas combined), true = one row/bar per individual area. A
+// per-report choice, not a fixed rule, so it's a toggle, not hardcoded.
+// chartsTotalOnly is the Charts tab's third pill ("Total only"): those charts collapse to a
+// single Total row/node. It sits on top of chartsByArea without changing it, so switching
+// back restores the earlier grouping.
 let summaryByArea = false;
 let chartsByArea = false;
+let chartsTotalOnly = false;
 // Waste Stream Contamination's own "hide streams with 0 lbs. logged" toggle — Summaries and
 // Charts each get their own copy (chartsContamHideZeroCols, declared near the other Charts
 // toggles), matching how summaryByArea/chartsByArea are already independent per tab rather
@@ -3697,6 +3706,25 @@ function groupSmallGenerators(flow, threshold = 0.01){
   });
 }
 
+// "Total only" view of the Total Waste Generation chart: every generator merged into one
+// node. Returns a NEW flow (the input is never mutated); the node uses a collision-proof
+// internal key with its label in displayNames (same pattern as groupSmallGenerators), links
+// to each stream are the per-stream sums, and stream/outcome data is carried over untouched.
+function collapseToTotal(flow, label){
+  const TOTAL_KEY = '__total__';
+  const byStream = {};
+  flow.areaStreamLinks.forEach(l => byStream[l.target] = (byStream[l.target] || 0) + l.value);
+  const total = flow.areaNodes.reduce((s,n) => s + flow.areaTotals[n], 0);
+  const hasAny = flow.areaNodes.length > 0;
+  return Object.assign({}, flow, {
+    areaNodes: hasAny ? [TOTAL_KEY] : [],
+    areaTotals: hasAny ? {[TOTAL_KEY]: total} : {},
+    areaStreamLinks: Object.keys(byStream).map(s => ({source: TOTAL_KEY, target: s, value: byStream[s]})),
+    displayNames: Object.assign({}, flow.displayNames || {}, {[TOTAL_KEY]: label}),
+    otherMembers: undefined
+  });
+}
+
 function buildAlluvialSvg(title, flow, groupColLabel){
   // H0 is the plot's base canvas height — the plot geometry is always laid out against it;
   // the final SVG height (H) only grows below it when the "Other" footnote is drawn.
@@ -4014,23 +4042,24 @@ function buildAlluvialSvg(title, flow, groupColLabel){
 // Waste Stream Contamination — same matrix as the Summaries table of the same name
 // (one row per group, one column per stream, cell = share of that stream's weight
 // that doesn't belong there), laid out as a ranked bar-per-cell table instead of a plain
-// text grid. Always the full breakdown regardless of the Area scope chips — same
-// reasoning as the diversion charts, there's no useful "single area" version of a
-// group-comparison table. byArea picks the row grouping (the shared Grouping toggle in the
-// filter sidebar — see renderGroupingToggle): one row per individual Area (labeled with its
-// tenant), or one row per Tenant with its areas combined.
+// text grid. Follows the Charts tab's Filter like the other charts: areaIds (optional,
+// default every area) limits the rows, the Total and the stream columns to those areas.
+// byArea picks the row grouping (the Grouping toggle in the filter sidebar): one row per
+// individual Area (labeled with its tenant), or one row per Tenant with its included areas
+// combined.
 // ============================================================
-function computeContaminationByStream(byArea, hideZeroCols){
+function computeContaminationByStream(byArea, hideZeroCols, areaIds){
+  const included = new Set(areaIds || areas.map(a => a.id));
+  const inAreas = areas.filter(a => included.has(a.id));
   const fex = computeExtrapolatedRows();
   // Display-only column filter, same idea as computeCharacterizationMatrix's — a stream's own
   // place in STREAMS/streamConfig and every calculation stay untouched, this only decides
-  // whether it gets a column here. This chart is always the full unscoped breakdown (never
-  // filtered by the Filter Sidebar — see the "always the full breakdown" callers), so
-  // "observed" is checked across every area, not just whichever byArea grouping is active.
+  // whether it gets a column here. "Observed" is checked across the included areas (the
+  // Filter selection), not just whichever byArea grouping is active.
   // Ghost streams are excluded unconditionally (presentStreamNames), independent of the
   // hideZeroCols toggle — they're not "present but empty," they're not present at all.
   const streamsList = hideZeroCols
-    ? presentStreamNames().filter(s => areas.reduce((sum,a) => sum + streamWeightForArea(a.id, s), 0) > 0)
+    ? presentStreamNames().filter(s => inAreas.reduce((sum,a) => sum + streamWeightForArea(a.id, s), 0) > 0)
     : presentStreamNames();
   function rowFor(label, areaIds, isTotal){
     const cells = streamsList.map(s => {
@@ -4042,9 +4071,12 @@ function computeContaminationByStream(byArea, hideZeroCols){
     return {label, cells, isTotal};
   }
   const rows = byArea
-    ? areas.map(a => rowFor(areaLabel(a.id), [a.id], false))
-    : distinctRollups().map(rg => rowFor(rg, areas.filter(a => a.rollup === rg).map(a => a.id), false));
-  rows.push(rowFor('Total', areas.map(a => a.id), true));
+    ? inAreas.map(a => rowFor(areaLabel(a.id), [a.id], false))
+    : distinctRollups()
+        .map(rg => ({rg, ids: inAreas.filter(a => a.rollup === rg).map(a => a.id)}))
+        .filter(g => g.ids.length)
+        .map(g => rowFor(g.rg, g.ids, false));
+  rows.push(rowFor((areaIds ? chartsTotalLabel() : 'Total'), inAreas.map(a => a.id), true));
   return {rows, streams: streamsList};
 }
 
@@ -4104,8 +4136,10 @@ function buildContaminationSvg(title, data, groupColLabel){
   const effHeaderY = needsWrap ? headerY - 6 : headerY;
   const effBodyStartY = needsWrap ? bodyStartY + 13 : bodyStartY;
 
-  const hasTotal = rows.some(r => r.isTotal);
-  const H = effBodyStartY + rows.length * rowH + (hasTotal ? totalExtraGap : 0) + MB;
+  // The extra gap only comes with the divider, which is drawn only when the Total follows at
+  // least one ordinary row.
+  const hasTotalDivider = rows.some((r, ri) => r.isTotal && ri > 0);
+  const H = effBodyStartY + rows.length * rowH + (hasTotalDivider ? totalExtraGap : 0) + MB;
   let svg = `<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />`;
   svg += `<text x="${ML}" y="${effHeaderY}" font-size="11" fill="#5c584d">${escapeHtml(groupColLabel || 'Generator')}</text>`;
 
@@ -4125,7 +4159,7 @@ function buildContaminationSvg(title, data, groupColLabel){
   const labelMaxW = nameColW - 10; // small buffer before the first stream column starts
   let cursor = effBodyStartY;
   rows.forEach((r, ri) => {
-    if (r.isTotal){
+    if (r.isTotal && ri > 0){
       svg += `<line x1="${ML}" y1="${cursor}" x2="${W-MR}" y2="${cursor}" stroke="#c7c2b4" stroke-width="1" stroke-dasharray="3 3" />`;
       cursor += totalExtraGap;
     }
@@ -4553,11 +4587,18 @@ window.downloadChartCard = function(btn){
 // potentialDenominator(): total minus the group's Unacceptable weight, and for the ghost tier
 // (ghostPotential, chart series C) minus only the Unacceptable weight NOT targeted at any
 // ghost stream — see sumUnacceptableWeight / potentialDenominator.
-function computeDiversionByArea(byArea){
-  const fex = computeExtrapolatedRows();
+// areaIds (optional, default every area) scopes every group and the Total to those areas
+// only — the Charts tab passes its Filter selection; a generator with no included area gets
+// no group, and one with only some areas included is computed on that subset alone.
+function computeDiversionByArea(byArea, areaIds){
+  const included = new Set(areaIds || areas.map(a => a.id));
+  const fex = computeExtrapolatedRows().filter(r => included.has(r.areaId));
+  const inAreas = areas.filter(a => included.has(a.id));
   const groupDefs = byArea
-    ? areas.map(a => ({label: areaLabel(a.id), areaIds: [a.id]}))
-    : distinctRollups().map(rg => ({label: rg, areaIds: areas.filter(a => a.rollup === rg).map(a => a.id)}));
+    ? inAreas.map(a => ({label: areaLabel(a.id), areaIds: [a.id]}))
+    : distinctRollups()
+        .map(rg => ({label: rg, areaIds: inAreas.filter(a => a.rollup === rg).map(a => a.id)}))
+        .filter(g => g.areaIds.length);
   const rateOver = (num, den) => den > 0 ? num/den : 0;
   const anyGhost = m => materialGhostTargets(m).length > 0;
   const ratesFor = (gData, total) => {
@@ -4576,8 +4617,8 @@ function computeDiversionByArea(byArea){
     const gData = fex.filter(r => areaIds.includes(r.areaId));
     return {label, ...ratesFor(gData, total)};
   });
-  const allTotal = areas.reduce((s,a) => s + areaTotalPresortLive(a.id), 0);
-  groups.push({label: 'Total', ...ratesFor(fex, allTotal), isTotal: true});
+  const allTotal = inAreas.reduce((s,a) => s + areaTotalPresortLive(a.id), 0);
+  groups.push({label: (areaIds ? chartsTotalLabel() : 'Total'), ...ratesFor(fex, allTotal), isTotal: true});
   // A group sitting at 0% current AND 0% potential has nothing divertible either way (e.g.
   // Bathroom's default material isn't accepted anywhere) — a flat pair of empty bars is just
   // clutter, not information. Total always stays, since it's the one number that summarizes
@@ -4712,8 +4753,10 @@ function buildDiversionTrackSvg(title, groups, opts){
 
   let rows = '';
   let cursor = MT;
-  groups.forEach((g) => {
-    if (g.isTotal){
+  groups.forEach((g, gi) => {
+    // Divider only when at least one ordinary row sits above the Total — a Total-only chart
+    // would otherwise get a stray dashed line right under its header.
+    if (g.isTotal && gi > 0){
       const dividerY = cursor + dividerPad;
       rows += `<line x1="${ML}" y1="${dividerY}" x2="${W-MR}" y2="${dividerY}" stroke="#c7c2b4" stroke-width="1" stroke-dasharray="3 3" />`;
       cursor = dividerY + totalGapAfterDivider;
@@ -5011,8 +5054,9 @@ function buildCharacterizationSvg(title, matrix, sharedScale){
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">${svg}</svg>`;
 }
 
-// scoped=false marks a card that ignores the Filter (always every tenant/area) — read back by
-// the export filename code via data-scoped, so no chart titles are hardcoded there.
+// scoped=false would mark a card that ignores the Filter (always every tenant/area) — read
+// back by the export filename code via data-scoped, so no chart titles are hardcoded there.
+// Every Charts card follows the Filter today, so none passes false.
 function chartCardHtml(title, svg, footerHtml, scoped = true){
   return `<div class="chart-card" data-scoped="${scoped ? '1' : '0'}">
       <div class="chart-card-header">
@@ -5025,14 +5069,36 @@ function chartCardHtml(title, svg, footerHtml, scoped = true){
 }
 
 
+// Charts tab's Grouping control: the two Summaries pills plus "Total only". Choosing one of
+// the first two sets chartsByArea and leaves Total only; "Total only" keeps chartsByArea as
+// it is, so switching back restores the earlier grouping. Summaries keeps renderGroupingToggle.
+function renderChartsGroupingToggle(){
+  const box = document.getElementById('chartsGroupingToggle');
+  if (!box) return;
+  const options = [
+    {label: 'By Generator', active: !chartsTotalOnly && !chartsByArea, pick: () => { chartsByArea = false; chartsTotalOnly = false; }},
+    {label: 'By Generator and area', active: !chartsTotalOnly && chartsByArea, pick: () => { chartsByArea = true; chartsTotalOnly = false; }},
+    {label: 'Total only', active: chartsTotalOnly, pick: () => { chartsTotalOnly = true; }},
+  ];
+  box.innerHTML = options.map(o =>
+    `<button type="button" class="grouping-pill${o.active ? ' active' : ''}">${o.label}</button>`).join('');
+  box.querySelectorAll('button').forEach((btn, i) => {
+    btn.onclick = () => { options[i].pick(); renderChartsTab(); };
+  });
+}
+
 function renderChartsTab(){
   const includedAreaIds = includedAreaIdsFor(chartsExcludedAreas);
   renderScopeFilterSidebar('chartsTenantFilters', 'chartsAreaFilters', chartsExcludedAreas, renderChartsTab);
-  renderGroupingToggle('chartsGroupingToggle', chartsByArea, (v) => { chartsByArea = v; renderChartsTab(); });
+  renderChartsGroupingToggle();
   const container = document.getElementById('chartsContent');
+  // "Total only" drops the "by …" part of the grouped charts' titles (and so their file names).
+  const groupedTitle = base => chartsTotalOnly ? base : base + ' by ' + (chartsByArea ? 'Area' : 'Generator');
+  const groupColLabel = chartsByArea && !chartsTotalOnly ? 'Area' : 'Generator';
 
-  const title0 = 'Total Waste Generation by ' + (chartsByArea ? 'Area' : 'Generator');
+  const title0 = groupedTitle('Total Waste Generation');
   const flow = computeWasteGenerationFlow(includedAreaIds, chartsByArea);
+  const flowShown = chartsTotalOnly ? collapseToTotal(flow, chartsTotalLabel()) : groupSmallGenerators(flow);
 
   const title1 = 'Breakdown of Total Waste Stream by Material Type';
   const donutData = computeCategoryBreakdown(includedAreaIds);
@@ -5040,14 +5106,13 @@ function renderChartsTab(){
   const title1b = 'Breakdown of Total Waste Stream by Material Type — Table';
   const materialRows = computeMaterialBreakdown(includedAreaIds);
 
-  // Always the full breakdown regardless of the Overall/Area scope chips above — those chips
-  // scope the donut to one area at a time, but this chart's whole point is comparing groups
-  // side by side, so there's no useful "single area" version of it. Grouping (by individual
-  // Area, or rolled up by Tenant) is its own toggle instead — chartsByArea, set via the
-  // sidebar's Grouping control (renderGroupingToggle), shared with the Contamination chart
-  // below so the two never disagree about what a "group" means on this tab.
-  const title2 = 'Current v Potential Diversion by ' + (chartsByArea ? 'Area' : 'Generator');
-  const diversionGroups = computeDiversionByArea(chartsByArea);
+  // Follows the Filter like the other charts: only the included areas get a group, and the
+  // Total covers just those. Grouping (by individual Area, or rolled up by Tenant, or Total
+  // only) is the sidebar's Grouping control (renderChartsGroupingToggle), shared with the
+  // Contamination chart below so the two never disagree about what a "group" means on this tab.
+  const title2 = groupedTitle('Current v Potential Diversion');
+  const diversionAll = computeDiversionByArea(chartsByArea, includedAreaIds);
+  const diversionGroups = chartsTotalOnly ? diversionAll.filter(g => g.isTotal) : diversionAll;
   // Rate A (the straightforward "if everything already divertible were placed correctly")
   // gets its own plain chart, always shown. Rates B and C each get their OWN separate chart
   // too, rather than sharing one — three differently-styled lines all labeled "Potential
@@ -5063,17 +5128,19 @@ function renderChartsTab(){
   const title2b = title2 + ' (programs active across all areas)';
   const title2c = title2 + ' (with new programs)';
   const diversionBCard = diversionShowB
-    ? chartCardHtml(title2b, buildDiversionTrackSvg(title2b, diversionGroups, {showB: true}), '', false)
+    ? chartCardHtml(title2b, buildDiversionTrackSvg(title2b, diversionGroups, {showB: true}), '')
     : '';
   const diversionCCard = diversionShowC
-    ? chartCardHtml(title2c, buildDiversionTrackSvg(title2c, diversionGroups, {showC: true}), '', false)
+    ? chartCardHtml(title2c, buildDiversionTrackSvg(title2c, diversionGroups, {showC: true}), '')
     : '';
 
-  // Same matrix as the Summaries tab's "Waste Stream Contamination" table — also always the
-  // full breakdown, same reasoning as the diversion charts above, and sharing the same
-  // chartsByArea toggle.
-  const title2d = 'Waste Stream Contamination by ' + (chartsByArea ? 'Area' : 'Generator');
-  const contamination = computeContaminationByStream(chartsByArea, chartsContamHideZeroCols);
+  // Same matrix as the Summaries tab's "Waste Stream Contamination" table — follows the
+  // Filter like the diversion charts above, and shares the same Grouping control.
+  const title2d = groupedTitle('Waste Stream Contamination');
+  const contaminationAll = computeContaminationByStream(chartsByArea, chartsContamHideZeroCols, includedAreaIds);
+  const contamination = chartsTotalOnly
+    ? Object.assign({}, contaminationAll, {rows: contaminationAll.rows.filter(r => r.isTotal)})
+    : contaminationAll;
   const contam2dToggleHtml = `<label class="toggle-field" style="margin-top:12px;">
       <input type="checkbox" ${chartsContamHideZeroCols ? 'checked' : ''} onchange="window.toggleChartsContamHideZero(this.checked)" />
       <span>Hide streams with 0 lbs. logged</span>
@@ -5099,14 +5166,14 @@ function renderChartsTab(){
     </label>`;
 
   container.innerHTML =
-    chartCardHtml(title2, buildDiversionTrackSvg(title2, diversionGroups, {showA: true}), '', false) +
+    chartCardHtml(title2, buildDiversionTrackSvg(title2, diversionGroups, {showA: true}), '') +
     diversionBCard +
     diversionCCard +
     chartCardHtml(title1, buildDonutSvg(title1, donutData)) +
     chartCardHtml(title1b, buildMaterialTableSvg(title1b, materialRows)) +
-    chartCardHtml(title0, buildAlluvialSvg(title0, groupSmallGenerators(flow), chartsByArea ? 'Area' : 'Generator')) +
+    chartCardHtml(title0, buildAlluvialSvg(title0, flowShown, groupColLabel)) +
     chartCardHtml(title3, buildCharacterizationSvg(title3, matrix, charSharedScale), char3ToggleHtml) +
-    chartCardHtml(title2d, buildContaminationSvg(title2d, contamination, chartsByArea ? 'Area' : 'Generator'), contam2dToggleHtml, false);
+    chartCardHtml(title2d, buildContaminationSvg(title2d, contamination, groupColLabel), contam2dToggleHtml);
 }
 window.toggleCharScale = function(checked){
   charSharedScale = checked;
