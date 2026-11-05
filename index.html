@@ -3628,11 +3628,56 @@ function ribbonPath(x1,y0top,y0bottom,x2,y1top,y1bottom){
   return `M${x1},${y0top} C${midX},${y0top} ${midX},${y1top} ${x2},${y1top} L${x2},${y1bottom} C${midX},${y1bottom} ${midX},${y0bottom} ${x1},${y0bottom} Z`;
 }
 
+// % of total for the Total Waste Generation chart's labels — a real-but-tiny share would
+// otherwise round to "0.0%", which reads as "nothing", so it's shown as "<0.1%" instead.
+function pctShare(n){ return (n > 0 && n < 0.001) ? '<0.1%' : pct(n); }
+
+// Display-only grouping for the Total Waste Generation chart: generators below `threshold`
+// of the flow's grand total are merged into one "Other (n smaller)" node, placed last in the
+// generator column. Returns a NEW flow (the input is never mutated); stream/outcome data is
+// carried over as-is, so stream and outcome totals are identical either way. Only groups
+// when at least two generators are small AND at least one stays ungrouped — otherwise the
+// flow is returned unchanged.
+function groupSmallGenerators(flow, threshold = 0.01){
+  const OTHER_KEY = '__other__';
+  const grandTotal = flow.areaNodes.reduce((s,n) => s + flow.areaTotals[n], 0);
+  if (!(grandTotal > 0)) return flow;
+  const small = flow.areaNodes.filter(n => flow.areaTotals[n] / grandTotal < threshold);
+  if (small.length < 2 || small.length >= flow.areaNodes.length) return flow;
+  const smallSet = new Set(small);
+  const kept = flow.areaNodes.filter(n => !smallSet.has(n));
+
+  const areaTotals = {};
+  kept.forEach(n => areaTotals[n] = flow.areaTotals[n]);
+  areaTotals[OTHER_KEY] = small.reduce((s,n) => s + flow.areaTotals[n], 0);
+
+  const areaStreamLinks = [];
+  const otherByStream = {};
+  flow.areaStreamLinks.forEach(l => {
+    if (smallSet.has(l.source)) otherByStream[l.target] = (otherByStream[l.target] || 0) + l.value;
+    else areaStreamLinks.push({source: l.source, target: l.target, value: l.value});
+  });
+  Object.keys(otherByStream).forEach(s => areaStreamLinks.push({source: OTHER_KEY, target: s, value: otherByStream[s]}));
+
+  const otherMembers = small.map(n => ({name: n, total: flow.areaTotals[n]})).sort((a,b) => b.total - a.total);
+  return Object.assign({}, flow, {
+    areaNodes: kept.concat([OTHER_KEY]),
+    areaTotals,
+    areaStreamLinks,
+    displayNames: Object.assign({}, flow.displayNames || {}, {[OTHER_KEY]: `Other (${small.length} smaller)`}),
+    otherMembers
+  });
+}
+
 function buildAlluvialSvg(title, flow, groupColLabel){
-  const W = 720, H = 560;
+  // H0 is the plot's base canvas height — the plot geometry is always laid out against it;
+  // the final SVG height (H) only grows below it when the "Other" footnote is drawn.
+  const W = 720, H0 = 560;
   const MT = 44, MB = 16;
   const nodeW = 14, nodeGap = 8;
-  const plotTop = MT, plotBottom = H - MB, plotH = plotBottom - plotTop;
+  const plotTop = MT, plotBottom = H0 - MB, plotH = plotBottom - plotTop;
+  const displayNames = flow.displayNames || {};
+  const displayName = name => displayNames[name] || name;
 
   // Area (the first step) is neutral grey rather than a brand color — it's just the raw
   // generation split before anything meaningful (stream, then diverted/landfilled) happens
@@ -3647,9 +3692,9 @@ function buildAlluvialSvg(title, flow, groupColLabel){
 
   const hasData = flow.areaNodes.length && flow.streamNodes.length;
   if (!hasData){
-    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
-      <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
-      <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
+    return `<svg viewBox="0 0 ${W} ${H0}" width="${W}" height="${H0}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
+      <rect x="0" y="0" width="${W}" height="${H0}" fill="#ffffff" />
+      <text x="${W/2}" y="${H0/2}" text-anchor="middle" font-size="14" fill="#8a8578">No data logged yet</text>
     </svg>`;
   }
 
@@ -3679,13 +3724,24 @@ function buildAlluvialSvg(title, flow, groupColLabel){
   // areaCol can be measured against before col1X is even decided.
   const measureCtx = document.createElement('canvas').getContext('2d');
   function textWidth(text, font){ measureCtx.font = font; return measureCtx.measureText(text).width; }
+  // One shared denominator for every node's percentage, across all three columns — total
+  // generation is conserved through the diagram (same grand total whichever column you sum),
+  // so "% of total" means the same thing whether it's labeling an area, a stream, or an
+  // outcome.
+  const grandTotal = flow.areaNodes.reduce((s,n) => s + flow.areaTotals[n], 0);
+  // Measured with the same font stack the SVG draws with, ×1.08 as slack for when the page
+  // itself doesn't have Poppins loaded (the canvas then measures the narrower Arial fallback).
+  const LABEL_FONT_1LINE = '600 10.5px Poppins, Arial, sans-serif';
+  const LABEL_FONT_NAME = '600 11px Poppins, Arial, sans-serif';
+  const LABEL_FONT_SUB = '10px Poppins, Arial, sans-serif';
   let maxAreaLabelW = 0;
   flow.areaNodes.forEach(name => {
     const p = areaCol.positions[name];
-    if (p.h <= 0.5) return;
-    const w = p.h < 26
-      ? textWidth(`${name} — ${lbs(flow.areaTotals[name])} lbs.`, '600 10.5px Arial')
-      : textWidth(name, '600 11px Arial');
+    const total = flow.areaTotals[name];
+    const sub = `${lbs(total)} lbs. · ${pctShare(total/grandTotal)}`;
+    const w = 1.08 * (p.h < 26
+      ? textWidth(`${displayName(name)} — ${sub}`, LABEL_FONT_1LINE)
+      : Math.max(textWidth(displayName(name), LABEL_FONT_NAME), textWidth(sub, LABEL_FONT_SUB)));
     if (w > maxAreaLabelW) maxAreaLabelW = w;
   });
   // Wide margins on both ends — area names sit to the LEFT of col1 (anchor "end") and
@@ -3735,55 +3791,95 @@ function buildAlluvialSvg(title, flow, groupColLabel){
     col2X + nodeW, col3X, (s,t) => OUTCOME_COLORS[t], 0.38
   );
 
-  // One shared denominator for every node's percentage, across all three columns — total
-  // generation is conserved through the diagram (same grand total whichever column you sum),
-  // so "% of total" means the same thing whether it's labeling an area, a stream, or an
-  // outcome.
-  const grandTotal = flow.areaNodes.reduce((s,n) => s + flow.areaTotals[n], 0);
+  // A node's label block — three tiers depending on how much vertical room the node's band
+  // has: tight bands get a single combined line (name — lbs. · %), roomier ones get name and
+  // "lbs. · %" on two lines, and the roomiest get name / lbs. / % on three. Each block is
+  // centered on its node's band; `top` is then nudged by resolveLabelOverlaps so neighbouring
+  // blocks never collide. Line offsets (dy) are baselines relative to the block's top.
+  function labelBlockFor(label, total, p, nameFill){
+    const midY = (p.y0+p.y1)/2;
+    const w = `${lbs(total)} lbs.`, share = pctShare(total/grandTotal);
+    if (p.h < 26){
+      return {top: midY-6, h: 12, lines: [
+        {dy: 10, size: 10.5, weight: 600, fill: nameFill, text: `${label} — ${w} · ${share}`}
+      ]};
+    }
+    if (p.h < 40){
+      return {top: midY-13, h: 26, lines: [
+        {dy: 11, size: 11, weight: 600, fill: nameFill, text: label},
+        {dy: 25, size: 10, fill: '#5c584d', text: `${w} · ${share}`}
+      ]};
+    }
+    return {top: midY-20, h: 40, lines: [
+      {dy: 10, size: 11, weight: 600, fill: nameFill, text: label},
+      {dy: 24, size: 10, fill: '#5c584d', text: w},
+      {dy: 38, size: 10, fill: '#5c584d', text: share}
+    ]};
+  }
 
-  // Three tiers depending on how much vertical room the node's band has: tight bands stay a
-  // single combined line (name — lbs.), roomier ones get name/lbs on two lines, and the
-  // roomiest add a third line for % of total underneath the lbs.
-  function drawNodes(nodeNames, positions, x, color, anchor, totals, haloed){
-    const halo = haloed ? 'stroke="#ffffff" stroke-width="2" paint-order="stroke" stroke-linejoin="round"' : '';
-    let svg = '';
-    nodeNames.forEach(name => {
-      const p = positions[name];
-      if (p.h <= 0.5) return;
-      svg += `<rect x="${x}" y="${p.y0}" width="${nodeW}" height="${p.h}" fill="${color}" rx="2" />`;
-      const labelX = anchor === 'end' ? x - 8 : x + nodeW + 8;
-      const midY = (p.y0+p.y1)/2;
-      if (p.h < 26){
-        svg += `<text x="${labelX}" y="${midY+4}" text-anchor="${anchor}" font-size="10.5" font-weight="600" fill="#1a1a1a" ${halo}>${escapeHtml(name)} — ${lbs(totals[name])} lbs.</text>`;
-      } else if (p.h < 40){
-        svg += `<text x="${labelX}" y="${midY-2}" text-anchor="${anchor}" font-size="11" font-weight="600" fill="#1a1a1a" ${halo}>${escapeHtml(name)}</text>
-          <text x="${labelX}" y="${midY+12}" text-anchor="${anchor}" font-size="10" fill="#5c584d" ${halo}>${lbs(totals[name])} lbs.</text>`;
-      } else {
-        svg += `<text x="${labelX}" y="${midY-10}" text-anchor="${anchor}" font-size="11" font-weight="600" fill="#1a1a1a" ${halo}>${escapeHtml(name)}</text>
-          <text x="${labelX}" y="${midY+4}" text-anchor="${anchor}" font-size="10" fill="#5c584d" ${halo}>${lbs(totals[name])} lbs.</text>
-          <text x="${labelX}" y="${midY+18}" text-anchor="${anchor}" font-size="10" fill="#5c584d" ${halo}>${pct(totals[name]/grandTotal)}</text>`;
+  // Top-to-bottom pass: a block starting less than 2px below the previous block's bottom is
+  // pushed down by the overlap; then the last block is clamped inside the base canvas,
+  // pushing earlier ones up as needed. Only labels move — rects and ribbons stay put.
+  const LABEL_GAP = 2, LABEL_BOTTOM_LIMIT = H0 - 2;
+  function resolveLabelOverlaps(blocks){
+    for (let i = 1; i < blocks.length; i++){
+      const minTop = blocks[i-1].top + blocks[i-1].h + LABEL_GAP;
+      if (blocks[i].top < minTop) blocks[i].top = minTop;
+    }
+    const n = blocks.length;
+    if (n && blocks[n-1].top + blocks[n-1].h > LABEL_BOTTOM_LIMIT){
+      blocks[n-1].top = LABEL_BOTTOM_LIMIT - blocks[n-1].h;
+      for (let i = n-2; i >= 0; i--){
+        const maxTop = blocks[i+1].top - LABEL_GAP - blocks[i].h;
+        if (blocks[i].top > maxTop) blocks[i].top = maxTop;
       }
+    }
+    return blocks;
+  }
+
+  // A node thinner than 2px is drawn 2px tall, centered on its band, so it never vanishes —
+  // only the drawn rect changes, the layout/ribbons still use the true band height.
+  function nodeRect(x, p, fill){
+    const drawH = Math.max(p.h, 2);
+    const y = p.h < 2 ? (p.y0+p.y1)/2 - 1 : p.y0;
+    return `<rect x="${x}" y="${y}" width="${nodeW}" height="${drawH}" fill="${fill}" rx="2" />`;
+  }
+
+  // Draws one column: every node's rect, then its (overlap-resolved) label block.
+  // fillFn(name) gives the rect color, nameFillFn(name) the label's name-line color.
+  function drawNodes(nodeNames, positions, x, fillFn, anchor, totals, haloed, labelFn, nameFillFn){
+    const halo = haloed ? 'stroke="#ffffff" stroke-width="2" paint-order="stroke" stroke-linejoin="round"' : '';
+    const labelX = anchor === 'end' ? x - 8 : x + nodeW + 8;
+    let svg = '';
+    nodeNames.forEach(name => { svg += nodeRect(x, positions[name], fillFn(name)); });
+    const blocks = resolveLabelOverlaps(nodeNames.map(name => labelBlockFor(labelFn(name), totals[name], positions[name], nameFillFn(name))));
+    blocks.forEach(b => {
+      b.lines.forEach(l => {
+        svg += `<text x="${labelX}" y="${b.top + l.dy}" text-anchor="${anchor}" font-size="${l.size}"${l.weight ? ` font-weight="${l.weight}"` : ''} fill="${l.fill}" ${halo}>${escapeHtml(l.text)}</text>`;
+      });
     });
     return svg;
   }
 
-  const areaNodesSvg = drawNodes(flow.areaNodes, areaCol.positions, col1X, ALLUVIAL_AREA_COLOR, 'end', flow.areaTotals, false);
-  const streamNodesSvg = drawNodes(flow.streamNodes, streamCol.positions, col2X, ALLUVIAL_STREAM_COLOR, 'start', flow.streamTotals, true);
+  const areaNodesSvg = drawNodes(flow.areaNodes, areaCol.positions, col1X, () => ALLUVIAL_AREA_COLOR, 'end', flow.areaTotals, false, displayName, () => '#1a1a1a');
+  const streamNodesSvg = drawNodes(flow.streamNodes, streamCol.positions, col2X, () => ALLUVIAL_STREAM_COLOR, 'start', flow.streamTotals, true, n => n, () => '#1a1a1a');
+  // Outcome nodes take per-node color (green/red) for both the rect and the name line.
+  const outcomeNodesColored = drawNodes(flow.outcomeNodes, outcomeCol.positions, col3X, n => OUTCOME_COLORS[n], 'start', flow.outcomeTotals, false, n => OUTCOME_LABELS[n] || n, n => OUTCOME_COLORS[n]);
 
-  // Outcome nodes need per-node color (green/red), unlike the single-color area/stream
-  // columns — draw them directly rather than reusing drawNodes' single-color param.
-  let outcomeNodesColored = '';
-  flow.outcomeNodes.forEach(name => {
-    const p = outcomeCol.positions[name];
-    if (p.h <= 0.5) return;
-    const labelX = col3X+nodeW+8, midY = (p.y0+p.y1)/2;
-    outcomeNodesColored += `<rect x="${col3X}" y="${p.y0}" width="${nodeW}" height="${p.h}" fill="${OUTCOME_COLORS[name]}" rx="2" />
-      <text x="${labelX}" y="${p.h < 40 ? midY-2 : midY-10}" text-anchor="start" font-size="11" font-weight="600" fill="${OUTCOME_COLORS[name]}">${escapeHtml(OUTCOME_LABELS[name] || name)}</text>
-      <text x="${labelX}" y="${p.h < 40 ? midY+12 : midY+4}" text-anchor="start" font-size="10" fill="#5c584d">${lbs(flow.outcomeTotals[name])} lbs.</text>`;
-    if (p.h >= 40){
-      outcomeNodesColored += `<text x="${labelX}" y="${midY+18}" text-anchor="start" font-size="10" fill="#5c584d">${pct(flow.outcomeTotals[name]/grandTotal)}</text>`;
-    }
-  });
+  // "Other (n smaller)" footnote — drawn inside the SVG (below the base canvas) so PNG/SVG
+  // exports carry it too. wrapText measures with Arial while the SVG draws Poppins, hence the
+  // ~92% width margin.
+  let footnoteSvg = '', footnoteHeight = 0;
+  if (flow.otherMembers && flow.otherMembers.length){
+    const noteText = `${displayName('__other__')}: ${flow.otherMembers.map(m => m.name).join(', ')}`;
+    const noteLines = wrapText(noteText, 0.92 * (W - 32), '10px Arial', 3, measureCtx);
+    const lineH = 13;
+    footnoteHeight = 6 + noteLines.length * lineH + 4;
+    noteLines.forEach((line, i) => {
+      footnoteSvg += `<text x="16" y="${H0 + 6 + 10 + i*lineH}" font-size="10" fill="#5c584d">${escapeHtml(line)}</text>`;
+    });
+  }
+  const H = H0 + footnoteHeight;
 
   // Column headers only — the outcome nodes already label themselves (name + color) right
   // next to their bar, so a separate Diverted/Landfilled swatch legend here would just repeat
@@ -3796,7 +3892,7 @@ function buildAlluvialSvg(title, flow, groupColLabel){
 
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Poppins, Arial, sans-serif">
     <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
-    ${legend}${areaStreamRibbons}${streamOutcomeRibbons}${areaNodesSvg}${streamNodesSvg}${outcomeNodesColored}
+    ${legend}${areaStreamRibbons}${streamOutcomeRibbons}${areaNodesSvg}${outcomeNodesColored}${streamNodesSvg}${footnoteSvg}
   </svg>`;
 }
 
@@ -4884,7 +4980,7 @@ function renderChartsTab(){
     diversionCCard +
     chartCardHtml(title1, buildDonutSvg(title1, donutData)) +
     chartCardHtml(title1b, buildMaterialTableSvg(title1b, materialRows)) +
-    chartCardHtml(title0, buildAlluvialSvg(title0, flow, chartsByArea ? 'Area' : 'Generator')) +
+    chartCardHtml(title0, buildAlluvialSvg(title0, groupSmallGenerators(flow), chartsByArea ? 'Area' : 'Generator')) +
     chartCardHtml(title3, buildCharacterizationSvg(title3, matrix, charSharedScale), char3ToggleHtml) +
     chartCardHtml(title2d, buildContaminationSvg(title2d, contamination, chartsByArea ? 'Area' : 'Generator'), contam2dToggleHtml, false);
 }
