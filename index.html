@@ -963,6 +963,9 @@ function materialGhostTargets(m){
 // double-counted. "Any non-divertible material" per the client's own framing — this has no
 // divertible/accepted check of its own beyond that dedupe, since materialGhostTargets already
 // carries that intent (a material only appears there if someone explicitly marked it).
+// This is the ghost tier's NUMERATOR only; its denominator is potentialDenominator(total, U, Ug),
+// where Ug is the Unacceptable weight targeted at this same ghost stream — those rows are
+// counted here, so they stay in the denominator even though other Unacceptable weight doesn't.
 function ghostPotentialWeightForStream(gData, streamName){
   return gData.filter(r => {
     if (r.hasDivertiblePath) return false;
@@ -975,13 +978,36 @@ function ghostPotentialWeightForStream(gData, streamName){
 // ANY ghost stream to count here, and is still never double-counted against hasDivertiblePath.
 // Used for the single, standing "Potential diversion rate C" figure in the Current v Potential
 // Diversion chart, as opposed to the per-stream breakdown ghostPotentialWeightForStream still
-// feeds in the Summaries tab's table.
+// feeds in the Summaries tab's table. Numerator only, like ghostPotentialWeightForStream: the
+// matching denominator keeps the Unacceptable weight targeted at ANY ghost stream.
 function ghostPotentialWeightCombined(gData){
   return gData.filter(r => {
     if (r.hasDivertiblePath) return false;
     const m = materials.find(mm => mm.id === r.materialId);
     return m && materialGhostTargets(m).length > 0;
   }).reduce((s,r) => s + r.weight, 0);
+}
+// Potential diversion rates (Potential, Programs Applied Everywhere and the "with new
+// programs" ghost tier) exclude materials whose Divertible value is "Unacceptable" from the
+// total they divide by — the client's long-standing reporting convention. The Current
+// Diversion Rate is NOT affected: it still divides by all logged weight.
+// Sums the Unacceptable weight of a set of fex rows (computeExtrapolatedRows). The optional
+// ghostEligible(material) predicate narrows it to the Unacceptable rows a ghost stream would
+// accept — those are in the ghost tier's numerator by design, so they must stay in its
+// denominator (see potentialDenominator).
+function sumUnacceptableWeight(rows, ghostEligible){
+  return rows.reduce((s,r) => {
+    const m = materials.find(mm => mm.id === r.materialId);
+    if (!m || m.divertible !== 'Unacceptable') return s;
+    if (ghostEligible && !ghostEligible(m)) return s;
+    return s + r.weight;
+  }, 0);
+}
+// The one place the Potential denominator is defined: total logged weight minus Unacceptable
+// weight, except the Unacceptable weight the ghost stream in play would accept (0 for the
+// Potential / Programs Applied Everywhere tiers). Callers treat a result <= 0 as a 0% rate.
+function potentialDenominator(total, unacceptableWeight, ghostEligibleUnacceptableWeight = 0){
+  return total - (unacceptableWeight - ghostEligibleUnacceptableWeight);
 }
 
 // ============================================================
@@ -3238,8 +3264,9 @@ function lbs(n){ return n.toFixed(2); }
 function fmtLbs1(n){ return n.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
 
 // scoped=false marks a table built from the Grouping toggle instead of the Filter (see
-// chartCardHtml for how it's used).
-function renderAnalysisTable(title, headers, bodyRowsHtml, extraClass, scoped = true){
+// chartCardHtml for how it's used). noteHtml, when given, is a muted line under the table (not
+// part of the <table>, so Copy table and the Image export leave it out).
+function renderAnalysisTable(title, headers, bodyRowsHtml, extraClass, scoped = true, noteHtml = ''){
   const headerHtml = headers.map(h =>
     `<th onclick="sortAnalysisTableHeader(this)">${h}<span class="sort-arrow"></span></th>`
   ).join('');
@@ -3250,7 +3277,8 @@ function renderAnalysisTable(title, headers, bodyRowsHtml, extraClass, scoped = 
         <button type="button" class="copy-table-btn" onclick="downloadAnalysisTableImage(this)">⬇ Image</button>
       </span>
     </div>
-    <table class="analysis ${extraClass||''}"><tr>${headerHtml}</tr>${bodyRowsHtml}</table>
+    <table class="analysis ${extraClass||''}"><tr>${headerHtml}</tr>${bodyRowsHtml}</table>${noteHtml ? `
+    <p class="note">${noteHtml}</p>` : ''}
   </div>`;
 }
 // Draws any rendered <table> onto a canvas, mirroring the analysis-table CSS closely enough
@@ -4521,32 +4549,35 @@ window.downloadChartCard = function(btn){
 // `globalPotential` (via hasDivertiblePath, unchanged) is "if every existing program were
 // active everywhere" — kept as its own explicit column (see the Current v Potential Diversion
 // table/chart) rather than folded away, since it's still a real, useful ceiling on its own.
+// Current divides by all logged weight (total). Every Potential tier divides by
+// potentialDenominator(): total minus the group's Unacceptable weight, and for the ghost tier
+// (ghostPotential, chart series C) minus only the Unacceptable weight NOT targeted at any
+// ghost stream — see sumUnacceptableWeight / potentialDenominator.
 function computeDiversionByArea(byArea){
   const fex = computeExtrapolatedRows();
   const groupDefs = byArea
     ? areas.map(a => ({label: areaLabel(a.id), areaIds: [a.id]}))
     : distinctRollups().map(rg => ({label: rg, areaIds: areas.filter(a => a.rollup === rg).map(a => a.id)}));
-  const ghostRateFor = (gData, total, globalPotential) => {
-    const weight = globalPotential + ghostPotentialWeightCombined(gData);
-    return total ? weight/total : 0;
+  const rateOver = (num, den) => den > 0 ? num/den : 0;
+  const anyGhost = m => materialGhostTargets(m).length > 0;
+  const ratesFor = (gData, total) => {
+    const diverted = gData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
+    const potential = gData.filter(r => r.hasDivertiblePathInArea).reduce((s,r) => s + r.weight, 0);
+    const globalPotential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
+    const unacc = sumUnacceptableWeight(gData);
+    const potDen = potentialDenominator(total, unacc);
+    const ghostDen = potentialDenominator(total, unacc, sumUnacceptableWeight(gData, anyGhost));
+    return {current: total ? diverted/total : 0, potential: rateOver(potential, potDen),
+            globalPotential: rateOver(globalPotential, potDen),
+            ghostPotential: rateOver(globalPotential + ghostPotentialWeightCombined(gData), ghostDen)};
   };
   const groups = groupDefs.map(({label, areaIds}) => {
     const total = areaIds.reduce((s,id) => s + areaTotalPresortLive(id), 0);
     const gData = fex.filter(r => areaIds.includes(r.areaId));
-    const diverted = gData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-    const potential = gData.filter(r => r.hasDivertiblePathInArea).reduce((s,r) => s + r.weight, 0);
-    const globalPotential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-    return {label, current: total ? diverted/total : 0, potential: total ? potential/total : 0,
-             globalPotential: total ? globalPotential/total : 0,
-             ghostPotential: ghostRateFor(gData, total, globalPotential)};
+    return {label, ...ratesFor(gData, total)};
   });
   const allTotal = areas.reduce((s,a) => s + areaTotalPresortLive(a.id), 0);
-  const allDiverted = fex.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
-  const allPotential = fex.filter(r => r.hasDivertiblePathInArea).reduce((s,r) => s + r.weight, 0);
-  const allGlobalPotential = fex.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-  groups.push({label: 'Total', current: allTotal ? allDiverted/allTotal : 0, potential: allTotal ? allPotential/allTotal : 0,
-               globalPotential: allTotal ? allGlobalPotential/allTotal : 0,
-               ghostPotential: ghostRateFor(fex, allTotal, allGlobalPotential), isTotal: true});
+  groups.push({label: 'Total', ...ratesFor(fex, allTotal), isTotal: true});
   // A group sitting at 0% current AND 0% potential has nothing divertible either way (e.g.
   // Bathroom's default material isn't accepted anywhere) — a flat pair of empty bars is just
   // clutter, not information. Total always stays, since it's the one number that summarizes
@@ -4591,13 +4622,13 @@ const DIVERSION_POTENTIAL_COLOR = '#1f5c4c'; // --brand
 // even in black and white.
 const DIVERSION_SERIES = {
   A: {color: '#1a1a1a', dash: null, sw: 2, label: 'Potential diversion rate',
-      desc: 'if all the materials were placed correctly without any change in the programs',
+      desc: 'if all the materials were placed correctly without any change in the programs (materials marked Unacceptable are not counted)',
       getValue: g => g.potential},
   B: {color: '#1a1a1a', dash: '1 2.4', sw: 1.5, label: 'Potential diversion rate (programs active across all areas)',
-      desc: 'if the materials were placed correctly',
+      desc: 'if the materials were placed correctly (materials marked Unacceptable are not counted)',
       getValue: g => g.globalPotential},
   C: {color: DIVERSION_POTENTIAL_COLOR, dash: '4 1.5 1 1.5', sw: 1.5, label: 'Potential diversion rate with new programs',
-      desc: 'if the materials were correctly placed',
+      desc: 'if the materials were correctly placed (materials marked Unacceptable are not counted)',
       getValue: g => g.ghostPotential},
 };
 function buildDiversionTrackSvg(title, groups, opts){
@@ -5269,6 +5300,10 @@ function buildSummaryTablesHtml(scope){
     // than folded away. One further column per configured ghost stream (a program that doesn't
     // exist anywhere yet — see ghostStreamNames) extends Global with just that one hypothetical
     // program's materials. Gap stays tied to the area-aware Potential, same as before.
+    // Current divides by all logged weight; every Potential column divides by
+    // potentialDenominator() — logged weight minus Unacceptable weight, where a ghost column
+    // keeps the Unacceptable weight targeted at its own ghost stream (it's in that column's
+    // numerator). Same math as computeDiversionByArea, which feeds the Charts tab.
     const t5GhostNames = ghostStreamNames();
     // Every scenario column states its own gap to Current inline — "80.0% (+13.8 pts)" — instead
     // of the gap living only in a separate column tied to just the one Potential rate. That
@@ -5279,33 +5314,41 @@ function buildSummaryTablesHtml(scope){
       return `${pct(rate)} (${fmtPts(rate - cur)})`;
     };
     let t5Html = '';
-    let allTotal = 0, allDiverted = 0, allPotential = 0, allGlobalPotential = 0;
+    const rateOver = (num, den) => den > 0 ? num/den : 0;
+    let allTotal = 0, allDiverted = 0, allPotential = 0, allGlobalPotential = 0, allUnacc = 0;
     const allGhostExtra = t5GhostNames.map(() => 0);
+    const allGhostUnacc = t5GhostNames.map(() => 0);
     rowGroups.forEach(({label, match, divDenomIds}) => {
       const total = divDenomIds.reduce((s,id) => s + areaTotalPresortLive(id), 0);
       const gData = fex.filter(match);
       const diverted = gData.filter(r => r.correctlyPlaced).reduce((s,r) => s + r.weight, 0);
       const potential = gData.filter(r => r.hasDivertiblePathInArea).reduce((s,r) => s + r.weight, 0);
       const globalPotential = gData.filter(r => r.hasDivertiblePath).reduce((s,r) => s + r.weight, 0);
-      allTotal += total; allDiverted += diverted; allPotential += potential; allGlobalPotential += globalPotential;
-      const curRate = total ? diverted/total : 0, potRate = total ? potential/total : 0, globalPotRate = total ? globalPotential/total : 0;
+      const unacc = sumUnacceptableWeight(gData);
+      allTotal += total; allDiverted += diverted; allPotential += potential; allGlobalPotential += globalPotential; allUnacc += unacc;
+      const potDen = potentialDenominator(total, unacc);
+      const curRate = total ? diverted/total : 0, potRate = rateOver(potential, potDen), globalPotRate = rateOver(globalPotential, potDen);
       const ghostCells = t5GhostNames.map((name, gi) => {
         const extra = ghostPotentialWeightForStream(gData, name);
+        const ghostUnacc = sumUnacceptableWeight(gData, m => materialGhostTargets(m).includes(name));
         allGhostExtra[gi] += extra;
-        const rate = total ? (globalPotential + extra) / total : 0;
+        allGhostUnacc[gi] += ghostUnacc;
+        const rate = rateOver(globalPotential + extra, potentialDenominator(total, unacc, ghostUnacc));
         return `<td class="num">${withGap(rate, curRate)}</td>`;
       }).join('');
       t5Html += `<tr><td>${label}</td><td class="num">${pct(curRate)}</td><td class="num">${withGap(potRate, curRate)}</td><td class="num">${withGap(globalPotRate, curRate)}</td>${ghostCells}</tr>`;
     });
-    const curRateTot = allTotal ? allDiverted/allTotal : 0, potRateTot = allTotal ? allPotential/allTotal : 0, globalPotRateTot = allTotal ? allGlobalPotential/allTotal : 0;
+    const potDenTot = potentialDenominator(allTotal, allUnacc);
+    const curRateTot = allTotal ? allDiverted/allTotal : 0, potRateTot = rateOver(allPotential, potDenTot), globalPotRateTot = rateOver(allGlobalPotential, potDenTot);
     const ghostCellsTot = t5GhostNames.map((name, gi) => {
-      const rate = allTotal ? (allGlobalPotential + allGhostExtra[gi]) / allTotal : 0;
+      const rate = rateOver(allGlobalPotential + allGhostExtra[gi], potentialDenominator(allTotal, allUnacc, allGhostUnacc[gi]));
       return `<td class="num">${withGap(rate, curRateTot)}</td>`;
     }).join('');
     t5Html += `<tr class="total-row"><td>Total</td><td class="num">${pct(curRateTot)}</td><td class="num">${withGap(potRateTot, curRateTot)}</td><td class="num">${withGap(globalPotRateTot, curRateTot)}</td>${ghostCellsTot}</tr>`;
     const t5Headers = [groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Programs Applied Everywhere Potential Diversion Rate',
       ...t5GhostNames.map(name => `Programs Applied Everywhere + ${name}`)];
-    html += renderAnalysisTable('Current v Potential Diversion', t5Headers, t5Html, 'wrap-headers', false);
+    html += renderAnalysisTable('Current v Potential Diversion', t5Headers, t5Html, 'wrap-headers', false,
+      'Potential rates exclude materials marked Unacceptable; the Current rate uses all logged weight, so the gap compares two different totals.');
   }
 
   return html;
@@ -5616,10 +5659,12 @@ function buildWorkbook(){
   // has_divertible_path_in_area and the per-ghost-stream columns are appended AFTER area_name
   // (not inserted earlier) so every existing column's letter stays exactly what it was before
   // area-specific programs got Excel support — nothing downstream that already addresses this
-  // sheet by column letter needs to change.
+  // sheet by column letter needs to change. is_unacceptable (Divertible = "Unacceptable", 1/0) is
+  // the LAST column, after the ghost columns, for the same reason — Table 5's Potential
+  // denominators subtract that weight (see pushDiversionTable).
   const fexGhostNames = ghostStreamNames();
   const fexHeader = ['area','stream','material_id','material_name','material_category','extrapolated_weight_lbs','correctly_placed','accepted_in_program','rollup_group','belongs_here','has_divertible_path','area_name',
-    'has_divertible_path_in_area', ...fexGhostNames.map(n => `ghost: ${n}`)];
+    'has_divertible_path_in_area', ...fexGhostNames.map(n => `ghost: ${n}`), 'is_unacceptable'];
   const fexRows = [fexHeader];
   areas.forEach(a => {
     STREAMS.forEach(s => {
@@ -5713,7 +5758,8 @@ function buildWorkbook(){
         // baked as a literal 1/0 per configured ghost stream rather than a formula, since it's
         // already fully known here in JS.
         const ghostFlags = fexGhostNames.map(gn => materialGhostTargets(m).includes(gn) ? 1 : 0);
-        fexRows.push([a.id, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr, a.name, hasPathInAreaExpr, ...ghostFlags]);
+        fexRows.push([a.id, s, m.id, nameExpr, catExpr, weightExpr, cpExpr, {f:acceptedExpr}, rollupExpr, belongsHereExpr, hasPathExpr, a.name, hasPathInAreaExpr, ...ghostFlags,
+          {f:`IF(${divertibleExpr}="Unacceptable",1,0)`}]);
       });
     });
   });
@@ -5738,6 +5784,9 @@ function buildWorkbook(){
     const col = colLetter(14 + i);
     return {name, range: `Fact_Extrapolated!$${col}$2:$${col}$${FEX_LAST}`};
   });
+  // is_unacceptable — the last column, right after the ghost columns.
+  const unaccCol = colLetter(14 + fexGhostNames.length);
+  const FEX_UNACC = `Fact_Extrapolated!$${unaccCol}$2:$${unaccCol}$${FEX_LAST}`;
 
   function buildSummarySheetRows(areaId, isOverall){
     const ac = areaId ? `,${FEX_AREAID},"${areaId}"` : '';
@@ -5907,49 +5956,57 @@ function buildWorkbook(){
         // further column per configured ghost stream extends that with just that one
         // not-yet-existing program's eligible materials — mirrors ghostPotentialWeightForStream
         // in the live app exactly.
+        // Two helper columns sit at the right end, after the last ghost column: the row's total
+        // logged weight (its long per-area, per-stream sum, written ONCE — repeating it in every
+        // rate cell pushed formulas past Excel's 8,192-character limit) and its Unacceptable
+        // weight (FEX_UNACC). Current divides by the logged total, unchanged. Potential and
+        // Programs Applied Everywhere divide by logged − Unacceptable; each ghost column adds
+        // back the Unacceptable weight targeted at its own ghost stream, since that weight is
+        // in its numerator — the same potentialDenominator() rule the live app uses.
+        const nCols = 4 + fexGhostCols.length;
+        const totCol = colLetter(nCols + 1), unaccHelperCol = colLetter(nCols + 2);
         rows.push([groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Programs Applied Everywhere Potential Diversion Rate',
-          ...fexGhostCols.map(gc => `Programs Applied Everywhere + ${gc.name}`)]);
-        diversionContaminationGroups(byArea).forEach(({label, matchField, matchValue, divDenomIds}) => {
-          const rr = rows.length + 1;
-          // Sum presortTotalFormula across every stream (not just one hardcoded name) — it
-          // already picks PSW vs FSW per stream based on that stream's own combined-weigh-sort
-          // flag, so this stays correct regardless of which streams are combined or renamed.
-          const totalExpr = divDenomIds.map(id =>
-            STREAMS.map(s => presortTotalFormula(id, s)).join('+')
-          ).join('+');
-          const curRateExpr = `IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_CP},1)/(${totalExpr}))`;
-          const potRateExpr = `IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH_INAREA},1)/(${totalExpr}))`;
-          const globalRateExpr = `IF((${totalExpr})=0,0,SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH},1)/(${totalExpr}))`;
+          ...fexGhostCols.map(gc => `Programs Applied Everywhere + ${gc.name}`),
+          'Total logged weight (lbs.)','Unacceptable weight (lbs.)']);
+        function diversionRow(label, rr, cond, totalExpr, unaccExpr){
+          const T = `$${totCol}${rr}`, U = `$${unaccHelperCol}${rr}`;
+          const potDen = `(${T}-${U})`;
+          const curRateExpr = `IF(${T}<=0,0,SUMIFS(${FEX_W}${cond},${FEX_CP},1)/${T})`;
+          const potRateExpr = `IF(${potDen}<=0,0,SUMIFS(${FEX_W}${cond},${FEX_HASPATH_INAREA},1)/${potDen})`;
+          const globalRateExpr = `IF(${potDen}<=0,0,SUMIFS(${FEX_W}${cond},${FEX_HASPATH},1)/${potDen})`;
           const curRef = `B${rr}`;
           const ghostCells = fexGhostCols.map(gc => {
-            const ghostRateExpr = `IF((${totalExpr})=0,0,(SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH},1)+SUMIFS(${FEX_W},${matchField},"${matchValue}",${FEX_HASPATH},0,${gc.range},1))/(${totalExpr}))`;
+            const ghostDen = `(${T}-${U}+SUMIFS(${FEX_W}${cond},${FEX_UNACC},1,${gc.range},1))`;
+            const ghostRateExpr = `IF(${ghostDen}<=0,0,(SUMIFS(${FEX_W}${cond},${FEX_HASPATH},1)+SUMIFS(${FEX_W}${cond},${FEX_HASPATH},0,${gc.range},1))/${ghostDen})`;
             return withGapCell(ghostRateExpr, curRef);
           });
           rows.push([label,
             {f:curRateExpr},
             withGapCell(potRateExpr, curRef),
             withGapCell(globalRateExpr, curRef),
-            ...ghostCells
+            ...ghostCells,
+            {f:totalExpr},
+            {f:unaccExpr}
           ]);
+        }
+        const firstGroupRow = rows.length + 1;
+        diversionContaminationGroups(byArea).forEach(({label, matchField, matchValue, divDenomIds}) => {
+          // Logged weight per area via unsortedAreaWeightFormula — every pre-sort bag in the
+          // area plus every combined-weigh-sort stream's sorted weight, the same total as
+          // areaTotalPresortLive in the live app — one compact term per area rather than one
+          // presortTotalFormula per area AND stream, which kept large groups under Excel's
+          // 8,192-character formula limit.
+          const totalExpr = divDenomIds.map(unsortedAreaWeightFormula).join('+') || '0';
+          const cond = `,${matchField},"${matchValue}"`;
+          diversionRow(label, rows.length + 1, cond, totalExpr, `SUMIFS(${FEX_W}${cond},${FEX_UNACC},1)`);
         });
-        const divTot = rows.length + 1;
-        const allAreaTotalExpr = areas.map(a =>
-          STREAMS.map(s => presortTotalFormula(a.id, s)).join('+')
-        ).join('+');
-        const curRateTotExpr = `IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_CP},1)/(${allAreaTotalExpr}))`;
-        const potRateTotExpr = `IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_HASPATH_INAREA},1)/(${allAreaTotalExpr}))`;
-        const globalRateTotExpr = `IF((${allAreaTotalExpr})=0,0,SUMIFS(${FEX_W},${FEX_HASPATH},1)/(${allAreaTotalExpr}))`;
-        const curRefTot = `B${divTot}`;
-        const ghostCellsTot = fexGhostCols.map(gc => {
-          const ghostRateTotExpr = `IF((${allAreaTotalExpr})=0,0,(SUMIFS(${FEX_W},${FEX_HASPATH},1)+SUMIFS(${FEX_W},${FEX_HASPATH},0,${gc.range},1))/(${allAreaTotalExpr}))`;
-          return withGapCell(ghostRateTotExpr, curRefTot);
-        });
-        rows.push(['Total',
-          {f:curRateTotExpr},
-          withGapCell(potRateTotExpr, curRefTot),
-          withGapCell(globalRateTotExpr, curRefTot),
-          ...ghostCellsTot
-        ]);
+        // Total row: the sum of the group helper cells above it (the groups cover every area),
+        // the same way the live Summaries Total row accumulates its groups — a fixed-length
+        // formula however many areas the site has.
+        const lastGroupRow = rows.length;
+        diversionRow('Total', rows.length + 1, '',
+          `SUM(${totCol}${firstGroupRow}:${totCol}${lastGroupRow})`,
+          `SUM(${unaccHelperCol}${firstGroupRow}:${unaccHelperCol}${lastGroupRow})`);
       }
 
       pushContaminationTable(false);
@@ -5998,6 +6055,7 @@ function buildWorkbook(){
     ...groupNotes.flatMap(n => [[n], []]),
     ['Any area with pre-sort weight but zero sorted-material rows (nothing was hand-sorted there) is reported as its own "[Area] Waste" line rather than folded into a stream it was never actually sorted into.'], [],
     ['Streams flagged "Not diverted" (Streams sheet, not_diverted column) are excluded from the correctly-diverted calculation (Current diversion), the same as in the tool; Potential diversion is unaffected by the flag.'], [],
+    ['Potential diversion rates (Potential, Programs Applied Everywhere and the new-programs scenarios) exclude materials marked Divertible = "Unacceptable" from the total they are divided by. The Current diversion rate divides by all logged weight, so the gap between them compares two different totals.'], [],
     ['"Currently Divertible?" is pulled live from the Materials Master tab for this site\u2019s specific recycling program, so it stays consistent across every summary sheet automatically.'],
   ];
   XLSX.utils.book_append_sheet(wb, makeSheet(notesRows), 'Notes & Assumptions');
