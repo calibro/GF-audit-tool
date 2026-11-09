@@ -1498,6 +1498,7 @@ function applyScenario(scenarioId){
   activeScenarioId = scenarioId;
   scenarioEdited = false;
   saveScenarioState();
+  resetViewFilters();
   renderAll();
 }
 function renderScenarioSelect(){
@@ -3077,6 +3078,7 @@ async function performNewSessionReset(){
   await saveSorted(); await savePresort(); await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta();
   applyingScenario = false;
   saveScenarioState();
+  resetViewFilters();
 }
 // Skips the "type DELETE" confirmation when there's nothing on this browser to lose yet
 // (a fresh browser, or right after a previous reset) — the warning only makes sense once
@@ -3155,7 +3157,28 @@ let chartsExcludedAreas = new Set();
 // Total row/node label on the Charts tab: says "(selected areas)" whenever the Filter leaves
 // anything out, so a filtered total is never mistaken for the whole building's.
 function chartsTotalLabel(){
-  return chartsExcludedAreas.size > 0 ? 'Total (selected areas)' : 'Total';
+  return activeExclusionCount(chartsExcludedAreas) > 0 ? 'Total (selected areas)' : 'Total';
+}
+// Area ids are per-session (they come from the imported file and repeat across audits — e.g.
+// OFFICES), so an exclusion Set can hold ids that no longer exist: an area deleted since, or a
+// leftover from another session. "Is a filter active" therefore counts only ids still in
+// `areas`, and pruneExcludedAreas drops the stale ones (called at the top of each tab render).
+function activeExclusionCount(excludedSet){
+  return areas.reduce((n, a) => n + (excludedSet.has(a.id) ? 1 : 0), 0);
+}
+function pruneExcludedAreas(excludedSet){
+  const live = new Set(areas.map(a => a.id));
+  [...excludedSet].forEach(id => { if (!live.has(id)) excludedSet.delete(id); });
+}
+// View filters belong to one session: cleared whenever the whole session is replaced (Replace
+// import, preset load, Start a new session — not Merge import). Mutates in place so every
+// existing reference to these objects stays valid. Grouping choices and display toggles are
+// left alone on purpose.
+function resetViewFilters(){
+  chartsExcludedAreas.clear();
+  summaryExcludedAreas.clear();
+  Object.assign(presortReviewFilters, {areaId: 'All', stream: 'All'});
+  Object.assign(sortedReviewFilters, {areaId: 'All', stream: 'All', category: 'All', material: 'All'});
 }
 function includedAreaIdsFor(excludedSet){
   return areas.map(a => a.id).filter(id => !excludedSet.has(id));
@@ -3494,7 +3517,7 @@ function renderScopeFilterSidebar(tenantBoxId, areaBoxId, excludedSet, onChange)
     row.className = 'filter-checkbox-row filter-checkbox-master';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.checked = excludedSet.size === 0;
+    cb.checked = activeExclusionCount(excludedSet) === 0;
     cb.onchange = () => {
       if (cb.checked){ excludedSet.clear(); onChange(); }
       else tryExclude(areas.map(a => a.id), cb);
@@ -5088,6 +5111,7 @@ function renderChartsGroupingToggle(){
 }
 
 function renderChartsTab(){
+  pruneExcludedAreas(chartsExcludedAreas);
   const includedAreaIds = includedAreaIdsFor(chartsExcludedAreas);
   renderScopeFilterSidebar('chartsTenantFilters', 'chartsAreaFilters', chartsExcludedAreas, renderChartsTab);
   renderChartsGroupingToggle();
@@ -5428,6 +5452,7 @@ function buildSummaryTablesHtml(scope){
   return html;
 }
 function renderSummaryTab(){
+  pruneExcludedAreas(summaryExcludedAreas);
   renderScopeFilterSidebar('summaryTenantFilters', 'summaryAreaFilters', summaryExcludedAreas, renderSummaryTab);
   renderGroupingToggle('summaryGroupingToggle', summaryByArea, (v) => { summaryByArea = v; renderSummaryTab(); });
   document.getElementById('summaryContent').innerHTML = buildSummaryTablesHtml(includedAreaIdsFor(summaryExcludedAreas));
@@ -6448,6 +6473,7 @@ document.getElementById('replaceImportBtn').onclick = async () => {
   await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta(); await saveSorted(); await savePresort();
   document.getElementById('importModal').classList.remove('show');
   pendingImport = null;
+  resetViewFilters();
   renderAll();
   showApp();
   showToast('Session replaced from file');
