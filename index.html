@@ -27,7 +27,6 @@
   }
   header{
     background:#fff; color:var(--ink); padding:14px 20px; border-bottom:1px solid var(--line);
-    position:sticky; top:0; z-index:20;
   }
   .app-header-top{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
   .app-logo{height:17px; width:auto; flex:none; display:block;}
@@ -40,7 +39,7 @@
   .dot.offline{background:var(--amber);}
   nav.tabs{
     display:flex; background:#fff; border-bottom:1px solid var(--line);
-    position:sticky; top:61px; z-index:19; overflow-x:auto;
+    position:sticky; top:0; z-index:25; overflow-x:auto;
   }
   nav.tabs button{
     flex:1; padding:12px 4px; border:none; background:transparent; color:var(--intro-dark); white-space:nowrap;
@@ -187,6 +186,9 @@
     pointer-events:none; max-width:90%; text-align:center;
   }
   .toast.show{opacity:1;}
+  /* Updated-row confirmation in the review tables: brand tint that fades out over ~2s */
+  @keyframes rowFlash{0%,40%{background:var(--brand-light);} 100%{background:transparent;}}
+  tr.row-flash > td{animation:rowFlash 2s ease-out;}
   .info-form{display:grid; grid-template-columns:1fr; gap:10px;}
   @media(min-width:520px){.info-form{grid-template-columns:1fr 1fr;}}
   .info-field label{display:block; font-size:14px; color:var(--intro-dark); font-weight:400; margin-bottom:4px;}
@@ -214,7 +216,7 @@
      holds two short checklists, not a whole form. ---- */
   .filter-content-grid{display:grid; grid-template-columns:1fr; gap:20px; align-items:start;}
   @media(min-width:760px){ .filter-content-grid{grid-template-columns:260px 1fr;} }
-  .filter-sidebar{background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px 20px; position:sticky; top:var(--sticky-offset, 106px);}
+  .filter-sidebar{background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px 20px; position:sticky; top:calc(var(--sticky-offset, 44px) + 12px); max-height:calc(100vh - var(--sticky-offset, 44px) - 12px - 100px); overflow-y:auto;}
   /* On mobile the sidebar stacks above the chart/summary content instead of sitting beside
      it (see .filter-content-grid's single-column default above), so an uncapped tenant/area
      checklist can push everything else off the bottom of the first screenful. Capping just
@@ -1343,8 +1345,8 @@ let presortEntries = [];  // {areaId, stream, weight, note, ts}
 
 let sortedSel = {rollup:null, areaId:null, stream:null, category:null, materialId:null, nonRepresentative:false};
 let presortSel = {rollup:null, areaId:null, stream:null, knownMaterialId:null};
-let editingSortedTs = null;
-let editingPresortTs = null;
+let editingSortedEntry = null;  // the entry object being edited (identity, not ts — imported ts values can collide)
+let editingPresortEntry = null;
 
 function materialsForStream(stream){
   if (streamExcludesSoiled(stream)) return materials.filter(m => !SOILED_IDS.has(m.id));
@@ -1536,11 +1538,13 @@ document.getElementById('scenarioSelect').onchange = (e) => {
 // ============================================================
 // UI helpers
 // ============================================================
-function showToast(msg){
+let toastTimer = null;
+function showToast(msg, ms){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 1400);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms || 1400);
 }
 function chip(label, selected, onClick, extraClass){
   const el = document.createElement('div');
@@ -2599,7 +2603,7 @@ function renderSortedRollups(){
       // Only clear the area pick for a brand-new entry — during an edit, the area was already
       // valid for the loaded entry's tenant, and re-picking it on every unrelated correction
       // (e.g. fixing a typo'd stream) is unnecessary rework the client explicitly flagged.
-      if (editingSortedTs === null) sortedSel.areaId = null;
+      if (editingSortedEntry === null) sortedSel.areaId = null;
       renderAll();
     }));
   });
@@ -2621,7 +2625,7 @@ function renderSortedStreams(){
       // Same edit-mode carve-out as the rollup chip above: area/stream are the error-prone
       // fields when transcribing from a spreadsheet, material rarely is, so don't force a
       // re-pick of an already-correct material just because the stream got corrected.
-      if (editingSortedTs === null){ sortedSel.category = null; sortedSel.materialId = null; }
+      if (editingSortedEntry === null){ sortedSel.category = null; sortedSel.materialId = null; }
       renderAll();
     }));
   });
@@ -2655,7 +2659,7 @@ function renderSortedAddButton(){
   const ready = sortedSel.areaId && sortedSel.stream && sortedSel.materialId &&
                 parseFloat(document.getElementById('sortedWeight').value) > 0;
   btn.disabled = !ready;
-  const editing = editingSortedTs !== null;
+  const editing = editingSortedEntry !== null;
   document.getElementById('addSortedBtnLabel').textContent = editing ? 'Update Entry' : 'Add Entry';
   cancelBtn.style.display = editing ? '' : 'none';
 }
@@ -2742,7 +2746,7 @@ function renderPresortAddButton(){
   const ready = presortSel.areaId && presortSel.stream &&
                 parseFloat(document.getElementById('presortWeight').value) > 0;
   btn.disabled = !ready;
-  const editing = editingPresortTs !== null;
+  const editing = editingPresortEntry !== null;
   document.getElementById('addPresortBtnLabel').textContent = editing ? 'Update Bag' : 'Add bag';
   cancelBtn.style.display = editing ? '' : 'none';
 }
@@ -2847,7 +2851,7 @@ function renderPresortReview(){
     pt.innerHTML = '<tr><th>Generator/Grouping</th><th>Area</th><th>Stream</th><th class="num">Wt</th><th></th></tr>' +
       filteredPresort.slice().reverse().map(e => {
         const idx = presortEntries.indexOf(e);
-        return `<tr><td>${rollupOf(e.areaId)}</td><td>${escapeHtml(areaById(e.areaId)?.name || '(removed area)')}</td><td>${e.stream}${knownBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
+        return `<tr data-idx="${idx}"><td>${rollupOf(e.areaId)}</td><td>${escapeHtml(areaById(e.areaId)?.name || '(removed area)')}</td><td>${e.stream}${knownBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
         <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editPresort(${idx})">Edit</button><button class="del-btn" onclick="deletePresort(${idx})">✕</button></div></td></tr>`;
       }).join('');
@@ -2896,7 +2900,7 @@ function renderSortedReview(){
     st.innerHTML = '<tr><th>Generator/Grouping</th><th>Area</th><th>Stream</th><th>Category</th><th>Material</th><th class="num">Wt</th><th></th></tr>' +
       filteredSorted.slice().reverse().map(e => {
         const idx = sortedEntries.indexOf(e);
-        return `<tr><td>${rollupOf(e.areaId)}</td><td>${escapeHtml(areaById(e.areaId)?.name || '(removed area)')}</td><td>${e.stream}</td><td>${categoryOf(e)}</td>
+        return `<tr data-idx="${idx}"><td>${rollupOf(e.areaId)}</td><td>${escapeHtml(areaById(e.areaId)?.name || '(removed area)')}</td><td>${e.stream}</td><td>${categoryOf(e)}</td>
         <td>${e.materialName}${nonRepBadge(e)}${e.note ? `<span class="entry-note">${escapeHtml(e.note)}</span>` : ''}</td>
         <td class="num">${e.weight.toFixed(2)}</td>
         <td class="del-cell"><div class="row-actions"><button class="edit-btn" onclick="editSorted(${idx})">Edit</button><button class="del-btn" onclick="deleteSorted(${idx})">✕</button></div></td></tr>`;
@@ -2917,23 +2921,36 @@ function renderAll(){
   renderChartsTab();
 }
 
+// After an Update: scroll the edited row into view and highlight it briefly. Returns false
+// when the row isn't in the table (a review filter is hiding it).
+function flashReviewRow(tableId, idx){
+  const row = document.querySelector(`#${tableId} tr[data-idx="${idx}"]`);
+  if (!row) return false;
+  // Instant, not smooth: on a long table a smooth scroll can outlast the highlight itself.
+  row.scrollIntoView({block:'center'});
+  row.classList.remove('row-flash');
+  void row.offsetWidth; // restart the animation if it's already running
+  row.classList.add('row-flash');
+  return true;
+}
+
 // ============================================================
 // Actions
 // ============================================================
 window.deleteSorted = function(idx){
   const entry = sortedEntries[idx];
-  if (entry && editingSortedTs === entry.ts) cancelEditSorted();
+  if (entry && editingSortedEntry === entry) cancelEditSorted();
   sortedEntries.splice(idx,1); saveSorted(); renderAll();
 };
 window.deletePresort = function(idx){
   const entry = presortEntries[idx];
-  if (entry && editingPresortTs === entry.ts) cancelEditPresort();
+  if (entry && editingPresortEntry === entry) cancelEditPresort();
   presortEntries.splice(idx,1); savePresort(); renderAll();
 };
 
-// Editing tracks the entry's unique `ts` rather than its array index — indices shift
-// whenever any other entry is added or deleted, which would silently point an in-progress
-// edit at the wrong row. Matching by ts stays correct regardless of what else changes.
+// Editing holds a reference to the entry object itself, not its array index (indices shift
+// whenever another entry is added or deleted) and not its `ts` (imported entries are stamped
+// within the same millisecond, so ts values can collide and find() would hit the wrong row).
 window.editSorted = function(idx){
   const e = sortedEntries[idx];
   if (!e) return;
@@ -2944,7 +2961,7 @@ window.editSorted = function(idx){
   sortedSel.category = mat ? mat.category : null;
   sortedSel.materialId = e.materialId;
   sortedSel.nonRepresentative = !!e.nonRepresentative;
-  editingSortedTs = e.ts;
+  editingSortedEntry = e;
   switchTab('sorted');
   document.getElementById('sortedWeight').value = e.weight;
   document.getElementById('sortedUnit').value = 'lbs'; // stored weight is always in lbs
@@ -2959,7 +2976,7 @@ window.editPresort = function(idx){
   presortSel.areaId = e.areaId;
   presortSel.stream = e.stream;
   presortSel.knownMaterialId = e.knownMaterialId || null;
-  editingPresortTs = e.ts;
+  editingPresortEntry = e;
   switchTab('presort');
   document.getElementById('presortWeight').value = e.weight;
   document.getElementById('presortUnit').value = 'lbs'; // stored weight is always in lbs
@@ -2968,14 +2985,14 @@ window.editPresort = function(idx){
   showToast('Editing bag — change fields and click Update');
 };
 function cancelEditSorted(){
-  editingSortedTs = null;
+  editingSortedEntry = null;
   document.getElementById('sortedWeight').value = '';
   document.getElementById('sortedNote').value = '';
   sortedSel.materialId = null;
   sortedSel.nonRepresentative = false;
 }
 function cancelEditPresort(){
-  editingPresortTs = null;
+  editingPresortEntry = null;
   document.getElementById('presortWeight').value = '';
   document.getElementById('presortNote').value = '';
   presortSel.knownMaterialId = null;
@@ -2991,16 +3008,20 @@ document.getElementById('addSortedBtn').onclick = () => {
   const mat = materials.find(m => m.id === sortedSel.materialId);
   const note = document.getElementById('sortedNote').value.trim();
   const nonRepresentative = !!sortedSel.nonRepresentative;
-  if (editingSortedTs !== null){
-    const entry = sortedEntries.find(e => e.ts === editingSortedTs);
-    if (entry){
-      entry.areaId = sortedSel.areaId; entry.stream = sortedSel.stream;
-      entry.materialId = mat.id; entry.materialName = mat.name;
-      entry.weight = w; entry.note = note; entry.nonRepresentative = nonRepresentative;
-    }
+  if (editingSortedEntry !== null){
+    const entry = editingSortedEntry;
     cancelEditSorted();
+    if (!sortedEntries.includes(entry)){
+      renderAll();
+      showToast('That entry no longer exists — nothing was changed');
+      return;
+    }
+    entry.areaId = sortedSel.areaId; entry.stream = sortedSel.stream;
+    entry.materialId = mat.id; entry.materialName = mat.name;
+    entry.weight = w; entry.note = note; entry.nonRepresentative = nonRepresentative;
     saveSorted(); renderAll();
-    showToast('Entry updated');
+    const shown = flashReviewRow('reviewSortedTable', sortedEntries.indexOf(entry));
+    showToast(`Entry updated — ${mat.name} · ${w.toFixed(2)} lbs` + (shown ? '' : ' — hidden by the current filter'), 3000);
     return;
   }
   sortedEntries.push({
@@ -3022,15 +3043,20 @@ document.getElementById('addPresortBtn').onclick = () => {
   const w = toLbs(raw, unit);
   const note = document.getElementById('presortNote').value.trim();
   const knownMaterialId = presortSel.knownMaterialId || null;
-  if (editingPresortTs !== null){
-    const entry = presortEntries.find(e => e.ts === editingPresortTs);
-    if (entry){
-      entry.areaId = presortSel.areaId; entry.stream = presortSel.stream;
-      entry.weight = w; entry.note = note; entry.knownMaterialId = knownMaterialId;
-    }
+  if (editingPresortEntry !== null){
+    const entry = editingPresortEntry;
     cancelEditPresort();
+    if (!presortEntries.includes(entry)){
+      renderAll();
+      showToast('That entry no longer exists — nothing was changed');
+      return;
+    }
+    entry.areaId = presortSel.areaId; entry.stream = presortSel.stream;
+    entry.weight = w; entry.note = note; entry.knownMaterialId = knownMaterialId;
     savePresort(); renderAll();
-    showToast('Bag updated');
+    const shown = flashReviewRow('reviewPresortTable', presortEntries.indexOf(entry));
+    const areaName = areaById(entry.areaId)?.name || '(removed area)';
+    showToast(`Bag updated — ${areaName} · ${entry.stream} · ${w.toFixed(2)} lbs` + (shown ? '' : ' — hidden by the current filter'), 3000);
     return;
   }
   presortEntries.push({areaId: presortSel.areaId, stream: presortSel.stream, weight: w, note, knownMaterialId, ts: Date.now()});
@@ -3060,6 +3086,7 @@ document.getElementById('presortWeight').addEventListener('input', renderPresort
 // itself doesn't care which one triggered it.
 async function performNewSessionReset(){
   sortedEntries = []; presortEntries = [];
+  cancelEditSorted(); cancelEditPresort();
   applyingScenario = true;
   // "Start a new session" begins from a blank slate (the 'empty' scenario), not from whichever
   // preset happens to be first in the dropdown — a client-specific preset defaulting in here
@@ -6283,6 +6310,18 @@ function parseImportedWorkbook(wb){
         ghostTargets,
       };
     });
+    // The app has a fixed set of categories (CATEGORY_ORDER). A material whose category isn't one
+    // of them would import fine but then vanish from the Materials tab, the category chips and
+    // the category tables. Put it in Other and report it (a case/whitespace-only difference is
+    // just normalized to the app's spelling).
+    result.categoryFixes = [];
+    result.materials.forEach(m => {
+      const raw = m.category == null ? '' : String(m.category).trim();
+      const canon = CATEGORY_ORDER.find(c => c.toLowerCase() === raw.toLowerCase());
+      if (canon){ m.category = canon; return; }
+      result.categoryFixes.push({name: m.name, from: raw || '(blank)'});
+      m.category = 'Other';
+    });
   }
 
   const areaRows = sheetRows(wb, 'Areas');
@@ -6439,7 +6478,11 @@ document.getElementById('importFileInput').addEventListener('change', (e) => {
       const s = pendingImport;
       document.getElementById('importSummary').textContent =
         `Found in file: ${s.sortedEntries.length} sorted weight entries, ${s.presortEntries.length} pre-sort bags, ` +
-        `${s.materials ? s.materials.length : 0} materials, ${s.areas ? s.areas.length : 0} areas.`;
+        `${s.materials ? s.materials.length : 0} materials, ${s.areas ? s.areas.length : 0} areas.` +
+        (s.categoryFixes && s.categoryFixes.length
+          ? ` ${s.categoryFixes.length} ${s.categoryFixes.length === 1 ? 'material has a category' : 'materials have categories'} this app doesn't have and will be placed in Other: ` +
+            s.categoryFixes.map(f => `${f.name} (was "${f.from}")`).join(', ') + '.'
+          : '');
       document.getElementById('importModal').classList.add('show');
     } catch(err){
       showToast('Could not read that file — is it an export from this tool?');
@@ -6470,6 +6513,7 @@ document.getElementById('replaceImportBtn').onclick = async () => {
   Object.assign(auditMeta, pendingImport.auditMeta);
   sortedEntries = pendingImport.sortedEntries;
   presortEntries = pendingImport.presortEntries;
+  cancelEditSorted(); cancelEditPresort();
   await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta(); await saveSorted(); await savePresort();
   document.getElementById('importModal').classList.remove('show');
   pendingImport = null;
@@ -6505,26 +6549,33 @@ document.getElementById('mergeImportBtn').onclick = async () => {
     if (!auditMeta[k]) auditMeta[k] = pendingImport.auditMeta[k];
   });
 
+  // De-duplicate by COUNT, not by a Set: two identical bags in one file are two real bags.
+  // Each entry already in the session "absorbs" one matching imported entry; anything beyond
+  // that is added. So re-merging the same file adds nothing, but a file with two identical
+  // bags merged into a session that has one of them adds exactly one.
+  let skipped = 0;
+  const mergeByCount = (current, incoming, keyOf) => {
+    const counts = new Map();
+    current.forEach(e => { const k = keyOf(e); counts.set(k, (counts.get(k) || 0) + 1); });
+    let added = 0;
+    incoming.forEach(e => {
+      const k = keyOf(e), n = counts.get(k) || 0;
+      if (n > 0){ counts.set(k, n - 1); skipped++; }
+      else { current.push(e); added++; }
+    });
+    return added;
+  };
   const sortedKey = e => [e.areaId, e.stream, e.materialId, e.weight, e.note].join('|');
-  const existingSortedKeys = new Set(sortedEntries.map(sortedKey));
-  let addedSorted = 0;
-  pendingImport.sortedEntries.forEach(e => {
-    if (!existingSortedKeys.has(sortedKey(e))){ sortedEntries.push(e); existingSortedKeys.add(sortedKey(e)); addedSorted++; }
-  });
-
   const presortKey = e => [e.areaId, e.stream, e.weight, e.note].join('|');
-  const existingPresortKeys = new Set(presortEntries.map(presortKey));
-  let addedPresort = 0;
-  pendingImport.presortEntries.forEach(e => {
-    if (!existingPresortKeys.has(presortKey(e))){ presortEntries.push(e); existingPresortKeys.add(presortKey(e)); addedPresort++; }
-  });
+  const addedSorted = mergeByCount(sortedEntries, pendingImport.sortedEntries, sortedKey);
+  const addedPresort = mergeByCount(presortEntries, pendingImport.presortEntries, presortKey);
 
   await saveMaterials(); await saveAreas(); await saveStreamConfig(); await saveMeta(); await saveSorted(); await savePresort();
   document.getElementById('importModal').classList.remove('show');
   pendingImport = null;
   renderAll();
   showApp();
-  showToast(`Merged — added ${addedSorted} sorted entries, ${addedPresort} bags`);
+  showToast(`Merged — added ${addedSorted} sorted entries, ${addedPresort} bags (skipped ${skipped} already present)`);
 };
 
 document.getElementById('exportBtn').onclick = () => {
@@ -6723,13 +6774,15 @@ document.getElementById('exportAllChartsSvgBtn').onclick = () => {
 // narrow screens), so nav.tabs' own sticky offset is measured rather than hardcoded — it
 // should start sticking exactly where the header stops.
 function updateHeaderStickyTop(){
-  const header = document.querySelector('header');
   const nav = document.querySelector('nav.tabs');
-  if (!header || !nav) return;
-  nav.style.top = header.offsetHeight + 'px';
-  document.documentElement.style.setProperty('--sticky-offset', (header.offsetHeight + nav.offsetHeight) + 'px');
+  if (!nav) return;
+  document.documentElement.style.setProperty('--sticky-offset', nav.offsetHeight + 'px');
 }
 window.addEventListener('resize', updateHeaderStickyTop);
+(function observeTabBar(){
+  const nav = document.querySelector('nav.tabs');
+  if (nav && window.ResizeObserver) new ResizeObserver(updateHeaderStickyTop).observe(nav);
+})();
 
 // ============================================================
 // Init
