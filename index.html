@@ -591,7 +591,7 @@
         </div>
 
         <div class="config-subpanel" id="configSubpanel-streams">
-          <p class="note">Renaming a stream updates every material's target list and every logged entry to match. Removing a stream also deletes any entries logged under it. One stream is the landfill baseline every diversion figure is measured against — it can be renamed and reassigned (“Set as baseline”), but not deleted.</p>
+          <p class="note">Renaming a stream updates every material's target list (including links to a not-yet-present stream) and every logged entry to match. Removing a stream also deletes any entries logged under it. One stream is the landfill baseline every diversion figure is measured against — it can be renamed and reassigned (“Set as baseline”), but not deleted.</p>
           <div id="streamsForm"></div>
         </div>
 
@@ -1338,7 +1338,13 @@ let scenarioEdited = false;
 let applyingScenario = false;
 let auditMeta = {};
 AUDIT_FIELDS.forEach(f => auditMeta[f.key] = f.default);
-auditMeta.auditDate = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+// Local calendar date as YYYY-MM-DD. toISOString() is UTC, which near midnight gives the
+// wrong day (after 7 pm in New York it already returns tomorrow).
+function localDateStr(d = new Date()){
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+auditMeta.auditDate = localDateStr(); // YYYY-MM-DD
 
 let sortedEntries = [];   // {areaId, stream, materialId, materialName, weight, note, ts}
 let presortEntries = [];  // {areaId, stream, weight, note, ts}
@@ -2234,7 +2240,10 @@ function renderStreamsForm(){
       }
       const oldName = s.name;
       s.name = newName;
-      materials.forEach(m => { m.targets = m.targets.map(t => t === oldName ? newName : t); });
+      materials.forEach(m => {
+        m.targets = m.targets.map(t => t === oldName ? newName : t);
+        if (Array.isArray(m.ghostTargets)) m.ghostTargets = m.ghostTargets.map(t => t === oldName ? newName : t);
+      });
       sortedEntries.forEach(e => { if (e.stream === oldName) e.stream = newName; });
       presortEntries.forEach(e => { if (e.stream === oldName) e.stream = newName; });
       applyStreamConfig(streamConfig);
@@ -2334,6 +2343,9 @@ function renderStreamsForm(){
           materials.forEach(m => {
             m.targets = m.targets.filter(t => t !== removedName);
             if (m.targets.length === 0 && m.divertible !== 'Unacceptable') m.targets = [defaultFallbackStream()];
+            // Same for links to a "not present yet" stream; an emptied list behaves exactly
+            // like a material that never had any (materialGhostTargets treats both as []).
+            if (Array.isArray(m.ghostTargets)) m.ghostTargets = m.ghostTargets.filter(t => t !== removedName);
           });
           sortedEntries = sortedEntries.filter(e => e.stream !== removedName);
           presortEntries = presortEntries.filter(e => e.stream !== removedName);
@@ -3098,7 +3110,7 @@ async function performNewSessionReset(){
   activeScenarioId = startScenario.id;
   scenarioEdited = false;
   AUDIT_FIELDS.forEach(f => auditMeta[f.key] = f.default);
-  auditMeta.auditDate = new Date().toISOString().slice(0,10);
+  auditMeta.auditDate = localDateStr();
   // applyingScenario must still be true through these saves — saveMaterials/saveAreas/
   // saveStreamConfig would otherwise see scenarioEdited=false and immediately flip it back
   // to true via markScenarioEdited(), undoing the reset just above.
@@ -4551,7 +4563,7 @@ function exportClientSite(){
 // scopeLabel is never empty: every export carries a scope part, "All_Areas" when no Filter is
 // active.
 function exportFileBase(scopeLabel){
-  const dateStr = new Date().toISOString().slice(0,10);
+  const dateStr = localDateStr();
   return `${exportClientSite()}_${scopeLabel}_${dateStr}`;
 }
 // Single-file name: "<client>_<site>_<scope>_<today>_<title_slug>.<ext>" — the same
@@ -4719,7 +4731,7 @@ const DIVERSION_SERIES = {
       desc: 'if the materials were placed correctly (materials marked Unacceptable are not counted)',
       getValue: g => g.globalPotential},
   C: {color: DIVERSION_POTENTIAL_COLOR, dash: '4 1.5 1 1.5', sw: 1.5, label: 'Potential diversion rate with new programs',
-      desc: 'if the materials were correctly placed (materials marked Unacceptable are not counted)',
+      desc: 'if the materials were correctly placed (materials marked Unacceptable are not counted, except those the new programs would accept)',
       getValue: g => g.ghostPotential},
 };
 function buildDiversionTrackSvg(title, groups, opts){
@@ -5473,7 +5485,8 @@ function buildSummaryTablesHtml(scope){
     const t5Headers = [groupColLabel,'Current Diversion Rate','Potential Diversion Rate','Programs Applied Everywhere Potential Diversion Rate',
       ...t5GhostNames.map(name => `Programs Applied Everywhere + ${name}`)];
     html += renderAnalysisTable('Current v Potential Diversion', t5Headers, t5Html, 'wrap-headers', false,
-      'Potential rates exclude materials marked Unacceptable; the Current rate uses all logged weight, so the gap compares two different totals.');
+      'Potential rates exclude materials marked Unacceptable; the Current rate uses all logged weight, so the gap compares two different totals.'
+      + (t5GhostNames.length ? ' In the new-programs columns, an Unacceptable material that the new program would accept stays in the total.' : ''));
   }
 
   return html;
@@ -5735,11 +5748,15 @@ function buildWorkbook(){
   function excelSafeSheetName(raw){
     let s = String(raw).replace(/[\\\/\?\*\[\]:]/g, ' ').trim();
     if (!s) s = 'Sheet';
-    if (s.length > 31) s = s.slice(0, 31);
+    // Cutting at 31 characters can leave a dangling "(", "&", "-" or space ("Hughes Hubbard &
+    // Reed Kitchen (") — trim that off whenever a name is shortened.
+    const trimCut = t => t.replace(/[\s(\[{\-\u2013\u2014,;:.&+\/]+$/, '') || t;
+    if (s.length > 31) s = trimCut(s.slice(0, 31));
     let candidate = s, n = 2;
     while (usedSheetNames.has(candidate.toLowerCase())){
       const suffix = ` (${n})`;
-      candidate = s.slice(0, 31 - suffix.length) + suffix;
+      const room = 31 - suffix.length;
+      candidate = (s.length > room ? trimCut(s.slice(0, room)) : s) + suffix;
       n++;
     }
     usedSheetNames.add(candidate.toLowerCase());
@@ -6145,8 +6162,24 @@ function buildWorkbook(){
   }
 
   XLSX.utils.book_append_sheet(wb, makeSheet(buildSummarySheetRows(null, true)), excelSafeSheetName('Overall Summary'));
+  // Per-area sheets: several areas can share a name across tenants ("Office Summary",
+  // "Office Summary (2)", ...) and long names get cut to 31 characters, so each sheet states
+  // its full area and Generator/Grouping in G1:H2 — beside Table 1's title and header (which
+  // only reach column E), so no existing row or formula moves.
   areas.forEach(a => {
-    XLSX.utils.book_append_sheet(wb, makeSheet(buildSummarySheetRows(a.id, false)), excelSafeSheetName(`${a.name} Summary`));
+    const rows = buildSummarySheetRows(a.id, false);
+    const putLabel = (r, label, value) => {
+      while (rows[r].length < 6) rows[r].push(null);
+      rows[r][6] = label; rows[r][7] = value;
+    };
+    putLabel(0, 'Area', a.name);
+    putLabel(1, 'Generator/Grouping', a.rollup || '');
+    const ws = makeSheet(rows);
+    const cols = [];
+    cols[6] = {wch: 20};
+    cols[7] = {wch: Math.max(22, String(a.name).length + 2, String(a.rollup || '').length + 2)};
+    ws['!cols'] = cols;
+    XLSX.utils.book_append_sheet(wb, ws, excelSafeSheetName(`${a.name} Summary`));
   });
 
   // Notes & Assumptions
@@ -6171,17 +6204,27 @@ function buildWorkbook(){
     return Object.values(groups).filter(g => g.length > 1);
   }
   const listFmt = new Intl.ListFormat('en', {style:'long', type:'conjunction'});
+  // Streams in a group only share SOME materials: a material that lists several of them as
+  // targets is correctly placed in any of them, but one that lists only one of them (e.g.
+  // Mixed Paper → Mixed Recycling only) is still contamination in the others.
   const groupNotes = contaminationStreamGroups().map(g =>
-    `${listFmt.format(g)} are treated as the same underlying program for contamination purposes — a material accepted in any of them is not counted as contamination when found in another.`
+    `${listFmt.format(g)} share some materials (a material that lists several of them as targets is counted as correctly placed in any of them). A material that lists only one of them is counted as contamination when found in the ${g.length > 2 ? 'others' : 'other'}.`
   );
+  // One line per present stream that's weighed and sorted in one step (combinedWeighSort),
+  // instead of a hard-coded "Cardboard Recycling" line that appeared even when no such stream
+  // existed.
+  const presentForNotes = new Set(presentStreamNames());
+  const looseWeighNotes = streamConfig
+    .filter(sc => sc.combinedWeighSort && presentForNotes.has(sc.name))
+    .map(sc => `${sc.name} is weighed loose rather than bagged, so its "pre-sort total" is the same as its sorted total (100% sorted by definition, no extrapolation needed).`);
   const notesRows = [
     ['Notes & Assumptions'], [],
     ['Total Waste Generation reflects the full pre-sort weight for each stream — everything that went on the scale — not just the portion that was hand-sorted into materials. The material breakdown is extrapolated: whatever percentage each material represented in the sorted sample is applied to the full pre-sort weight for that area/stream.'], [],
-    ['Cardboard Recycling is weighed loose rather than bagged, so its "pre-sort total" is the same as its sorted total (100% sorted by definition, no extrapolation needed).'], [],
+    ...looseWeighNotes.flatMap(n => [[n], []]),
     ...groupNotes.flatMap(n => [[n], []]),
     ['Any area with pre-sort weight but zero sorted-material rows (nothing was hand-sorted there) is reported as its own "[Area] Waste" line rather than folded into a stream it was never actually sorted into.'], [],
     ['Streams flagged "Not diverted" (Streams sheet, not_diverted column) are excluded from the correctly-diverted calculation (Current diversion), the same as in the tool; Potential diversion is unaffected by the flag.'], [],
-    ['Potential diversion rates (Potential, Programs Applied Everywhere and the new-programs scenarios) exclude materials marked Divertible = "Unacceptable" from the total they are divided by. The Current diversion rate divides by all logged weight, so the gap between them compares two different totals.'], [],
+    ['Potential diversion rates (Potential and Programs Applied Everywhere) exclude materials marked Divertible = "Unacceptable" from the total they are divided by. In the new-programs scenarios, an Unacceptable material that the new program would accept stays in the total, because it is counted in that scenario\'s ceiling. The Current diversion rate divides by all logged weight, so the gap between them compares two different totals.'], [],
     ['"Currently Divertible?" is pulled live from the Materials Master tab for this site\u2019s specific recycling program, so it stays consistent across every summary sheet automatically.'],
   ];
   XLSX.utils.book_append_sheet(wb, makeSheet(notesRows), 'Notes & Assumptions');
@@ -6586,7 +6629,7 @@ document.getElementById('exportBtn').onclick = () => {
   const clientSlug = slugifyForFilename(auditMeta.clientName, 'Client');
   const accountSlug = slugifyForFilename(auditMeta.account, 'Account');
   const siteSlug = slugifyForFilename(auditMeta.siteName, 'Site');
-  const dateStr = new Date().toISOString().slice(0,10);
+  const dateStr = localDateStr();
   XLSX.writeFile(wb, `${clientSlug}_${accountSlug}_${siteSlug}_Field Data_${dateStr}.xlsx`);
   showToast(configOnly ? 'Config exported (no entries logged yet)' : 'Excel file downloaded');
 };
